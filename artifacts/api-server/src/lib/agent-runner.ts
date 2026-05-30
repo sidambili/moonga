@@ -9,6 +9,41 @@ import { GITHUB_TOOLS } from "./github-tools";
 
 const MAX_STEPS = 10;
 const MAX_PAYLOAD_CHARS = 2_000;
+const MAX_CONTEXT_CHARS = 15_000;
+
+function extractKeywords(payload: Record<string, unknown>): string[] {
+  const data = payload.data as Record<string, unknown> | undefined;
+  const title = (data?.title as string) ?? "";
+  const description = (data?.description as string) ?? "";
+  const text = `${title} ${description}`.toLowerCase();
+  // Filter out common stop words, keep meaningful tokens
+  const stopWords = new Set(["the", "a", "an", "in", "on", "at", "to", "for", "of", "with", "and", "or", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "shall", "can", "this", "that", "these", "those", "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", "my", "your", "his", "her", "its", "our", "their", "fix", "bug", "issue", "error", "problem", "feature", "request"]);
+  const tokens = text
+    .replace(/[^a-z0-9_\-/\.\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 2 && !stopWords.has(t));
+  // Deduplicate and limit
+  return Array.from(new Set(tokens)).slice(0, 8);
+}
+
+async function fetchFileContent(
+  client: Octokit,
+  owner: string,
+  repo: string,
+  path: string,
+): Promise<string | null> {
+  try {
+    const { data } = await client.rest.repos.getContent({ owner, repo, path });
+    if (Array.isArray(data)) return null;
+    if ("content" in data && typeof data.content === "string") {
+      const decoded = Buffer.from(data.content, "base64").toString("utf8");
+      return decoded;
+    }
+  } catch (err) {
+    logger.warn({ err, path }, "Failed to fetch file content");
+  }
+  return null;
+}
 
 interface StepRecord {
   role: "user" | "assistant" | "tool";
@@ -40,12 +75,14 @@ async function gatherEventContext(
   eventType: string,
   payload: Record<string, unknown>,
   githubToken: string | undefined,
+  repoId?: string,
 ): Promise<string> {
   if (!githubToken) return "";
 
   const repo = payload.repository as { full_name?: string } | undefined;
-  if (!repo?.full_name) return "";
-  const [owner, repoName] = repo.full_name.split("/");
+  const repoFullName = repo?.full_name || repoId;
+  if (!repoFullName) return "";
+  const [owner, repoName] = repoFullName.split("/");
   if (!owner || !repoName) return "";
 
   const client = new Octokit({ auth: githubToken });
@@ -111,6 +148,47 @@ async function gatherEventContext(
           }
         } catch (err) {
           parts.push(`Could not fetch commit ${sha}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+
+    if (eventType === "ticket_created") {
+      // 1. Fetch README
+      try {
+        const readmeContent = await fetchFileContent(client, owner, repoName, "README.md");
+        if (readmeContent) {
+          parts.push(`README.md:\n${readmeContent.slice(0, 3_000)}`);
+        }
+      } catch (err) {
+        parts.push(`Could not fetch README: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      // 2. Extract keywords and find relevant source files
+      const keywords = extractKeywords(payload);
+      if (keywords.length > 0) {
+        parts.push(`Keywords extracted from ticket: ${keywords.join(", ")}`);
+        try {
+          const { data: tree } = await client.rest.git.getTree({ owner, repo: repoName, tree_sha: "HEAD", recursive: "1" });
+          const matchingFiles = tree.tree
+            .filter((e): e is typeof e & { path: string } => e.type === "blob" && typeof e.path === "string")
+            .filter((e) => keywords.some((k) => e.path.toLowerCase().includes(k)))
+            .slice(0, 10);
+
+          if (matchingFiles.length > 0) {
+            parts.push("Relevant source files:");
+            for (const f of matchingFiles) {
+              const content = await fetchFileContent(client, owner, repoName, f.path);
+              if (content) {
+                parts.push(`--- ${f.path} ---\n${content.slice(0, 2_500)}`);
+              } else {
+                parts.push(`--- ${f.path} --- (could not fetch content)`);
+              }
+            }
+          } else {
+            parts.push("No source files matched the extracted keywords.");
+          }
+        } catch (err) {
+          parts.push(`Could not search repo tree: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     }
@@ -341,6 +419,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     event.event_type,
     event.payload_raw as Record<string, unknown>,
     githubToken,
+    event.repo_id ?? undefined,
   );
 
   const messages = buildInitialMessages(

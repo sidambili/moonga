@@ -33,13 +33,34 @@ function extractTitle(source: string, payload: Record<string, unknown>): string 
   if (source === "github" && payload.pull_request) return (payload.pull_request as Record<string, unknown>).title as string || "GitHub PR";
   if (source === "github" && payload.head_commit) return `Push: ${(payload.head_commit as Record<string, unknown>).message as string || "commit"}`;
   if (source === "linear") return (payload.data as Record<string, unknown>)?.title as string || "Linear ticket";
-  if (source === "sentry") return (payload.data as Record<string, unknown>)?.error?.title as string || "Sentry error";
+  if (source === "sentry") {
+    const err = ((payload.data as Record<string, unknown>)?.error as Record<string, unknown> | undefined);
+    return (err?.title as string) || "Sentry error";
+  }
   if (source === "betterstack") return "Better Stack alert";
   if (source === "slack") return "Slack message";
   return `${source} event`;
 }
 
-async function ingestWebhook(source: string, payload: Record<string, unknown>) {
+function getLinearTeamName(payload: Record<string, unknown>): string | undefined {
+  const data = payload.data as Record<string, unknown> | undefined;
+  const team = data?.team as Record<string, unknown> | undefined;
+  return team?.name as string | undefined;
+}
+
+function isEngineeringTeam(teamName: string | undefined): boolean {
+  if (!teamName) return false;
+  const allowed = (process.env.LINEAR_ENG_TEAM_NAMES ?? "Engineering")
+    .split(",")
+    .map((s) => s.trim().toLowerCase());
+  return allowed.includes(teamName.toLowerCase());
+}
+
+function getLinearRepoId(): string | undefined {
+  return process.env.LINEAR_DEFAULT_REPO;
+}
+
+async function ingestWebhook(source: string, payload: Record<string, unknown>, repoId?: string) {
   const eventType = detectEventType(source, payload);
   const severity = detectSeverity(source, payload);
   const title = extractTitle(source, payload);
@@ -50,6 +71,7 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>) {
     severity,
     status: "new",
     title,
+    repo_id: repoId ?? null,
     payload_raw: payload,
   }).returning();
 
@@ -73,8 +95,15 @@ router.post("/github", async (req, res) => {
 });
 
 router.post("/linear", async (req, res) => {
-  const { event, session } = await ingestWebhook("linear", req.body);
-  res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
+  const teamName = getLinearTeamName(req.body);
+  if (!isEngineeringTeam(teamName)) {
+    return res.status(202).json({
+      accepted: false,
+      reason: `Team '${teamName ?? "unknown"}' is not in the engineering list`,
+    });
+  }
+  const { event, session } = await ingestWebhook("linear", req.body, getLinearRepoId());
+  return res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
 });
 
 router.post("/sentry", async (req, res) => {
@@ -92,7 +121,7 @@ router.post("/slack", async (req, res) => {
     return res.json({ challenge: req.body.challenge });
   }
   const { event, session } = await ingestWebhook("slack", req.body);
-  res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
+  return res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
 });
 
 export default router;
