@@ -1,9 +1,20 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { db } from "@workspace/db";
 import { eventsTable, sessionsTable, integrationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router = Router();
+
+function verifySlackRequest(signingSecret: string, timestamp: string, rawBody: string, signature: string): boolean {
+  const sigBasestring = `v0:${timestamp}:${rawBody}`;
+  const mySignature = "v0=" + crypto.createHmac("sha256", signingSecret).update(sigBasestring).digest("hex");
+  try {
+    return crypto.timingSafeEqual(Buffer.from(mySignature, "utf8"), Buffer.from(signature, "utf8"));
+  } catch {
+    return false;
+  }
+}
 
 const GITHUB_EVENT_TYPE_MAP: Record<string, string> = {
   issues: "issues",
@@ -189,6 +200,27 @@ router.post("/slack", async (req, res) => {
   if (req.body.type === "url_verification") {
     return res.json({ challenge: req.body.challenge });
   }
+
+  const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "slack"));
+  if (!row?.enabled) {
+    return res.status(202).json({ accepted: false, reason: "Slack integration disabled" });
+  }
+
+  const rawBody = (req as unknown as Record<string, unknown> & { rawBody?: string }).rawBody ?? "";
+  const signature = req.headers["x-slack-signature"] as string | undefined;
+  const timestamp = req.headers["x-slack-request-timestamp"] as string | undefined;
+
+  if (row.webhook_secret && signature && timestamp) {
+    const now = Math.floor(Date.now() / 1000);
+    const ts = Number(timestamp);
+    if (Number.isNaN(ts) || Math.abs(now - ts) > 300) {
+      return res.status(400).json({ accepted: false, reason: "Request timestamp too old or invalid" });
+    }
+    if (!verifySlackRequest(row.webhook_secret, timestamp, rawBody, signature)) {
+      return res.status(400).json({ accepted: false, reason: "Invalid Slack signature" });
+    }
+  }
+
   const { event, session } = await ingestWebhook("slack", req.body);
   return res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
 });

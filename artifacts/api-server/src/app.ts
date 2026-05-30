@@ -32,7 +32,13 @@ app.use((req, res, next) => {
   res.setHeader("Expires", "0");
   next();
 });
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as unknown as Record<string, unknown> & { rawBody?: string }).rawBody = buf.toString("utf8");
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);

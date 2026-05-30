@@ -159,24 +159,69 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
         </div>
       </div>
 
-      {/* API Key */}
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">
-          API Key
-          {current?.api_key_masked && (
-            <span className="text-emerald-400 ml-1.5">(set: {current.api_key_masked})</span>
-          )}
-        </Label>
-        <Input
-          type="password"
-          placeholder="Enter new API key to update…"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          className="bg-muted/50 border-border/60 rounded-lg text-sm"
-        />
-      </div>
+      {/* API Key — shown for all providers except slack (which has its own Bot Token field) */}
+      {provider.id !== "slack" && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">
+            API Key
+            {current?.api_key_masked && (
+              <span className="text-emerald-400 ml-1.5">(set: {current.api_key_masked})</span>
+            )}
+          </Label>
+          <Input
+            type="password"
+            placeholder="Enter new API key to update…"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="bg-muted/50 border-border/60 rounded-lg text-sm"
+          />
+        </div>
+      )}
 
-      {provider.id === "github" ? (
+      {provider.id === "slack" ? (
+        <>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Bot User OAuth Token
+              {current?.api_key_masked && (
+                <span className="text-emerald-400 ml-1.5">(set: {current.api_key_masked})</span>
+              )}
+            </Label>
+            <Input
+              type="password"
+              placeholder="xoxb-..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="bg-muted/50 border-border/60 rounded-lg text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground">Used later to post messages back to Slack channels.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Events API Request URL</Label>
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg border border-border/60 px-3 py-2">
+              <code className="text-xs flex-1 truncate text-foreground">{webhookUrl}</code>
+              <CopyButton value={webhookUrl} />
+            </div>
+            <p className="text-[11px] text-muted-foreground">Paste this into Slack App → Event Subscriptions → Request URL.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Signing Secret
+              {current?.webhook_secret && <span className="text-emerald-400 ml-1.5">(set)</span>}
+            </Label>
+            <Input
+              type="password"
+              placeholder="Enter Slack signing secret…"
+              value={webhookSecret}
+              onChange={(e) => setWebhookSecret(e.target.value)}
+              className="bg-muted/50 border-border/60 rounded-lg text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground">From Slack App → Basic Information → Signing Secret. Verifies incoming webhooks.</p>
+          </div>
+        </>
+      ) : provider.id === "github" ? (
         <>
           {/* Incoming Events */}
           <div className="space-y-3 pt-2 border-t border-border/40">
