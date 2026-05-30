@@ -148,6 +148,8 @@ export const ListSessionsResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -189,6 +191,8 @@ export const GetSessionResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -228,6 +232,8 @@ export const RetrySessionResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -312,6 +318,8 @@ export const ListArtifactsResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -361,6 +369,8 @@ export const GetArtifactResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -408,6 +418,8 @@ export const ApproveArtifactResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -455,6 +467,8 @@ export const RejectArtifactResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -506,6 +520,8 @@ export const EditArtifactResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({

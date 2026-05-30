@@ -23,6 +23,10 @@ export interface Session {
   output_summary?: string | null;
   /** @nullable */
   confidence_score?: number | null;
+  /** @nullable */
+  step_count?: number | null;
+  /** @nullable */
+  total_cost?: number | null;
   created_at: string;
   updated_at: string;
   event?: Event;

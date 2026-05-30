@@ -113,6 +113,19 @@ export default function Sessions() {
                     <Confidence score={session.confidence_score} />
                     <span className="text-xs text-muted-foreground">{formatRelative(session.updated_at)}</span>
                   </div>
+                  {(session.step_count != null && session.step_count > 0) && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-muted-foreground/60">{session.step_count} steps</span>
+                      {session.total_cost != null && session.total_cost > 0 && (
+                        <>
+                          <span className="text-[10px] text-muted-foreground/30">·</span>
+                          <span className="text-[10px] text-muted-foreground/60">
+                            {session.total_cost < 0.001 ? "<$0.001" : `$${session.total_cost.toFixed(4)}`}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 flex-shrink-0 self-center hidden md:block" />
               </div>

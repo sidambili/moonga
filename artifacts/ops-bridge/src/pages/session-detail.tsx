@@ -7,6 +7,7 @@ import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 import Markdown from "@/components/markdown";
+import SessionTrace from "@/components/session-trace";
 
 const objectiveColors: Record<string, string> = {
   diagnose: "bg-orange-500/10 text-orange-400",
@@ -158,6 +159,9 @@ export default function SessionDetail() {
           </pre>
         </div>
       )}
+
+      {/* Reasoning trace */}
+      <SessionTrace sessionId={session.id} totalCost={session.total_cost} />
 
       <div className="flex justify-end">
         <Link href={`/artifacts?session_id=${session.id}`}>

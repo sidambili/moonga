@@ -666,6 +666,10 @@ components:
           type: ["string", "null"]
         confidence_score:
           type: ["number", "null"]
+        step_count:
+          type: ["integer", "null"]
+        total_cost:
+          type: ["number", "null"]
         created_at:
           type: string
         updated_at:

@@ -19,6 +19,8 @@ router.get("/", async (req, res) => {
       db.select({
         session: sessionsTable,
         event: eventsTable,
+        step_count: sql<number>`(SELECT COUNT(*)::int FROM session_steps WHERE session_steps.session_id = ${sessionsTable.id})`,
+        total_cost: sql<number>`(SELECT SUM(session_steps.cost) FROM session_steps WHERE session_steps.session_id = ${sessionsTable.id})`,
       })
         .from(sessionsTable)
         .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
@@ -29,7 +31,7 @@ router.get("/", async (req, res) => {
       db.select({ count: sql<number>`count(*)::int` }).from(sessionsTable).where(where),
     ]);
 
-    const items = rows.map(({ session, event }) => ({ ...session, event }));
+    const items = rows.map(({ session, event, step_count, total_cost }) => ({ ...session, event, step_count, total_cost }));
     return res.json({ items, total: count });
   } catch {
     return res.status(500).json({ error: "Failed to list sessions" });
@@ -39,13 +41,18 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [row] = await db.select({ session: sessionsTable, event: eventsTable })
+    const [row] = await db.select({
+      session: sessionsTable,
+      event: eventsTable,
+      step_count: sql<number>`(SELECT COUNT(*)::int FROM session_steps WHERE session_steps.session_id = ${sessionsTable.id})`,
+      total_cost: sql<number>`(SELECT SUM(session_steps.cost) FROM session_steps WHERE session_steps.session_id = ${sessionsTable.id})`,
+    })
       .from(sessionsTable)
       .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
       .where(eq(sessionsTable.id, id));
 
     if (!row) return res.status(404).json({ error: "Session not found" });
-    return res.json({ ...row.session, event: row.event });
+    return res.json({ ...row.session, event: row.event, step_count: row.step_count, total_cost: row.total_cost });
   } catch {
     return res.status(500).json({ error: "Failed to get session" });
   }
@@ -61,7 +68,7 @@ router.post("/:id/retry", async (req, res) => {
     if (!updated) return res.status(404).json({ error: "Session not found" });
 
     const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, updated.event_id));
-    return res.json({ ...updated, event });
+    return res.json({ ...updated, event, step_count: 0, total_cost: null });
   } catch {
     return res.status(500).json({ error: "Failed to retry session" });
   }
