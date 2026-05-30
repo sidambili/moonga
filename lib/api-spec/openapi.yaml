@@ -688,6 +688,12 @@ components:
           type: ["string", "null"]
         tokens_used:
           type: ["integer", "null"]
+        prompt_tokens:
+          type: ["integer", "null"]
+        completion_tokens:
+          type: ["integer", "null"]
+        cost:
+          type: ["number", "null"]
         created_at:
           type: string
 

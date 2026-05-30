@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, real, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,6 +14,9 @@ export const sessionStepsTable = pgTable("session_steps", {
   tool_result: jsonb("tool_result"),
   model: text("model"),
   tokens_used: integer("tokens_used"),
+  prompt_tokens: integer("prompt_tokens"),
+  completion_tokens: integer("completion_tokens"),
+  cost: real("cost"),
   created_at: timestamp("created_at").notNull().defaultNow(),
 });
 
