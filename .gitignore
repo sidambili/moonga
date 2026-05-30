@@ -48,6 +48,10 @@ Thumbs.db
 .cache/
 .local/
 
+# Capacitor native projects
+ios/
+android/
+
 # Environment variables
 .env
 .env.local
