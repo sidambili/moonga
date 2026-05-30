@@ -30,9 +30,9 @@ router.get("/", async (req, res) => {
     ]);
 
     const items = rows.map(({ session, event }) => ({ ...session, event }));
-    res.json({ items, total: count });
+    return res.json({ items, total: count });
   } catch {
-    res.status(500).json({ error: "Failed to list sessions" });
+    return res.status(500).json({ error: "Failed to list sessions" });
   }
 });
 
@@ -45,9 +45,9 @@ router.get("/:id", async (req, res) => {
       .where(eq(sessionsTable.id, id));
 
     if (!row) return res.status(404).json({ error: "Session not found" });
-    res.json({ ...row.session, event: row.event });
+    return res.json({ ...row.session, event: row.event });
   } catch {
-    res.status(500).json({ error: "Failed to get session" });
+    return res.status(500).json({ error: "Failed to get session" });
   }
 });
 
@@ -61,9 +61,9 @@ router.post("/:id/retry", async (req, res) => {
     if (!updated) return res.status(404).json({ error: "Session not found" });
 
     const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, updated.event_id));
-    res.json({ ...updated, event });
+    return res.json({ ...updated, event });
   } catch {
-    res.status(500).json({ error: "Failed to retry session" });
+    return res.status(500).json({ error: "Failed to retry session" });
   }
 });
 
@@ -75,9 +75,9 @@ router.get("/:id/steps", async (req, res) => {
       .from(sessionStepsTable)
       .where(eq(sessionStepsTable.session_id, id))
       .orderBy(sessionStepsTable.step_number);
-    res.json(steps);
+    return res.json(steps);
   } catch {
-    res.status(500).json({ error: "Failed to get session steps" });
+    return res.status(500).json({ error: "Failed to get session steps" });
   }
 });
 

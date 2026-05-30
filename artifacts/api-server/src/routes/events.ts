@@ -23,9 +23,9 @@ router.get("/", async (req, res) => {
       db.select({ count: sql<number>`count(*)::int` }).from(eventsTable).where(where),
     ]);
 
-    res.json({ items, total: count });
+    return res.json({ items, total: count });
   } catch (err) {
-    res.status(500).json({ error: "Failed to list events" });
+    return res.status(500).json({ error: "Failed to list events" });
   }
 });
 
@@ -34,9 +34,9 @@ router.get("/:id", async (req, res) => {
     const id = Number(req.params.id);
     const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, id));
     if (!event) return res.status(404).json({ error: "Event not found" });
-    res.json(event);
+    return res.json(event);
   } catch {
-    res.status(500).json({ error: "Failed to get event" });
+    return res.status(500).json({ error: "Failed to get event" });
   }
 });
 

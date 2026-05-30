@@ -30,9 +30,9 @@ router.get("/", async (req, res) => {
     ]);
 
     const hydrated = await Promise.all(items.map(hydrateArtifact));
-    res.json({ items: hydrated, total: count });
+    return res.json({ items: hydrated, total: count });
   } catch {
-    res.status(500).json({ error: "Failed to list artifacts" });
+    return res.status(500).json({ error: "Failed to list artifacts" });
   }
 });
 
@@ -41,9 +41,9 @@ router.get("/:id", async (req, res) => {
     const id = Number(req.params.id);
     const [artifact] = await db.select().from(artifactsTable).where(eq(artifactsTable.id, id));
     if (!artifact) return res.status(404).json({ error: "Artifact not found" });
-    res.json(await hydrateArtifact(artifact));
+    return res.json(await hydrateArtifact(artifact));
   } catch {
-    res.status(500).json({ error: "Failed to get artifact" });
+    return res.status(500).json({ error: "Failed to get artifact" });
   }
 });
 
@@ -60,9 +60,9 @@ router.post("/:id/approve", async (req, res) => {
       .set({ status: "approved", updated_at: new Date() })
       .where(eq(sessionsTable.id, updated.session_id));
 
-    res.json(await hydrateArtifact(updated));
+    return res.json(await hydrateArtifact(updated));
   } catch {
-    res.status(500).json({ error: "Failed to approve artifact" });
+    return res.status(500).json({ error: "Failed to approve artifact" });
   }
 });
 
@@ -79,9 +79,9 @@ router.post("/:id/reject", async (req, res) => {
       .set({ status: "rejected", updated_at: new Date() })
       .where(eq(sessionsTable.id, updated.session_id));
 
-    res.json(await hydrateArtifact(updated));
+    return res.json(await hydrateArtifact(updated));
   } catch {
-    res.status(500).json({ error: "Failed to reject artifact" });
+    return res.status(500).json({ error: "Failed to reject artifact" });
   }
 });
 
@@ -97,9 +97,9 @@ router.patch("/:id/edit", async (req, res) => {
       .returning();
     if (!updated) return res.status(404).json({ error: "Artifact not found" });
 
-    res.json(await hydrateArtifact(updated));
+    return res.json(await hydrateArtifact(updated));
   } catch {
-    res.status(500).json({ error: "Failed to edit artifact" });
+    return res.status(500).json({ error: "Failed to edit artifact" });
   }
 });
 
