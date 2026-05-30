@@ -70,6 +70,42 @@ export interface SessionList {
   total: number;
 }
 
+export type SessionStepToolCallsItem = { [key: string]: unknown };
+
+/**
+ * @nullable
+ */
+export type SessionStepToolResult = { [key: string]: unknown } | null;
+
+export interface SessionStep {
+  id: number;
+  session_id: number;
+  step_number: number;
+  /** user | assistant | tool */
+  role: string;
+  /** @nullable */
+  content?: string | null;
+  /** @nullable */
+  tool_calls?: SessionStepToolCallsItem[] | null;
+  /** @nullable */
+  tool_call_id?: string | null;
+  /** @nullable */
+  tool_name?: string | null;
+  /** @nullable */
+  tool_result?: SessionStepToolResult;
+  /** @nullable */
+  model?: string | null;
+  /** @nullable */
+  tokens_used?: number | null;
+  /** @nullable */
+  prompt_tokens?: number | null;
+  /** @nullable */
+  completion_tokens?: number | null;
+  /** @nullable */
+  cost?: number | null;
+  created_at: string;
+}
+
 export interface Artifact {
   id: number;
   session_id: number;
@@ -126,6 +162,14 @@ export interface IntegrationInput {
   webhook_secret?: string | null;
   /** @nullable */
   config?: IntegrationInputConfig;
+}
+
+export interface Repo {
+  id: number;
+  full_name: string;
+  name: string;
+  owner: string;
+  private: boolean;
 }
 
 export interface ModelSettings {
@@ -212,33 +256,4 @@ session_id?: number;
 limit?: number;
 offset?: number;
 };
-
-export interface SessionStep {
-  id: number;
-  session_id: number;
-  step_number: number;
-  /** user | assistant | tool */
-  role: string;
-  /** @nullable */
-  content?: string | null;
-  /** @nullable */
-  tool_calls?: unknown[] | null;
-  /** @nullable */
-  tool_call_id?: string | null;
-  /** @nullable */
-  tool_name?: string | null;
-  /** @nullable */
-  tool_result?: unknown | null;
-  /** @nullable */
-  model?: string | null;
-  /** @nullable */
-  tokens_used?: number | null;
-  /** @nullable */
-  prompt_tokens?: number | null;
-  /** @nullable */
-  completion_tokens?: number | null;
-  /** @nullable */
-  cost?: number | null;
-  created_at: string;
-}
 
