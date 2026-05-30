@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost } from "./model-prices";
 
-const MAX_STEPS = 5;
+const MAX_STEPS = 8;
 const MAX_TOOL_CALLS = 20;
 const MAX_PAYLOAD_CHARS = 2_000;
 
@@ -182,7 +182,6 @@ function extractLinearTicketInfo(payload: Record<string, unknown>): string {
   const description = (data.description as string | undefined) || "";
 
   const lines = [
-    `Title: ${data.title}`,
     `State: ${state}`,
     `Priority: ${priorityLabel[data.priority as number] ?? "Unknown"}`,
     `Assignee: ${assignee}`,
@@ -258,8 +257,10 @@ Title: ${title}
 ${ticketInfo}${contextBlock}
 
 Before writing the plan:
-- Use search_code or list_directory to find the files most relevant to this ticket
-- Read those files to understand the current implementation
+- Extract 2-3 key technical terms from the title/description (function names, feature areas, module names — not generic words)
+- Use search_code with those terms to find the relevant files; fall back to list_directory if needed
+- Read the relevant files to understand the current implementation
+- If the ticket has no description, state that in the objective summary and skip to what you can infer from context
 - Base every task on what you actually find in the code
 
 Respond with:
@@ -631,8 +632,18 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     }
 
     const finalTextRaw = result.text;
-    const finalConfidence = parseConfidence(finalTextRaw);
     const finalText = stripConfidence(finalTextRaw);
+
+    if (!finalText) {
+      logger.warn({ sessionId, steps: result.steps.length }, "Agent produced no final text — marking failed");
+      await db
+        .update(sessionsTable)
+        .set({ status: "failed", failure_reason: "empty_output", model_used: modelString, updated_at: new Date() })
+        .where(eq(sessionsTable.id, sessionId));
+      return;
+    }
+
+    const finalConfidence = parseConfidence(finalTextRaw);
 
     await db
       .update(sessionsTable)
