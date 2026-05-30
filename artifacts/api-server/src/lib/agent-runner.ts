@@ -168,9 +168,15 @@ function parseConfidence(text: string): number {
   return match ? Math.min(1, Math.max(0, parseFloat(match[1]))) : 0.75;
 }
 
-function buildSystemPrompt(): string {
-  return `You are an expert SRE and engineering analyst. You analyze inbound engineering events (tickets, PRs, errors) and produce actionable, source-code-grounded analysis.
+function stripConfidence(text: string): string {
+  return text.replace(/\n?CONFIDENCE:\s*[\d.]+\s*$/im, "").trim();
+}
 
+function buildSystemPrompt(techStack?: string): string {
+  const stackLine = techStack
+    ? `\nThis repository uses ${techStack}. Use language-idiomatic patterns in your analysis.\n`
+    : "";
+  return `You are an expert SRE and engineering analyst. You analyze inbound engineering events (tickets, PRs, errors) and produce actionable, source-code-grounded analysis.${stackLine}
 You have access to GitHub repository tools to read files, list directories, and search code. Use these tools when the pre-fetched repository context is insufficient.
 
 Rules:
@@ -236,6 +242,17 @@ function getModelConfig(settings: NonNullable<Awaited<ReturnType<typeof getModel
   return openaiProvider.chat(modelString);
 }
 
+function categorizeError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const lower = msg.toLowerCase();
+  if (lower.includes("rate limit") || lower.includes("429")) return "rate_limited";
+  if (lower.includes("context length") || lower.includes("too long") || lower.includes("maximum context")) return "context_length_exceeded";
+  if (lower.includes("unauthorized") || lower.includes("401") || lower.includes("invalid api key") || lower.includes("incorrect api key")) return "unauthorized";
+  if (lower.includes("timeout") || lower.includes("etimedout")) return "timeout";
+  if (lower.includes("enotfound") || lower.includes("econnrefused")) return "network_error";
+  return "unknown";
+}
+
 function getRepoFromPayload(payload: Record<string, unknown>, repoId?: string): { owner: string; repo: string } | null {
   const repo = payload.repository as { full_name?: string } | undefined;
   const fullName = repo?.full_name || repoId;
@@ -243,6 +260,57 @@ function getRepoFromPayload(payload: Record<string, unknown>, repoId?: string): 
   const [owner, name] = fullName.split("/");
   if (!owner || !name) return null;
   return { owner, repo: name };
+}
+
+async function detectTechStack(
+  client: Octokit,
+  owner: string,
+  repoName: string,
+): Promise<string> {
+  const checks = [
+    { path: "package.json", label: "JavaScript/Node.js" },
+    { path: "Cargo.toml", label: "Rust" },
+    { path: "pyproject.toml", label: "Python" },
+    { path: "requirements.txt", label: "Python" },
+    { path: "go.mod", label: "Go" },
+    { path: "composer.json", label: "PHP" },
+    { path: "Gemfile", label: "Ruby" },
+    { path: "pom.xml", label: "Java" },
+    { path: "build.gradle", label: "Java" },
+    { path: "pubspec.yaml", label: "Dart/Flutter" },
+  ];
+
+  for (const c of checks) {
+    try {
+      const { data } = await client.rest.repos.getContent({ owner, repo: repoName, path: c.path });
+      if (!Array.isArray(data) && data.type === "file") {
+        if (c.path === "package.json") {
+          try {
+            const content = Buffer.from(data.content, "base64").toString("utf-8");
+            const pkg = JSON.parse(content);
+            const deps = Object.keys(pkg.dependencies || {});
+            const devDeps = Object.keys(pkg.devDependencies || {});
+            const all = [...deps, ...devDeps];
+            const fw: string[] = [];
+            if (all.includes("react")) fw.push("React");
+            if (all.includes("next")) fw.push("Next.js");
+            if (all.includes("vue")) fw.push("Vue");
+            if (all.includes("svelte")) fw.push("Svelte");
+            if (all.includes("express")) fw.push("Express");
+            if (all.includes("fastify")) fw.push("Fastify");
+            if (devDeps.includes("typescript") || deps.includes("typescript")) fw.push("TypeScript");
+            return `JavaScript/Node.js${fw.length ? ` — ${fw.join(", ")}` : ""}`;
+          } catch {
+            return "JavaScript/Node.js";
+          }
+        }
+        return c.label;
+      }
+    } catch {
+      // file not found
+    }
+  }
+  return "";
 }
 
 export async function runAgentSession(sessionId: number): Promise<void> {
@@ -260,7 +328,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   if (!row?.event) {
     await db
       .update(sessionsTable)
-      .set({ status: "failed", updated_at: new Date() })
+      .set({ status: "failed", failure_reason: "missing_event", updated_at: new Date() })
       .where(eq(sessionsTable.id, sessionId));
     logger.warn({ sessionId }, "Session has no associated event — marked failed");
     return;
@@ -270,7 +338,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   if (!settings?.api_key) {
     await db
       .update(sessionsTable)
-      .set({ status: "failed", updated_at: new Date() })
+      .set({ status: "failed", failure_reason: "missing_api_key", updated_at: new Date() })
       .where(eq(sessionsTable.id, sessionId));
     logger.warn({ sessionId }, "No API key in model settings — session marked failed");
     return;
@@ -285,6 +353,10 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   const githubToken = await getGithubToken();
   const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, event.repo_id ?? undefined);
 
+  const techStack = repo && githubToken
+    ? await detectTechStack(new Octokit({ auth: githubToken }), repo.owner, repo.repo)
+    : "";
+
   // Pre-fetch repository context based on event type
   const context = await gatherEventContext(
     event.event_type,
@@ -293,7 +365,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     event.repo_id ?? undefined,
   );
 
-  const systemPrompt = buildSystemPrompt();
+  const systemPrompt = buildSystemPrompt(techStack || undefined);
   const userPrompt = buildUserPrompt(
     session.objective,
     event.source,
@@ -414,8 +486,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       stepNum++;
     }
 
-    const finalText = result.text;
-    const finalConfidence = parseConfidence(finalText);
+    const finalTextRaw = result.text;
+    const finalConfidence = parseConfidence(finalTextRaw);
+    const finalText = stripConfidence(finalTextRaw);
 
     await db
       .update(sessionsTable)
@@ -443,10 +516,11 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
     logger.info({ sessionId, model: modelString, confidence: finalConfidence, steps: result.steps.length }, "Session completed → needs_review");
   } catch (err) {
-    logger.error({ err, sessionId }, "Agent loop failed");
+    const reason = categorizeError(err);
+    logger.error({ err, sessionId, reason }, "Agent loop failed");
     await db
       .update(sessionsTable)
-      .set({ status: "failed", updated_at: new Date() })
+      .set({ status: "failed", failure_reason: reason, updated_at: new Date() })
       .where(eq(sessionsTable.id, sessionId));
   }
 }

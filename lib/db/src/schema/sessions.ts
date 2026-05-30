@@ -11,6 +11,7 @@ export const sessionsTable = pgTable("sessions", {
   context_snapshot: jsonb("context_snapshot"),
   output_summary: text("output_summary"),
   confidence_score: real("confidence_score"),
+  failure_reason: text("failure_reason"),
   created_at: timestamp("created_at").notNull().defaultNow(),
   updated_at: timestamp("updated_at").notNull().defaultNow(),
 });
