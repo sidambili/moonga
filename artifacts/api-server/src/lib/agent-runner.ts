@@ -620,8 +620,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         }),
       } : undefined;
 
-      if (step.text) {
-        await persistStep(sessionId, stepNum, "assistant", step.text, modelString, stepUsage, step.toolCalls as unknown[]);
+      if (step.text || (step.toolCalls && step.toolCalls.length > 0)) {
+        await persistStep(sessionId, stepNum, "assistant", step.text ?? "", modelString, stepUsage, step.toolCalls as unknown[]);
       }
 
       for (const tr of step.toolResults ?? []) {

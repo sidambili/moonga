@@ -1,105 +1,185 @@
 import { useState } from "react";
 import { useGetSessionSteps, getGetSessionStepsQueryKey } from "@workspace/api-client-react";
 import type { SessionStep } from "@workspace/api-client-react";
-import { ChevronDown, ChevronRight, Wrench, Bot, User, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Wrench, Bot, Loader2, CornerDownRight } from "lucide-react";
 
-function formatCost(cost: number | null | undefined): string | null {
+function formatCost(cost: number | null | undefined) {
   if (cost == null || cost === 0) return null;
-  if (cost < 0.001) return `<$0.001`;
+  if (cost < 0.001) return "<$0.001";
   return `$${cost.toFixed(4)}`;
 }
 
-function formatTokens(n: number | null | undefined): string | null {
+function formatTokens(n: number | null | undefined) {
   if (n == null || n === 0) return null;
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k tok` : `${n} tok`;
 }
 
-function StepCard({ step }: { step: SessionStep }) {
-  const [open, setOpen] = useState(false);
+type ToolCall = { toolName?: string; function?: { name: string }; args?: unknown };
 
-  const isInitialPrompt = step.role === "user" && step.step_number === 0;
-  const isContextTool = step.role === "tool" && step.tool_name === "gather_event_context";
-  const defaultCollapsed = isInitialPrompt || isContextTool;
+// Group assistant-tool_calls steps with their subsequent tool-result steps
+type StepGroup =
+  | { kind: "action"; call: SessionStep; results: SessionStep[] }
+  | { kind: "message"; step: SessionStep };
 
-  const [expanded, setExpanded] = useState(!defaultCollapsed);
-
-  const tokens = formatTokens(step.tokens_used);
-  const cost = formatCost(step.cost);
-
-  let icon = <User className="w-3 h-3" />;
-  let headerLabel = "Prompt";
-  let headerCls = "text-muted-foreground";
-  let borderCls = "border-border/40";
-
-  if (step.role === "assistant") {
-    icon = <Bot className="w-3 h-3" />;
-    if (step.tool_calls && (step.tool_calls as unknown[]).length > 0) {
-      const calls = step.tool_calls as Array<{ toolName?: string; function?: { name: string } }>;
-      const names = calls.map(c => c.toolName ?? c.function?.name ?? "tool").join(", ");
-      headerLabel = `Calling: ${names}`;
-      headerCls = "text-blue-400";
-      borderCls = "border-blue-500/20";
+function groupSteps(steps: SessionStep[]): StepGroup[] {
+  const groups: StepGroup[] = [];
+  let i = 0;
+  while (i < steps.length) {
+    const s = steps[i];
+    if (s.role === "assistant" && s.tool_calls && (s.tool_calls as unknown[]).length > 0) {
+      const results: SessionStep[] = [];
+      let j = i + 1;
+      while (j < steps.length && steps[j].role === "tool") {
+        results.push(steps[j]);
+        j++;
+      }
+      groups.push({ kind: "action", call: s, results });
+      i = j;
+    } else if (s.role === "tool") {
+      groups.push({ kind: "action", call: s, results: [] });
+      i++;
     } else {
-      headerLabel = "Model reasoning";
-      headerCls = "text-emerald-400";
-      borderCls = "border-emerald-500/20";
+      groups.push({ kind: "message", step: s });
+      i++;
     }
-  } else if (step.role === "tool") {
-    icon = <Wrench className="w-3 h-3" />;
-    headerLabel = step.tool_name ?? "Tool result";
-    headerCls = "text-purple-400";
-    borderCls = "border-purple-500/20";
   }
+  return groups;
+}
 
-  const hasContent = !!(
-    step.content ||
-    (step.tool_calls && (step.tool_calls as unknown[]).length > 0) ||
-    step.tool_result
-  );
+function resultSummary(r: SessionStep): string {
+  const v = r.tool_result;
+  if (!v) return r.content?.slice(0, 100) ?? "";
+  const s = typeof v === "string" ? v : JSON.stringify(v);
+  return s.replace(/\s+/g, " ").slice(0, 100);
+}
+
+function ToolAction({ call, results }: { call: SessionStep; results: SessionStep[] }) {
+  const [open, setOpen] = useState(false);
+  const calls = (call.role === "assistant"
+    ? (call.tool_calls ?? [])
+    : []) as ToolCall[];
+  const names = calls.length
+    ? calls.map(c => c.toolName ?? c.function?.name ?? "tool")
+    : [call.tool_name ?? "tool"];
+  const preview = results[0]
+    ? resultSummary(results[0])
+    : call.role === "tool"
+    ? (call.content?.replace(/\s+/g, " ").slice(0, 100) ?? null)
+    : null;
 
   return (
-    <div className={`rounded-lg border ${borderCls} bg-card overflow-hidden`}>
+    <div>
       <button
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent/30 transition-colors"
-        onClick={() => setExpanded(e => !e)}
-        disabled={!hasContent}
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
       >
-        <span className={`flex-shrink-0 ${headerCls}`}>{icon}</span>
-        <span className={`text-[11px] font-medium flex-1 ${headerCls}`}>
-          {headerLabel}
-        </span>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {tokens && <span className="text-[10px] text-muted-foreground/60">{tokens} tok</span>}
-          {cost && <span className="text-[10px] text-muted-foreground/60">{cost}</span>}
-          {hasContent && (
-            expanded
-              ? <ChevronDown className="w-3 h-3 text-muted-foreground/40" />
-              : <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
+        <Wrench className="w-3 h-3 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <span className="text-xs font-mono text-foreground/75 block">{names.join(", ")}</span>
+          {preview && !open && (
+            <span className="text-[11px] text-muted-foreground block truncate">{preview}</span>
           )}
         </div>
+        {open
+          ? <ChevronDown className="w-3 h-3 text-muted-foreground/30 flex-shrink-0 mt-0.5" />
+          : <ChevronRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0 mt-0.5" />
+        }
       </button>
 
-      {expanded && hasContent && (
-        <div className="px-3 pb-3 border-t border-border/30">
-          {step.content && (
-            <pre className="text-xs text-foreground/80 whitespace-pre-wrap font-mono leading-relaxed mt-2 max-h-64 overflow-auto">
-              {step.content}
-            </pre>
+      {open && (
+        <div className="px-4 pb-3 ml-6 space-y-2">
+          {calls.map((c, i) =>
+            c.args != null ? (
+              <div key={i}>
+                <p className="text-[10px] text-muted-foreground/50 mb-1 flex items-center gap-1">
+                  <CornerDownRight className="w-2.5 h-2.5" /> args
+                </p>
+                <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-36 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
+                  {JSON.stringify(c.args, null, 2)}
+                </pre>
+              </div>
+            ) : null
           )}
-          {step.tool_calls && (step.tool_calls as unknown[]).length > 0 && (
-            <pre className="text-xs text-foreground/80 whitespace-pre-wrap font-mono leading-relaxed mt-2 max-h-48 overflow-auto">
-              {JSON.stringify(step.tool_calls, null, 2)}
-            </pre>
-          )}
-          {step.tool_result && (
-            <pre className="text-xs text-foreground/80 whitespace-pre-wrap font-mono leading-relaxed mt-2 max-h-48 overflow-auto">
-              {JSON.stringify(step.tool_result, null, 2)}
-            </pre>
-          )}
+          {results.length > 0 ? results.map(r => (
+            <div key={r.id}>
+              <p className="text-[10px] text-muted-foreground/50 mb-1 flex items-center gap-1">
+                <CornerDownRight className="w-2.5 h-2.5" /> result
+              </p>
+              <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
+                {r.tool_result != null
+                  ? (typeof r.tool_result === "string" ? r.tool_result : JSON.stringify(r.tool_result, null, 2))
+                  : (r.content ?? "")}
+              </pre>
+            </div>
+          )) : call.role === "tool" && call.content ? (
+            <div>
+              <p className="text-[10px] text-muted-foreground/50 mb-1 flex items-center gap-1">
+                <CornerDownRight className="w-2.5 h-2.5" /> result
+              </p>
+              <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
+                {call.content}
+              </pre>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
   );
+}
+
+function MessageItem({ step }: { step: SessionStep }) {
+  const [expanded, setExpanded] = useState(false);
+  const text = step.content ?? "";
+
+  if (step.role === "user") {
+    return (
+      <div>
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
+        >
+          <span className="w-3 h-3 flex-shrink-0 rounded-full border border-border/60 bg-muted/50" />
+          <span className="text-xs text-muted-foreground flex-1">Prompt</span>
+          {expanded
+            ? <ChevronDown className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
+            : <ChevronRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
+          }
+        </button>
+        {expanded && text && (
+          <div className="px-4 pb-3 ml-6">
+            <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
+              {text}
+            </pre>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (step.role === "assistant" && text) {
+    const isLong = text.length > 400;
+    return (
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Bot className="w-3 h-3 text-muted-foreground/50" />
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">Agent</span>
+        </div>
+        <p className={`text-xs text-foreground/80 leading-relaxed ${!expanded && isLong ? "line-clamp-5" : ""}`}>
+          {text}
+        </p>
+        {isLong && (
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="text-[11px] text-muted-foreground hover:text-foreground mt-2 transition-colors"
+          >
+            {expanded ? "Show less" : "Show more"}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 interface SessionTraceProps {
@@ -108,64 +188,55 @@ interface SessionTraceProps {
 }
 
 export default function SessionTrace({ sessionId, totalCost }: SessionTraceProps) {
-  const [panelOpen, setPanelOpen] = useState(false);
   const { data: steps, isLoading } = useGetSessionSteps(sessionId, {
-    query: { queryKey: getGetSessionStepsQueryKey(sessionId), enabled: panelOpen && !!sessionId },
+    query: { queryKey: getGetSessionStepsQueryKey(sessionId), enabled: !!sessionId },
   });
 
-  const stepCount = steps?.length ?? 0;
-  const costDisplay = formatCost(totalCost);
+  const groups = steps ? groupSteps(steps) : [];
+  const totalTok = steps?.reduce((s, st) => s + (st.tokens_used ?? 0), 0) ?? 0;
+  const totalCostComputed = steps?.reduce((s, st) => s + (st.cost ?? 0), 0) ?? 0;
+  const displayCost = formatCost(totalCostComputed || totalCost);
 
   return (
-    <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
-      <button
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-accent/30 transition-colors"
-        onClick={() => setPanelOpen(o => !o)}
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">Reasoning Trace</span>
-          {stepCount > 0 && (
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {stepCount} steps
-            </span>
+    <div className="rounded-xl border border-border/60 bg-card overflow-hidden flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 flex-shrink-0">
+        <span className="text-xs font-medium">Agent Trace</span>
+        <div className="flex items-center gap-2.5">
+          {steps && steps.length > 0 && (
+            <span className="text-[11px] text-muted-foreground">{steps.length} steps</span>
           )}
-          {costDisplay && (
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {costDisplay}
-            </span>
+          {displayCost && (
+            <span className="text-[11px] text-muted-foreground">{displayCost}</span>
           )}
         </div>
-        {panelOpen
-          ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/40" />
-          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40" />
-        }
-      </button>
+      </div>
 
-      {panelOpen && (
-        <div className="px-4 pb-4 border-t border-border/30 space-y-2 pt-3">
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground py-4 justify-center">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Loading trace…
-            </div>
-          ) : !steps || steps.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-4">No steps recorded.</p>
-          ) : (
-            <>
-              {steps.map(step => <StepCard key={step.id} step={step} />)}
-              {/* Cost footer */}
-              {(() => {
-                const totalTok = steps.reduce((s, st) => s + (st.tokens_used ?? 0), 0);
-                const totalCostSum = steps.reduce((s, st) => s + (st.cost ?? 0), 0);
-                return (totalTok > 0 || totalCostSum > 0) ? (
-                  <div className="flex justify-end gap-3 pt-1 text-[10px] text-muted-foreground/60">
-                    {totalTok > 0 && <span>Total: {formatTokens(totalTok)} tokens</span>}
-                    {totalCostSum > 0 && <span>{formatCost(totalCostSum)}</span>}
-                  </div>
-                ) : null;
-              })()}
-            </>
-          )}
+      {/* Scrollable feed */}
+      <div className="overflow-y-auto flex-1 divide-y divide-border/25 min-h-0">
+        {isLoading ? (
+          <div className="flex items-center justify-center gap-2 py-12 text-xs text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Loading…
+          </div>
+        ) : groups.length === 0 ? (
+          <div className="py-12 text-center text-xs text-muted-foreground">
+            No steps recorded.
+          </div>
+        ) : (
+          groups.map((g, i) =>
+            g.kind === "action"
+              ? <ToolAction key={i} call={g.call} results={g.results} />
+              : <MessageItem key={i} step={g.step} />
+          )
+        )}
+      </div>
+
+      {/* Footer */}
+      {(totalTok > 0 || displayCost) && (
+        <div className="border-t border-border/40 px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+          {totalTok > 0 && <span className="text-[10px] text-muted-foreground/60">{formatTokens(totalTok)}</span>}
+          {displayCost && <span className="text-[10px] text-muted-foreground/60">{displayCost} total</span>}
         </div>
       )}
     </div>
