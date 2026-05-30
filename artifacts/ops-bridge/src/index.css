@@ -42,103 +42,100 @@
   --color-sidebar-accent: hsl(var(--sidebar-accent));
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
 
-  --font-sans: "Inter", "Geist", sans-serif;
-  --font-mono: "Space Mono", "Spline Sans Mono", monospace;
+  --font-sans: "Inter", -apple-system, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", monospace;
 
-  --radius-sm: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
   --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 2px);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
 }
 
 :root {
-  /* Default to dark terminal look */
-  --background: 240 10% 4%;
-  --foreground: 0 0% 98%;
+  --background: 240 8% 5%;
+  --foreground: 240 5% 90%;
 
-  --card: 240 10% 6%;
-  --card-foreground: 0 0% 98%;
-  --card-border: 240 10% 12%;
+  --card: 240 8% 8%;
+  --card-foreground: 240 5% 90%;
+  --card-border: 240 14% 13%;
 
-  --popover: 240 10% 6%;
-  --popover-foreground: 0 0% 98%;
-  --popover-border: 240 10% 12%;
+  --popover: 240 8% 9%;
+  --popover-foreground: 240 5% 90%;
+  --popover-border: 240 14% 13%;
 
-  --primary: 210 100% 50%; /* sharp blue */
-  --primary-foreground: 0 0% 100%;
+  --primary: 234 90% 74%;
+  --primary-foreground: 240 8% 5%;
 
-  --secondary: 240 10% 15%;
-  --secondary-foreground: 0 0% 98%;
+  --secondary: 240 10% 14%;
+  --secondary-foreground: 240 5% 90%;
 
-  --muted: 240 10% 12%;
-  --muted-foreground: 240 5% 65%;
+  --muted: 240 8% 11%;
+  --muted-foreground: 240 6% 55%;
 
-  --accent: 240 10% 15%;
-  --accent-foreground: 0 0% 98%;
+  --accent: 240 14% 16%;
+  --accent-foreground: 240 5% 90%;
 
-  --destructive: 0 84% 60%;
+  --destructive: 0 80% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 240 10% 12%;
-  --input: 240 10% 12%;
-  --ring: 210 100% 50%;
+  --border: 240 14% 13%;
+  --input: 240 8% 11%;
+  --ring: 234 90% 74%;
 
-  --sidebar: 240 10% 4%;
-  --sidebar-foreground: 240 5% 65%;
-  --sidebar-border: 240 10% 12%;
-  --sidebar-primary: 210 100% 50%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 240 10% 12%;
-  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar: 240 8% 5%;
+  --sidebar-foreground: 240 6% 55%;
+  --sidebar-border: 240 14% 10%;
+  --sidebar-primary: 234 90% 74%;
+  --sidebar-primary-foreground: 240 8% 5%;
+  --sidebar-accent: 240 14% 13%;
+  --sidebar-accent-foreground: 240 5% 90%;
 
-  --radius: 0.3rem;
+  --radius: 0.625rem;
 
-  /* Status Colors */
-  --status-critical: 0 84% 60%; /* Red */
-  --status-high: 32 95% 54%;    /* Orange */
-  --status-medium: 48 96% 53%;  /* Yellow */
-  --status-low: 210 100% 50%;   /* Blue */
+  --status-critical: 0 80% 60%;
+  --status-high: 32 95% 58%;
+  --status-medium: 45 90% 55%;
+  --status-low: 217 80% 65%;
 }
 
-/* Force everything to use dark mode by default if not set */
 .dark {
-  /* Same as root */
-  --background: 240 10% 4%;
-  --foreground: 0 0% 98%;
+  --background: 240 8% 5%;
+  --foreground: 240 5% 90%;
 
-  --card: 240 10% 6%;
-  --card-foreground: 0 0% 98%;
-  --card-border: 240 10% 12%;
+  --card: 240 8% 8%;
+  --card-foreground: 240 5% 90%;
+  --card-border: 240 14% 13%;
 
-  --popover: 240 10% 6%;
-  --popover-foreground: 0 0% 98%;
-  --popover-border: 240 10% 12%;
+  --popover: 240 8% 9%;
+  --popover-foreground: 240 5% 90%;
+  --popover-border: 240 14% 13%;
 
-  --primary: 210 100% 50%;
-  --primary-foreground: 0 0% 100%;
+  --primary: 234 90% 74%;
+  --primary-foreground: 240 8% 5%;
 
-  --secondary: 240 10% 15%;
-  --secondary-foreground: 0 0% 98%;
+  --secondary: 240 10% 14%;
+  --secondary-foreground: 240 5% 90%;
 
-  --muted: 240 10% 12%;
-  --muted-foreground: 240 5% 65%;
+  --muted: 240 8% 11%;
+  --muted-foreground: 240 6% 55%;
 
-  --accent: 240 10% 15%;
-  --accent-foreground: 0 0% 98%;
+  --accent: 240 14% 16%;
+  --accent-foreground: 240 5% 90%;
 
-  --destructive: 0 84% 60%;
+  --destructive: 0 80% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 240 10% 12%;
-  --input: 240 10% 12%;
-  --ring: 210 100% 50%;
+  --border: 240 14% 13%;
+  --input: 240 8% 11%;
+  --ring: 234 90% 74%;
 
-  --sidebar: 240 10% 4%;
-  --sidebar-foreground: 240 5% 65%;
-  --sidebar-border: 240 10% 12%;
-  --sidebar-primary: 210 100% 50%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 240 10% 12%;
-  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar: 240 8% 5%;
+  --sidebar-foreground: 240 6% 55%;
+  --sidebar-border: 240 14% 10%;
+  --sidebar-primary: 234 90% 74%;
+  --sidebar-primary-foreground: 240 8% 5%;
+  --sidebar-accent: 240 14% 13%;
+  --sidebar-accent-foreground: 240 5% 90%;
 }
 
 @layer base {
