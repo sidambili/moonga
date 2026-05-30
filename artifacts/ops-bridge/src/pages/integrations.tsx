@@ -39,10 +39,11 @@ function CopyButton({ value }: { value: string }) {
 
 function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
   const queryClient = useQueryClient();
-  const { data: integrations } = useListIntegrations();
+  const { data: integrationsRaw } = useListIntegrations();
   const upsertMutation = useUpsertIntegration();
 
-  const current = integrations?.find((i) => i.provider === provider.id);
+  const integrations = Array.isArray(integrationsRaw) ? integrationsRaw : [];
+  const current = integrations.find((i) => i.provider === provider.id);
   const [apiKey, setApiKey]               = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
   const [enabled, setEnabled]             = useState(current?.enabled ?? false);
