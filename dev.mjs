@@ -3,12 +3,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
-const envPath = new URL(".env.local", import.meta.url);
+const envLocalPath = new URL(".env.local", import.meta.url);
+const envPath = new URL(".env", import.meta.url);
 
 // Load .env.local if it exists, without overriding existing env vars.
 // On Replit, Secrets provide env vars directly so this is a no-op.
-if (existsSync(envPath)) {
-  const content = readFileSync(envPath, "utf8");
+// Fall back to .env if .env.local is missing.
+const envFileToLoad = existsSync(envLocalPath) ? envLocalPath : envPath;
+if (existsSync(envFileToLoad)) {
+  const content = readFileSync(envFileToLoad, "utf8");
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;

@@ -272,6 +272,9 @@ export const GetSessionStepsResponseItem = zod.object({
 }).passthrough().nullish(),
   "model": zod.string().nullish(),
   "tokens_used": zod.number().nullish(),
+  "prompt_tokens": zod.number().nullish(),
+  "completion_tokens": zod.number().nullish(),
+  "cost": zod.number().nullish(),
   "created_at": zod.string()
 })
 export const GetSessionStepsResponse = zod.array(GetSessionStepsResponseItem)
@@ -603,6 +606,23 @@ export const UpsertIntegrationResponse = zod.object({
 export const DeleteIntegrationParams = zod.object({
   "provider": zod.coerce.string()
 })
+
+
+/**
+ * @summary List repositories for the authenticated provider user
+ */
+export const ListIntegrationReposParams = zod.object({
+  "provider": zod.coerce.string()
+})
+
+export const ListIntegrationReposResponseItem = zod.object({
+  "id": zod.number(),
+  "full_name": zod.string(),
+  "name": zod.string(),
+  "owner": zod.string(),
+  "private": zod.boolean()
+})
+export const ListIntegrationReposResponse = zod.array(ListIntegrationReposResponseItem)
 
 
 /**

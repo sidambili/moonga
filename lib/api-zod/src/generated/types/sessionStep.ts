@@ -28,5 +28,11 @@ export interface SessionStep {
   model?: string | null;
   /** @nullable */
   tokens_used?: number | null;
+  /** @nullable */
+  prompt_tokens?: number | null;
+  /** @nullable */
+  completion_tokens?: number | null;
+  /** @nullable */
+  cost?: number | null;
   created_at: string;
 }

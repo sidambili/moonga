@@ -24,6 +24,7 @@ export * from './listEventsParams';
 export * from './listSessionsParams';
 export * from './modelSettings';
 export * from './modelSettingsInput';
+export * from './repo';
 export * from './session';
 export * from './sessionContextSnapshot';
 export * from './sessionList';
