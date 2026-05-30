@@ -39,7 +39,7 @@ function CopyButton({ value }: { value: string }) {
 
 function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
   const queryClient = useQueryClient();
-  const { data: integrationsRaw } = useListIntegrations();
+  const { data: integrationsRaw, isLoading, isError } = useListIntegrations();
   const upsertMutation = useUpsertIntegration();
 
   const integrations = Array.isArray(integrationsRaw) ? integrationsRaw : [];
@@ -47,6 +47,28 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
   const [apiKey, setApiKey]               = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
   const [enabled, setEnabled]             = useState(current?.enabled ?? false);
+
+  if (isLoading) {
+    return (
+      <div className="rounded-xl bg-card border border-border/60 p-4 space-y-4 animate-pulse">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-muted" />
+          <div className="space-y-1.5 flex-1">
+            <div className="h-4 w-24 bg-muted rounded" />
+            <div className="h-3 w-48 bg-muted rounded" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-xl bg-card border border-destructive/25 p-4">
+        <p className="text-sm text-destructive">Failed to load integration data.</p>
+      </div>
+    );
+  }
 
   const isEnabled = current?.enabled ?? enabled;
   const webhookUrl = getWebhookUrl(provider.id);

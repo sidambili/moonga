@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Layout } from "@/components/layout";
+import { ErrorBoundary } from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import EventsFeed from "@/pages/events";
@@ -17,19 +18,27 @@ import ModelSettings from "@/pages/settings";
 
 const queryClient = new QueryClient();
 
+function SafeRoute({ component: Component }: { component: React.ComponentType }) {
+  return (
+    <ErrorBoundary>
+      <Component />
+    </ErrorBoundary>
+  );
+}
+
 function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/events" component={EventsFeed} />
-        <Route path="/events/:id" component={EventDetail} />
-        <Route path="/sessions" component={Sessions} />
-        <Route path="/sessions/:id" component={SessionDetail} />
-        <Route path="/artifacts" component={ArtifactsReview} />
-        <Route path="/artifacts/:id" component={ArtifactDetail} />
-        <Route path="/integrations" component={Integrations} />
-        <Route path="/settings" component={ModelSettings} />
+        <Route path="/" component={() => <SafeRoute component={Dashboard} />} />
+        <Route path="/events" component={() => <SafeRoute component={EventsFeed} />} />
+        <Route path="/events/:id" component={() => <SafeRoute component={EventDetail} />} />
+        <Route path="/sessions" component={() => <SafeRoute component={Sessions} />} />
+        <Route path="/sessions/:id" component={() => <SafeRoute component={SessionDetail} />} />
+        <Route path="/artifacts" component={() => <SafeRoute component={ArtifactsReview} />} />
+        <Route path="/artifacts/:id" component={() => <SafeRoute component={ArtifactDetail} />} />
+        <Route path="/integrations" component={() => <SafeRoute component={Integrations} />} />
+        <Route path="/settings" component={() => <SafeRoute component={ModelSettings} />} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
