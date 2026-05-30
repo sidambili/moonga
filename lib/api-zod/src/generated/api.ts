@@ -250,6 +250,34 @@ export const RetrySessionResponse = zod.object({
 
 
 /**
+ * @summary Get reasoning steps for a session
+ */
+export const GetSessionStepsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetSessionStepsResponseItem = zod.object({
+  "id": zod.number(),
+  "session_id": zod.number(),
+  "step_number": zod.number(),
+  "role": zod.string().describe('user | assistant | tool'),
+  "content": zod.string().nullish(),
+  "tool_calls": zod.array(zod.object({
+
+}).passthrough()).nullish(),
+  "tool_call_id": zod.string().nullish(),
+  "tool_name": zod.string().nullish(),
+  "tool_result": zod.object({
+
+}).passthrough().nullish(),
+  "model": zod.string().nullish(),
+  "tokens_used": zod.number().nullish(),
+  "created_at": zod.string()
+})
+export const GetSessionStepsResponse = zod.array(GetSessionStepsResponseItem)
+
+
+/**
  * @summary List all artifacts
  */
 export const listArtifactsQueryLimitDefault = 50;

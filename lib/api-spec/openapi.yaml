@@ -222,6 +222,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/Session"
 
+  /sessions/{id}/steps:
+    get:
+      operationId: getSessionSteps
+      tags: [sessions]
+      summary: Get reasoning steps for a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session steps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionStep"
+
   # ── Artifacts ─────────────────────────────────────────────────────
   /artifacts:
     get:
@@ -637,6 +658,38 @@ components:
             $ref: "#/components/schemas/Session"
         total:
           type: integer
+
+    SessionStep:
+      type: object
+      required: [id, session_id, step_number, role, created_at]
+      properties:
+        id:
+          type: integer
+        session_id:
+          type: integer
+        step_number:
+          type: integer
+        role:
+          type: string
+          description: "user | assistant | tool"
+        content:
+          type: ["string", "null"]
+        tool_calls:
+          type: ["array", "null"]
+          items:
+            type: object
+        tool_call_id:
+          type: ["string", "null"]
+        tool_name:
+          type: ["string", "null"]
+        tool_result:
+          type: ["object", "null"]
+        model:
+          type: ["string", "null"]
+        tokens_used:
+          type: ["integer", "null"]
+        created_at:
+          type: string
 
     Artifact:
       type: object

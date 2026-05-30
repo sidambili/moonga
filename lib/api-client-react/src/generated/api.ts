@@ -37,6 +37,7 @@ import type {
   ModelSettingsInput,
   Session,
   SessionList,
+  SessionStep,
   SeverityCount,
   SourceCount,
   WebhookAck,
@@ -2003,4 +2004,75 @@ export const useIngestSlackWebhook = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getIngestSlackWebhookMutationOptions(options));
     }
+
+export const getGetSessionStepsUrl = (id: number,) => {
+
+
+
+
+  return `/api/sessions/${id}/steps`
+}
+
+/**
+ * @summary Get reasoning steps for a session
+ */
+export const getSessionSteps = async (id: number, options?: RequestInit): Promise<SessionStep[]> => {
+
+  return customFetch<SessionStep[]>(getGetSessionStepsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSessionStepsQueryKey = (id: number,) => {
+    return [
+    `/api/sessions/${id}/steps`
+    ] as const;
+    }
+
+
+export const getGetSessionStepsQueryOptions = <TData = Awaited<ReturnType<typeof getSessionSteps>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionSteps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSessionStepsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSessionSteps>>> = ({ signal }) => getSessionSteps(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSessionSteps>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSessionStepsQueryResult = NonNullable<Awaited<ReturnType<typeof getSessionSteps>>>
+export type GetSessionStepsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get reasoning steps for a session
+ */
+
+export function useGetSessionSteps<TData = Awaited<ReturnType<typeof getSessionSteps>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionSteps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSessionStepsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 

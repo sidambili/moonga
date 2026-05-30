@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { sessionsTable, eventsTable } from "@workspace/db";
+import { sessionsTable, eventsTable, sessionStepsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 
 const router = Router();
@@ -64,6 +64,20 @@ router.post("/:id/retry", async (req, res) => {
     res.json({ ...updated, event });
   } catch {
     res.status(500).json({ error: "Failed to retry session" });
+  }
+});
+
+router.get("/:id/steps", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const steps = await db
+      .select()
+      .from(sessionStepsTable)
+      .where(eq(sessionStepsTable.session_id, id))
+      .orderBy(sessionStepsTable.step_number);
+    res.json(steps);
+  } catch {
+    res.status(500).json({ error: "Failed to get session steps" });
   }
 });
 

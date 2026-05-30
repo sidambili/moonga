@@ -213,3 +213,26 @@ limit?: number;
 offset?: number;
 };
 
+export interface SessionStep {
+  id: number;
+  session_id: number;
+  step_number: number;
+  /** user | assistant | tool */
+  role: string;
+  /** @nullable */
+  content?: string | null;
+  /** @nullable */
+  tool_calls?: unknown[] | null;
+  /** @nullable */
+  tool_call_id?: string | null;
+  /** @nullable */
+  tool_name?: string | null;
+  /** @nullable */
+  tool_result?: unknown | null;
+  /** @nullable */
+  model?: string | null;
+  /** @nullable */
+  tokens_used?: number | null;
+  created_at: string;
+}
+
