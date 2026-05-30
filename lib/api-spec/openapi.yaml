@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Ops Bridge API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: events
+    description: Inbound operational events
+  - name: sessions
+    description: Agent sessions
+  - name: artifacts
+    description: Agent-produced artifacts for human review
+  - name: integrations
+    description: Integration configuration
+  - name: webhooks
+    description: Webhook ingest endpoints
+  - name: dashboard
+    description: Dashboard summary data
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,513 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Dashboard ──────────────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: High-level counts and recent activity
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Recent events and session updates
+      responses:
+        "200":
+          description: Activity feed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/severity-breakdown:
+    get:
+      operationId: getSeverityBreakdown
+      tags: [dashboard]
+      summary: Event counts grouped by severity
+      responses:
+        "200":
+          description: Severity breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SeverityCount"
+
+  /dashboard/source-breakdown:
+    get:
+      operationId: getSourceBreakdown
+      tags: [dashboard]
+      summary: Event counts grouped by source
+      responses:
+        "200":
+          description: Source breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SourceCount"
+
+  # ── Events ────────────────────────────────────────────────────────
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List all events
+      parameters:
+        - name: source
+          in: query
+          schema:
+            type: string
+        - name: severity
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventList"
+
+  /events/{id}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get event by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "404":
+          description: Not found
+
+  # ── Sessions ──────────────────────────────────────────────────────
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List all agent sessions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+
+  /sessions/{id}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get session by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Not found
+
+  /sessions/{id}/retry:
+    post:
+      operationId: retrySession
+      tags: [sessions]
+      summary: Retry a failed session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  # ── Artifacts ─────────────────────────────────────────────────────
+  /artifacts:
+    get:
+      operationId: listArtifacts
+      tags: [artifacts]
+      summary: List all artifacts
+      parameters:
+        - name: approval_state
+          in: query
+          schema:
+            type: string
+        - name: session_id
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of artifacts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactList"
+
+  /artifacts/{id}:
+    get:
+      operationId: getArtifact
+      tags: [artifacts]
+      summary: Get artifact by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Artifact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "404":
+          description: Not found
+
+  /artifacts/{id}/approve:
+    post:
+      operationId: approveArtifact
+      tags: [artifacts]
+      summary: Approve an artifact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Artifact approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+
+  /artifacts/{id}/reject:
+    post:
+      operationId: rejectArtifact
+      tags: [artifacts]
+      summary: Reject an artifact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Artifact rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+
+  /artifacts/{id}/edit:
+    patch:
+      operationId: editArtifact
+      tags: [artifacts]
+      summary: Edit artifact content
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtifactEdit"
+      responses:
+        "200":
+          description: Artifact edited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+
+  # ── Integrations ──────────────────────────────────────────────────
+  /integrations:
+    get:
+      operationId: listIntegrations
+      tags: [integrations]
+      summary: List all integration configs
+      responses:
+        "200":
+          description: List of integrations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Integration"
+
+  /integrations/{provider}:
+    get:
+      operationId: getIntegration
+      tags: [integrations]
+      summary: Get integration config for a provider
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Integration config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Integration"
+        "404":
+          description: Not found
+
+    put:
+      operationId: upsertIntegration
+      tags: [integrations]
+      summary: Create or update an integration config
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationInput"
+      responses:
+        "200":
+          description: Integration saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Integration"
+
+    delete:
+      operationId: deleteIntegration
+      tags: [integrations]
+      summary: Delete an integration config
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Model settings ────────────────────────────────────────────────
+  /model-settings:
+    get:
+      operationId: getModelSettings
+      tags: [integrations]
+      summary: Get model routing settings
+      responses:
+        "200":
+          description: Model settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelSettings"
+
+    put:
+      operationId: updateModelSettings
+      tags: [integrations]
+      summary: Update model routing settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelSettingsInput"
+      responses:
+        "200":
+          description: Settings saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelSettings"
+
+  # ── Webhook ingest ────────────────────────────────────────────────
+  /webhooks/github:
+    post:
+      operationId: ingestGithubWebhook
+      tags: [webhooks]
+      summary: Receive GitHub webhook events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAck"
+
+  /webhooks/linear:
+    post:
+      operationId: ingestLinearWebhook
+      tags: [webhooks]
+      summary: Receive Linear webhook events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAck"
+
+  /webhooks/sentry:
+    post:
+      operationId: ingestSentryWebhook
+      tags: [webhooks]
+      summary: Receive Sentry webhook events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAck"
+
+  /webhooks/betterstack:
+    post:
+      operationId: ingestBetterstackWebhook
+      tags: [webhooks]
+      summary: Receive Better Stack webhook events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAck"
+
+  /webhooks/slack:
+    post:
+      operationId: ingestSlackWebhook
+      tags: [webhooks]
+      summary: Receive Slack webhook events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAck"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +552,271 @@ components:
       required:
         - status
 
+    # ── Domain entities ──────────────────────────────────────────────
+
+    Event:
+      type: object
+      required: [id, source, event_type, severity, status, created_at]
+      properties:
+        id:
+          type: integer
+        source:
+          type: string
+          description: "github | linear | betterstack | sentry | slack | email"
+        event_type:
+          type: string
+          description: "error | anomaly | ticket_created | issue_updated | deploy_failed | push | pr_opened"
+        severity:
+          type: string
+          description: "low | medium | high | critical"
+        status:
+          type: string
+          description: "new | processing | processed | ignored"
+        service:
+          type: ["string", "null"]
+        repo_id:
+          type: ["string", "null"]
+        ticket_id:
+          type: ["string", "null"]
+        title:
+          type: ["string", "null"]
+        payload_raw:
+          type: object
+        session_id:
+          type: ["integer", "null"]
+        created_at:
+          type: string
+
+    EventList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+        total:
+          type: integer
+
+    Session:
+      type: object
+      required: [id, event_id, objective, status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        event_id:
+          type: integer
+        objective:
+          type: string
+          description: "diagnose | plan | summarize | draft"
+        status:
+          type: string
+          description: "pending | running | needs_review | approved | rejected | completed | failed"
+        model_used:
+          type: ["string", "null"]
+        context_snapshot:
+          type: ["object", "null"]
+        output_summary:
+          type: ["string", "null"]
+        confidence_score:
+          type: ["number", "null"]
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        event:
+          $ref: "#/components/schemas/Event"
+
+    SessionList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+        total:
+          type: integer
+
+    Artifact:
+      type: object
+      required: [id, session_id, type, content, approval_state, created_at]
+      properties:
+        id:
+          type: integer
+        session_id:
+          type: integer
+        type:
+          type: string
+          description: "slack_message | linear_ticket | incident_report | implementation_plan"
+        content:
+          type: string
+        approval_state:
+          type: string
+          description: "draft | approved | rejected | edited"
+        created_at:
+          type: string
+        session:
+          $ref: "#/components/schemas/Session"
+
+    ArtifactList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Artifact"
+        total:
+          type: integer
+
+    ArtifactEdit:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+
+    Integration:
+      type: object
+      required: [id, provider, enabled, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        provider:
+          type: string
+          description: "github | linear | slack | sentry | betterstack | email"
+        enabled:
+          type: boolean
+        webhook_url:
+          type: ["string", "null"]
+        webhook_secret:
+          type: ["string", "null"]
+        api_key_masked:
+          type: ["string", "null"]
+        config:
+          type: ["object", "null"]
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    IntegrationInput:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        api_key:
+          type: ["string", "null"]
+        webhook_secret:
+          type: ["string", "null"]
+        config:
+          type: ["object", "null"]
+
+    ModelSettings:
+      type: object
+      required: [id, triage_model, plan_model, provider, updated_at]
+      properties:
+        id:
+          type: integer
+        provider:
+          type: string
+          description: "openai | anthropic | openrouter | custom"
+        triage_model:
+          type: string
+        plan_model:
+          type: string
+        api_key_set:
+          type: boolean
+        base_url:
+          type: ["string", "null"]
+        updated_at:
+          type: string
+
+    ModelSettingsInput:
+      type: object
+      properties:
+        provider:
+          type: string
+        triage_model:
+          type: string
+        plan_model:
+          type: string
+        api_key:
+          type: ["string", "null"]
+        base_url:
+          type: ["string", "null"]
+
+    # ── Dashboard ───────────────────────────────────────────────────
+
+    DashboardSummary:
+      type: object
+      required: [total_events, pending_review, sessions_running, approved_today, events_today]
+      properties:
+        total_events:
+          type: integer
+        pending_review:
+          type: integer
+        sessions_running:
+          type: integer
+        approved_today:
+          type: integer
+        events_today:
+          type: integer
+        critical_open:
+          type: integer
+
+    ActivityItem:
+      type: object
+      required: [id, type, title, timestamp, source, severity]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          description: "event | session | artifact"
+        title:
+          type: string
+        timestamp:
+          type: string
+        source:
+          type: string
+        severity:
+          type: string
+        status:
+          type: string
+
+    SeverityCount:
+      type: object
+      required: [severity, count]
+      properties:
+        severity:
+          type: string
+        count:
+          type: integer
+
+    SourceCount:
+      type: object
+      required: [source, count]
+      properties:
+        source:
+          type: string
+        count:
+          type: integer
+
+    # ── Webhooks ───────────────────────────────────────────────────
+    WebhookPayload:
+      type: object
+      description: Raw webhook payload (varies per source)
+      additionalProperties: true
+
+    WebhookAck:
+      type: object
+      required: [accepted, event_id]
+      properties:
+        accepted:
+          type: boolean
+        event_id:
+          type: ["integer", "null"]
+        message:
+          type: string
