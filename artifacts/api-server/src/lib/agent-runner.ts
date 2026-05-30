@@ -1,58 +1,15 @@
-import OpenAI from "openai";
 import { Octokit } from "octokit";
+import { generateText, tool } from "ai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createOpenAI } from "@ai-sdk/openai";
+import { z } from "zod";
 import { db } from "@workspace/db";
 import { sessionsTable, sessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
-import { executeToolCalls, type ToolCall, type ToolResult } from "./github-tools";
-import { GITHUB_TOOLS } from "./github-tools";
 
 const MAX_STEPS = 10;
 const MAX_PAYLOAD_CHARS = 2_000;
-const MAX_CONTEXT_CHARS = 15_000;
-
-function extractKeywords(payload: Record<string, unknown>): string[] {
-  const data = payload.data as Record<string, unknown> | undefined;
-  const title = (data?.title as string) ?? "";
-  const description = (data?.description as string) ?? "";
-  const text = `${title} ${description}`.toLowerCase();
-  // Filter out common stop words, keep meaningful tokens
-  const stopWords = new Set(["the", "a", "an", "in", "on", "at", "to", "for", "of", "with", "and", "or", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "shall", "can", "this", "that", "these", "those", "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", "my", "your", "his", "her", "its", "our", "their", "fix", "bug", "issue", "error", "problem", "feature", "request"]);
-  const tokens = text
-    .replace(/[^a-z0-9_\-/\.\s]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length > 2 && !stopWords.has(t));
-  // Deduplicate and limit
-  return Array.from(new Set(tokens)).slice(0, 8);
-}
-
-async function fetchFileContent(
-  client: Octokit,
-  owner: string,
-  repo: string,
-  path: string,
-): Promise<string | null> {
-  try {
-    const { data } = await client.rest.repos.getContent({ owner, repo, path });
-    if (Array.isArray(data)) return null;
-    if ("content" in data && typeof data.content === "string") {
-      const decoded = Buffer.from(data.content, "base64").toString("utf8");
-      return decoded;
-    }
-  } catch (err) {
-    logger.warn({ err, path }, "Failed to fetch file content");
-  }
-  return null;
-}
-
-interface StepRecord {
-  role: "user" | "assistant" | "tool";
-  content?: string;
-  tool_calls?: ToolCall[];
-  tool_call_id?: string;
-  tool_name?: string;
-  tool_result?: unknown;
-}
 
 async function getModelSettings() {
   const rows = await db.select().from(modelSettingsTable).limit(1);
@@ -153,43 +110,14 @@ async function gatherEventContext(
     }
 
     if (eventType === "ticket_created") {
-      // 1. Fetch README
       try {
-        const readmeContent = await fetchFileContent(client, owner, repoName, "README.md");
-        if (readmeContent) {
-          parts.push(`README.md:\n${readmeContent.slice(0, 3_000)}`);
+        const { data: readme } = await client.rest.repos.getContent({ owner, repo: repoName, path: "README.md" });
+        if (!Array.isArray(readme) && "content" in readme && typeof readme.content === "string") {
+          const decoded = Buffer.from(readme.content, "base64").toString("utf8");
+          parts.push(`README.md:\n${decoded.slice(0, 3_000)}`);
         }
       } catch (err) {
         parts.push(`Could not fetch README: ${err instanceof Error ? err.message : String(err)}`);
-      }
-
-      // 2. Extract keywords and find relevant source files
-      const keywords = extractKeywords(payload);
-      if (keywords.length > 0) {
-        parts.push(`Keywords extracted from ticket: ${keywords.join(", ")}`);
-        try {
-          const { data: tree } = await client.rest.git.getTree({ owner, repo: repoName, tree_sha: "HEAD", recursive: "1" });
-          const matchingFiles = tree.tree
-            .filter((e): e is typeof e & { path: string } => e.type === "blob" && typeof e.path === "string")
-            .filter((e) => keywords.some((k) => e.path.toLowerCase().includes(k)))
-            .slice(0, 10);
-
-          if (matchingFiles.length > 0) {
-            parts.push("Relevant source files:");
-            for (const f of matchingFiles) {
-              const content = await fetchFileContent(client, owner, repoName, f.path);
-              if (content) {
-                parts.push(`--- ${f.path} ---\n${content.slice(0, 2_500)}`);
-              } else {
-                parts.push(`--- ${f.path} --- (could not fetch content)`);
-              }
-            }
-          } else {
-            parts.push("No source files matched the extracted keywords.");
-          }
-        } catch (err) {
-          parts.push(`Could not search repo tree: ${err instanceof Error ? err.message : String(err)}`);
-        }
       }
     }
 
@@ -213,96 +141,58 @@ async function gatherEventContext(
 async function persistStep(
   sessionId: number,
   stepNumber: number,
-  record: StepRecord,
+  role: string,
+  content: string,
   model?: string,
-  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number },
+  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; cost?: number },
+  toolCalls?: unknown[],
+  toolName?: string,
 ) {
   await db.insert(sessionStepsTable).values({
     session_id: sessionId,
     step_number: stepNumber,
-    role: record.role,
-    content: record.content ?? null,
-    tool_calls: record.tool_calls ? record.tool_calls as unknown[] : null,
-    tool_call_id: record.tool_call_id ?? null,
-    tool_name: record.tool_name ?? null,
-    tool_result: record.tool_result ? record.tool_result as unknown[] : null,
+    role: role as "user" | "assistant" | "tool",
+    content: content.slice(0, 50_000) || null,
+    tool_calls: toolCalls ?? null,
+    tool_name: toolName ?? null,
     model: model ?? null,
-    tokens_used: usage?.total_tokens ?? null,
-    prompt_tokens: usage?.prompt_tokens ?? null,
-    completion_tokens: usage?.completion_tokens ?? null,
+    tokens_used: usage?.totalTokens ?? null,
+    prompt_tokens: usage?.promptTokens ?? null,
+    completion_tokens: usage?.completionTokens ?? null,
     cost: usage?.cost ?? null,
   });
 }
 
-async function fetchOpenRouterCost(
-  genId: string,
-  apiKey: string,
-  baseUrl: string,
-): Promise<number | undefined> {
-  try {
-    const url = baseUrl.replace(/\/?$/, "").replace(/\/v1$/, "") + `/api/v1/generation?id=${encodeURIComponent(genId)}`;
-    logger.debug({ url, genId }, "Fetching OpenRouter cost");
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${apiKey}`, "HTTP-Referer": "https://oncident.io" },
-    });
-    if (!res.ok) {
-      logger.warn({ status: res.status, statusText: res.statusText, genId }, "OpenRouter cost fetch failed");
-      return undefined;
-    }
-    const data = await res.json() as { data?: { total_cost?: number } };
-    logger.debug({ genId, cost: data.data?.total_cost }, "OpenRouter cost fetched");
-    return data.data?.total_cost;
-  } catch (err) {
-    logger.warn({ err, genId }, "Failed to fetch OpenRouter cost");
-    return undefined;
-  }
-}
-
-function buildToolsDescription(): string {
-  const lines = GITHUB_TOOLS.map((t) => {
-    const fn = t.function;
-    const props = (fn.parameters.properties ?? {}) as Record<string, { description?: string }>;
-    const required = (fn.parameters.required ?? []) as string[];
-    const params = Object.entries(props)
-      .map(([k, v]) => `${k}${required.includes(k) ? "" : "?"}: ${v.description || "string"}`)
-      .join(", ");
-    return `- ${fn.name}(${params}) — ${fn.description}`;
-  });
-  return lines.join("\n");
+function parseConfidence(text: string): number {
+  const match = text.match(/CONFIDENCE:\s*([\d.]+)\s*$/im);
+  return match ? Math.min(1, Math.max(0, parseFloat(match[1]))) : 0.75;
 }
 
 function buildSystemPrompt(): string {
-  const toolsDesc = buildToolsDescription();
-  return `You are an expert SRE and engineering analyst with access to GitHub repository tools.
+  return `You are an expert SRE and engineering analyst. You analyze inbound engineering events (tickets, PRs, errors) and produce actionable, source-code-grounded analysis.
 
-Available tools:
-${toolsDesc}
+You have access to GitHub repository tools to read files, list directories, and search code. Use these tools when the pre-fetched repository context is insufficient.
 
-When you need to use one or more tools, output them as a single JSON code block like this:
-\`\`\`json
-[
-  {"name": "tool_name", "arguments": {"key": "value"}}
-]
-\`\`\`
-
-After receiving tool results, provide your final diagnosis or plan directly in plain text.
-Be concise. Avoid unnecessary tool calls. If the provided event payload is sufficient, answer directly.`;
+Rules:
+- Always base your analysis on actual source code, not assumptions
+- If you need to see more code, use the available tools
+- Be concise (max 300 words for the final answer)
+- On the very last line write exactly: CONFIDENCE: <0.0–1.0>`;
 }
 
-function buildInitialMessages(
+function buildUserPrompt(
   objective: string,
   source: string,
   eventType: string,
   title: string,
   payload: unknown,
   context: string,
-): OpenAI.Chat.ChatCompletionMessageParam[] {
+): string {
   const payloadStr = JSON.stringify(payload, null, 2).slice(0, MAX_PAYLOAD_CHARS);
   const contextBlock = context ? `\n\nRepository context:\n${context}` : "";
 
-  let userPrompt: string;
   if (objective === "diagnose") {
-    userPrompt = `Analyze this inbound engineering event and produce a concise diagnosis.
+    return `Analyze this inbound engineering event and produce a concise diagnosis.
 
 Source: ${source}
 Event type: ${eventType}
@@ -317,8 +207,9 @@ Respond with:
 4. Estimated resolution time
 
 Be concise (max 300 words). On the very last line write exactly: CONFIDENCE: <0.0–1.0>`;
-  } else {
-    userPrompt = `Analyze this ticket/task and produce an action plan.
+  }
+
+  return `Analyze this ticket/task and produce an action plan.
 
 Source: ${source}
 Event type: ${eventType}
@@ -333,40 +224,25 @@ Respond with:
 4. Estimated complexity (Low / Medium / High)
 
 Be concise (max 300 words). On the very last line write exactly: CONFIDENCE: <0.0–1.0>`;
-  }
-
-  return [
-    { role: "system", content: buildSystemPrompt() },
-    { role: "user", content: userPrompt },
-  ];
 }
 
-function parseToolCallsFromText(text: string): ToolCall[] | null {
-  const blockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-  if (!blockMatch) return null;
-  try {
-    const parsed = JSON.parse(blockMatch[1]) as Array<{ name: string; arguments: Record<string, unknown> }>;
-    if (!Array.isArray(parsed)) return null;
-    return parsed.map((item, idx) => ({
-      id: `call_${idx}_${Date.now()}`,
-      type: "function" as const,
-      function: {
-        name: item.name,
-        arguments: JSON.stringify(item.arguments),
-      },
-    }));
-  } catch {
-    return null;
+function getModelConfig(settings: NonNullable<Awaited<ReturnType<typeof getModelSettings>>>, modelString: string) {
+  const isOpenRouter = settings.provider === "openrouter" || (settings.base_url && settings.base_url.includes("openrouter"));
+  if (isOpenRouter) {
+    const openrouter = createOpenRouter({ apiKey: settings.api_key! });
+    return openrouter.chat(modelString);
   }
+  const openaiProvider = createOpenAI({ apiKey: settings.api_key!, baseURL: settings.base_url ?? undefined });
+  return openaiProvider.chat(modelString);
 }
 
-function parseOutput(text: string): { summary: string; confidence: number } {
-  const match = text.match(/CONFIDENCE:\s*([\d.]+)\s*$/im);
-  const confidence = match
-    ? Math.min(1, Math.max(0, parseFloat(match[1])))
-    : 0.75;
-  const summary = text.replace(/CONFIDENCE:\s*[\d.]+\s*$/im, "").trim();
-  return { summary, confidence };
+function getRepoFromPayload(payload: Record<string, unknown>, repoId?: string): { owner: string; repo: string } | null {
+  const repo = payload.repository as { full_name?: string } | undefined;
+  const fullName = repo?.full_name || repoId;
+  if (!fullName) return null;
+  const [owner, name] = fullName.split("/");
+  if (!owner || !name) return null;
+  return { owner, repo: name };
 }
 
 export async function runAgentSession(sessionId: number): Promise<void> {
@@ -401,18 +277,13 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   }
 
   const { session, event } = row;
-  const model =
+  const modelString =
     session.objective === "plan"
       ? (settings.plan_model ?? "gpt-4o")
       : (settings.triage_model ?? "gpt-4o-mini");
 
-  const client = new OpenAI({
-    apiKey: settings.api_key,
-    baseURL: settings.base_url ?? undefined,
-    defaultHeaders: settings.base_url ? { "HTTP-Referer": "https://oncident.io" } : undefined,
-  });
-
   const githubToken = await getGithubToken();
+  const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, event.repo_id ?? undefined);
 
   // Pre-fetch repository context based on event type
   const context = await gatherEventContext(
@@ -422,7 +293,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     event.repo_id ?? undefined,
   );
 
-  const messages = buildInitialMessages(
+  const systemPrompt = buildSystemPrompt();
+  const userPrompt = buildUserPrompt(
     session.objective,
     event.source,
     event.event_type,
@@ -431,141 +303,150 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     context,
   );
 
-  // Persist the initial user message as step 0
-  await persistStep(sessionId, 0, {
-    role: "user",
-    content: messages[messages.length - 1].content as string,
-  });
-
-  // Persist gathered context as step -1 (before user prompt)
+  // Persist pre-fetched context and user prompt
   if (context) {
-    await persistStep(sessionId, -1, {
-      role: "tool",
-      content: `[System] Pre-fetched repository context:\n${context}`,
-      tool_name: "gather_event_context",
-    });
+    await persistStep(sessionId, -1, "tool", `[System] Pre-fetched repository context:\n${context}`, undefined, undefined, undefined, "gather_event_context");
   }
+  await persistStep(sessionId, 0, "user", userPrompt);
 
-  let stepCount = 0;
-  let finalText = "";
-  let finalConfidence = 0.75;
+  // Define GitHub tools — execute returns error if repo/token missing
+  const githubTools = {
+    get_file_contents: tool({
+      description: "Fetch the contents of a file from the GitHub repository",
+      parameters: z.object({
+        path: z.string().describe("File path within the repo, e.g. 'src/index.ts'"),
+        ref: z.string().optional().describe("Git ref (branch, tag, or commit SHA)"),
+      }),
+      execute: async ({ path, ref }) => {
+        if (!repo || !githubToken) return "Error: GitHub integration not configured";
+        const client = new Octokit({ auth: githubToken });
+        try {
+          const { data } = await client.rest.repos.getContent({
+            owner: repo.owner,
+            repo: repo.repo,
+            path,
+            ref,
+          });
+          if (Array.isArray(data)) return "Error: path is a directory, not a file";
+          if (data.type === "file") {
+            const content = data.content ? Buffer.from(data.content, "base64").toString("utf-8") : "";
+            return content.length > 100_000 ? content.slice(0, 100_000) + "\n\n[...truncated]" : content;
+          }
+          return "Error: not a file";
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    }),
+    list_directory: tool({
+      description: "List files and directories at a path in the GitHub repository",
+      parameters: z.object({
+        path: z.string().describe("Directory path. Use empty string for root."),
+        ref: z.string().optional(),
+      }),
+      execute: async ({ path, ref }) => {
+        if (!repo || !githubToken) return "Error: GitHub integration not configured";
+        const client = new Octokit({ auth: githubToken });
+        try {
+          const { data } = await client.rest.repos.getContent({
+            owner: repo.owner,
+            repo: repo.repo,
+            path: path || "",
+            ref,
+          });
+          if (!Array.isArray(data)) return "Error: not a directory";
+          return JSON.stringify(data.map((e) => ({ name: e.name, type: e.type, path: e.path, size: e.size })), null, 2);
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    }),
+    search_code: tool({
+      description: "Search for code across the GitHub repository",
+      parameters: z.object({
+        query: z.string().describe("Search query, e.g. 'filename:package.json' or 'class User'"),
+      }),
+      execute: async ({ query }) => {
+        if (!repo || !githubToken) return "Error: GitHub integration not configured";
+        const client = new Octokit({ auth: githubToken });
+        try {
+          const q = `${query} repo:${repo.owner}/${repo.repo}`;
+          const { data } = await client.rest.search.code({ q });
+          return JSON.stringify({
+            total_count: data.total_count,
+            items: data.items.map((item) => ({ path: item.path, url: item.html_url, score: item.score })),
+          }, null, 2);
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    }),
+  };
+
+  const modelConfig = getModelConfig(settings, modelString);
 
   try {
-    while (stepCount < MAX_STEPS) {
-      stepCount++;
+    const result = await generateText({
+      model: modelConfig,
+      system: systemPrompt,
+      prompt: userPrompt,
+      maxSteps: MAX_STEPS,
+      tools: githubTools,
+    });
 
-      const completion = await client.chat.completions.create({
-        model,
-        messages,
-        max_tokens: 4096,
-      });
+    // Persist each step from the Vercel AI SDK result
+    let stepNum = 1;
+    for (const step of result.steps) {
+      const stepUsage = step.usage ? {
+        promptTokens: step.usage.promptTokens,
+        completionTokens: step.usage.completionTokens,
+        totalTokens: step.usage.totalTokens,
+      } : undefined;
 
-      const choice = completion.choices[0];
-      const assistantText = choice.message.content ?? "";
-      const usage = completion.usage;
-
-      let cost: number | undefined;
-      if (settings.base_url && completion.id) {
-        cost = await fetchOpenRouterCost(completion.id, settings.api_key, settings.base_url);
+      if (step.text) {
+        await persistStep(sessionId, stepNum, "assistant", step.text, modelString, stepUsage, step.toolCalls as unknown[]);
       }
 
-      const usageRecord = {
-        prompt_tokens: usage?.prompt_tokens,
-        completion_tokens: usage?.completion_tokens,
-        total_tokens: usage?.total_tokens,
-        cost,
-      };
-
-      // Parse tool calls from text response
-      const toolCalls = parseToolCallsFromText(assistantText);
-
-      // Persist assistant message (stripping tool block for readability)
-      const displayText = assistantText.replace(/```json\s*[\s\S]*?\s*```/g, "[tool calls omitted]").trim();
-      await persistStep(sessionId, stepCount, {
-        role: "assistant",
-        content: displayText || assistantText,
-        tool_calls: toolCalls ?? undefined,
-      }, model, usageRecord);
-
-      if (toolCalls && toolCalls.length > 0) {
-        // Execute tools
-        const toolResults = await executeToolCalls(
-          toolCalls,
-          githubToken,
-          event.payload_raw as Record<string, unknown>,
-        );
-
-        // Add assistant message to conversation (full text with tool block)
-        messages.push({
-          role: "assistant",
-          content: assistantText,
-        });
-
-        // Build tool results as a user message
-        let resultText = "Tool results:\n";
-        for (const tr of toolResults) {
-          const matchingCall = toolCalls.find((tc) => tc.id === tr.tool_call_id);
-          const name = matchingCall?.function?.name ?? "unknown";
-          resultText += `\n--- ${name} ---\n${tr.content}\n`;
-
-          await persistStep(sessionId, stepCount, {
-            role: "tool",
-            content: tr.content,
-            tool_call_id: tr.tool_call_id,
-            tool_name: name,
-            tool_result: tr,
-          });
-        }
-        messages.push({ role: "user", content: resultText });
-      } else {
-        // Final answer — no tool calls
-        finalText = assistantText;
-        const parsed = parseOutput(finalText);
-        finalText = parsed.summary;
-        finalConfidence = parsed.confidence;
-        break;
+      for (const tr of step.toolResults ?? []) {
+        await persistStep(sessionId, stepNum, "tool", String(tr.result ?? "No result"), modelString, undefined, undefined, tr.toolName);
       }
+
+      stepNum++;
     }
 
-    if (stepCount >= MAX_STEPS) {
-      logger.warn({ sessionId }, "Agent reached max steps without final answer");
-      finalText = finalText || "Analysis stopped after reaching the maximum number of reasoning steps.";
-    }
+    const finalText = result.text;
+    const finalConfidence = parseConfidence(finalText);
+
+    await db
+      .update(sessionsTable)
+      .set({
+        status: "needs_review",
+        output_summary: finalText,
+        confidence_score: finalConfidence,
+        model_used: modelString,
+        updated_at: new Date(),
+      })
+      .where(eq(sessionsTable.id, sessionId));
+
+    const artifactType = session.objective === "plan" ? "action_plan" : "diagnosis";
+    await db.insert(artifactsTable).values({
+      session_id: sessionId,
+      type: artifactType,
+      content: finalText,
+      approval_state: "draft",
+    });
+
+    await db
+      .update(eventsTable)
+      .set({ status: "needs_review" })
+      .where(eq(eventsTable.id, event.id));
+
+    logger.info({ sessionId, model: modelString, confidence: finalConfidence, steps: result.steps.length }, "Session completed → needs_review");
   } catch (err) {
     logger.error({ err, sessionId }, "Agent loop failed");
     await db
       .update(sessionsTable)
       .set({ status: "failed", updated_at: new Date() })
       .where(eq(sessionsTable.id, sessionId));
-    return;
   }
-
-  // Update session with final result
-  await db
-    .update(sessionsTable)
-    .set({
-      status: "needs_review",
-      output_summary: finalText,
-      confidence_score: finalConfidence,
-      model_used: model,
-      updated_at: new Date(),
-    })
-    .where(eq(sessionsTable.id, sessionId));
-
-  // Create artifact
-  const artifactType = session.objective === "plan" ? "action_plan" : "diagnosis";
-  await db.insert(artifactsTable).values({
-    session_id: sessionId,
-    type: artifactType,
-    content: finalText,
-    approval_state: "draft",
-  });
-
-  // Update event status
-  await db
-    .update(eventsTable)
-    .set({ status: "needs_review" })
-    .where(eq(eventsTable.id, event.id));
-
-  logger.info({ sessionId, model, confidence: finalConfidence, steps: stepCount }, "Session completed → needs_review");
 }
