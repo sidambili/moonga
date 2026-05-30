@@ -53,7 +53,10 @@ function detectEventType(source: string, payload: Record<string, unknown>): stri
     if (payload.commits) return "push";
     return "issue_updated";
   }
-  if (source === "linear") return "ticket_created";
+  if (source === "linear") {
+    const action = payload.action as string | undefined;
+    return action === "create" ? "ticket_created" : "ticket_updated";
+  }
   if (source === "sentry") return "error";
   if (source === "betterstack") return "anomaly";
   if (source === "slack") return "issue_updated";
@@ -89,6 +92,16 @@ function isEngineeringTeam(teamName: string | undefined): boolean {
 
 function getLinearRepoId(): string | undefined {
   return process.env.LINEAR_DEFAULT_REPO;
+}
+
+function shouldProcessLinearEvent(payload: Record<string, unknown>): { process: boolean; reason?: string } {
+  const action = payload.action as string | undefined;
+
+  if (action === "create") {
+    return { process: true };
+  }
+
+  return { process: false, reason: `Linear action '${action}' is not processed — only new issues are handled` };
 }
 
 async function ingestWebhook(source: string, payload: Record<string, unknown>, repoId?: string) {
@@ -138,6 +151,12 @@ router.post("/linear", async (req, res) => {
       reason: `Team '${teamName ?? "unknown"}' is not in the engineering list`,
     });
   }
+
+  const { process, reason } = shouldProcessLinearEvent(req.body);
+  if (!process) {
+    return res.status(202).json({ accepted: false, reason });
+  }
+
   const { event, session } = await ingestWebhook("linear", req.body, getLinearRepoId());
   return res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
 });
