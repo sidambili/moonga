@@ -5,6 +5,7 @@ import sessionsRouter from "./sessions";
 import artifactsRouter from "./artifacts";
 import integrationsRouter from "./integrations";
 import modelSettingsRouter from "./model-settings";
+import modelPricesRouter from "./model-prices";
 import dashboardRouter from "./dashboard";
 import webhooksRouter from "./webhooks";
 
@@ -16,6 +17,7 @@ router.use("/sessions", sessionsRouter);
 router.use("/artifacts", artifactsRouter);
 router.use("/integrations", integrationsRouter);
 router.use("/model-settings", modelSettingsRouter);
+router.use("/model-prices", modelPricesRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/webhooks", webhooksRouter);
 

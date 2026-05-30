@@ -7,6 +7,7 @@ import { db } from "@workspace/db";
 import { sessionsTable, sessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
+import { estimateCost } from "./model-prices";
 
 const MAX_STEPS = 10;
 const MAX_PAYLOAD_CHARS = 2_000;
@@ -410,6 +411,120 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         }
       },
     }),
+    get_commit_diff: tool({
+      description: "Get the diff (patch) for a specific commit SHA. Useful for analyzing what changed.",
+      parameters: z.object({
+        sha: z.string().describe("Commit SHA"),
+      }),
+      execute: async ({ sha }) => {
+        if (!repo || !githubToken) return "Error: GitHub integration not configured";
+        const client = new Octokit({ auth: githubToken });
+        try {
+          const { data } = await client.rest.repos.getCommit({ owner: repo.owner, repo: repo.repo, ref: sha });
+          const files = data.files?.map((f) => ({
+            filename: f.filename,
+            status: f.status,
+            additions: f.additions,
+            deletions: f.deletions,
+            patch: f.patch || "",
+          })) ?? [];
+          return JSON.stringify(files, null, 2);
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    }),
+    get_pull_request: tool({
+      description: "Get details about a pull request including title, body, changed files, and diff.",
+      parameters: z.object({
+        number: z.number().describe("Pull request number"),
+      }),
+      execute: async ({ number }) => {
+        if (!repo || !githubToken) return "Error: GitHub integration not configured";
+        const client = new Octokit({ auth: githubToken });
+        try {
+          const { data: pr } = await client.rest.pulls.get({ owner: repo.owner, repo: repo.repo, pull_number: number });
+          const { data: files } = await client.rest.pulls.listFiles({ owner: repo.owner, repo: repo.repo, pull_number: number });
+          return JSON.stringify({
+            title: pr.title,
+            body: pr.body,
+            state: pr.state,
+            additions: pr.additions,
+            deletions: pr.deletions,
+            changed_files: pr.changed_files,
+            files: files.map((f) => ({ filename: f.filename, status: f.status, additions: f.additions, deletions: f.deletions, patch: f.patch || "" })),
+          }, null, 2);
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    }),
+    get_issue: tool({
+      description: "Get details about a GitHub issue including title, body, labels, and comments.",
+      parameters: z.object({
+        number: z.number().describe("Issue number"),
+      }),
+      execute: async ({ number }) => {
+        if (!repo || !githubToken) return "Error: GitHub integration not configured";
+        const client = new Octokit({ auth: githubToken });
+        try {
+          const { data: issue } = await client.rest.issues.get({ owner: repo.owner, repo: repo.repo, issue_number: number });
+          const { data: comments } = await client.rest.issues.listComments({ owner: repo.owner, repo: repo.repo, issue_number: number });
+          return JSON.stringify({
+            title: issue.title,
+            body: issue.body,
+            state: issue.state,
+            labels: issue.labels.map((l) => (typeof l === "string" ? l : l.name)),
+            comments: comments.map((c) => ({ body: c.body, user: c.user?.login, created_at: c.created_at })),
+          }, null, 2);
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    }),
+    get_package_manifest: tool({
+      description: "Fetch the primary package manifest (package.json, Cargo.toml, pyproject.toml, go.mod, etc.) to understand dependencies and tech stack.",
+      parameters: z.object({
+        path: z.string().describe("Manifest file path, e.g. 'package.json' or 'Cargo.toml'"),
+      }),
+      execute: async ({ path }) => {
+        if (!repo || !githubToken) return "Error: GitHub integration not configured";
+        const client = new Octokit({ auth: githubToken });
+        try {
+          const { data } = await client.rest.repos.getContent({ owner: repo.owner, repo: repo.repo, path });
+          if (Array.isArray(data) || data.type !== "file") return "Error: not a file";
+          const content = data.content ? Buffer.from(data.content, "base64").toString("utf-8") : "";
+          return content.length > 100_000 ? content.slice(0, 100_000) + "\n\n[...truncated]" : content;
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    }),
+    get_recent_commits: tool({
+      description: "Get the most recent commits on the default branch. Useful for spotting regressions.",
+      parameters: z.object({
+        per_page: z.number().optional().describe("Number of commits to fetch (max 30)"),
+      }),
+      execute: async ({ per_page }) => {
+        if (!repo || !githubToken) return "Error: GitHub integration not configured";
+        const client = new Octokit({ auth: githubToken });
+        try {
+          const { data } = await client.rest.repos.listCommits({
+            owner: repo.owner,
+            repo: repo.repo,
+            per_page: Math.min(per_page || 10, 30),
+          });
+          return JSON.stringify(data.map((c) => ({
+            sha: c.sha,
+            message: c.commit.message,
+            author: c.commit.author?.name,
+            date: c.commit.author?.date,
+          })), null, 2);
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    }),
     list_directory: tool({
       description: "List files and directories at a path in the GitHub repository",
       parameters: z.object({
@@ -473,6 +588,10 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         promptTokens: step.usage.promptTokens,
         completionTokens: step.usage.completionTokens,
         totalTokens: step.usage.totalTokens,
+        cost: await estimateCost(modelString, {
+          promptTokens: step.usage.promptTokens,
+          completionTokens: step.usage.completionTokens,
+        }),
       } : undefined;
 
       if (step.text) {
