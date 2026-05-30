@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useListIntegrations, useUpsertIntegration, getListIntegrationsQueryKey } from "@workspace/api-client-react";
+import { useListIntegrations, useUpsertIntegration, useListIntegrationRepos, getListIntegrationsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Webhook, Copy, Check } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Webhook, Copy, Check, GitBranch } from "lucide-react";
 import { SourceIcon } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 
@@ -47,6 +48,11 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
   const [apiKey, setApiKey]               = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
   const [enabled, setEnabled]             = useState(current?.enabled ?? false);
+  const [selectedRepo, setSelectedRepo]   = useState<string>((current?.config as { selected_repo?: string } | null)?.selected_repo ?? "");
+
+  const { data: repos, isLoading: reposLoading } = useListIntegrationRepos(
+    provider.id === "github" && current?.api_key_masked ? provider.id : ""
+  );
 
   if (isLoading) {
     return (
@@ -76,7 +82,12 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
   const handleSave = () => {
     upsertMutation.mutate({
       provider: provider.id,
-      data: { enabled, api_key: apiKey || undefined, webhook_secret: webhookSecret || undefined }
+      data: {
+        enabled,
+        api_key: apiKey || undefined,
+        webhook_secret: webhookSecret || undefined,
+        config: provider.id === "github" ? { selected_repo: selectedRepo || undefined } : undefined,
+      }
     }, {
       onSuccess: () => {
         toast({ title: `${provider.label} saved` });
@@ -154,6 +165,33 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
             onChange={(e) => setWebhookSecret(e.target.value)}
             className="bg-muted/50 border-border/60 rounded-lg text-sm"
           />
+        </div>
+      )}
+
+      {/* Repository Selector (GitHub only) */}
+      {provider.id === "github" && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground flex items-center gap-1">
+            <GitBranch className="w-3 h-3" />
+            Primary Repository
+            {selectedRepo && <span className="text-emerald-400 ml-1.5">({selectedRepo})</span>}
+          </Label>
+          <Select value={selectedRepo} onValueChange={setSelectedRepo}>
+            <SelectTrigger className="bg-muted/50 border-border/60 rounded-lg text-sm h-9">
+              <SelectValue placeholder={reposLoading ? "Loading repositories…" : "Select a repository…"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">None</SelectItem>
+              {repos?.map((repo) => (
+                <SelectItem key={repo.id} value={repo.full_name}>
+                  {repo.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!current?.api_key_masked && (
+            <p className="text-[11px] text-muted-foreground">Add an API key above to load your repositories.</p>
+          )}
         </div>
       )}
 

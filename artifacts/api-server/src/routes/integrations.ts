@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Octokit } from "octokit";
 import { db } from "@workspace/db";
 import { integrationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -28,9 +29,9 @@ function toPublic(row: typeof integrationsTable.$inferSelect) {
 router.get("/", async (_req, res) => {
   try {
     const rows = await db.select().from(integrationsTable);
-    res.json(rows.map(toPublic));
+    return res.json(rows.map(toPublic));
   } catch {
-    res.status(500).json({ error: "Failed to list integrations" });
+    return res.status(500).json({ error: "Failed to list integrations" });
   }
 });
 
@@ -38,9 +39,9 @@ router.get("/:provider", async (req, res) => {
   try {
     const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, req.params.provider));
     if (!row) return res.status(404).json({ error: "Integration not found" });
-    res.json(toPublic(row));
+    return res.json(toPublic(row));
   } catch {
-    res.status(500).json({ error: "Failed to get integration" });
+    return res.status(500).json({ error: "Failed to get integration" });
   }
 });
 
@@ -71,18 +72,44 @@ router.put("/:provider", async (req, res) => {
       webhook_secret: webhook_secret ?? null,
       config: config ?? null,
     }).returning();
-    res.json(toPublic(created));
+    return res.json(toPublic(created));
   } catch {
-    res.status(500).json({ error: "Failed to upsert integration" });
+    return res.status(500).json({ error: "Failed to upsert integration" });
+  }
+});
+
+router.get("/:provider/repos", async (req, res) => {
+  try {
+    const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, req.params.provider));
+    if (!row) return res.status(404).json({ error: "Integration not found" });
+    if (!row.api_key) return res.status(400).json({ error: "No API key configured for this provider" });
+
+    const client = new Octokit({ auth: row.api_key });
+    const { data: repos } = await client.rest.repos.listForAuthenticatedUser({
+      sort: "updated",
+      per_page: 100,
+    });
+
+    const result = repos.map((r) => ({
+      id: r.id,
+      full_name: r.full_name,
+      name: r.name,
+      owner: r.owner.login,
+      private: r.private,
+    }));
+
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to list repositories", message: err instanceof Error ? err.message : String(err) });
   }
 });
 
 router.delete("/:provider", async (req, res) => {
   try {
     await db.delete(integrationsTable).where(eq(integrationsTable.provider, req.params.provider));
-    res.status(204).send();
+    return res.status(204).send();
   } catch {
-    res.status(500).json({ error: "Failed to delete integration" });
+    return res.status(500).json({ error: "Failed to delete integration" });
   }
 });
 

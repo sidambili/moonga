@@ -435,6 +435,31 @@ paths:
         "204":
           description: Deleted
 
+  /integrations/{provider}/repos:
+    get:
+      operationId: listIntegrationRepos
+      tags: [integrations]
+      summary: List repositories for the authenticated provider user
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of repositories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Repo"
+        "404":
+          description: Integration not found
+        "400":
+          description: No API key configured
+
   # ── Model settings ────────────────────────────────────────────────
   /model-settings:
     get:
@@ -771,6 +796,21 @@ components:
           type: ["string", "null"]
         config:
           type: ["object", "null"]
+
+    Repo:
+      type: object
+      required: [id, full_name, name, owner, private]
+      properties:
+        id:
+          type: integer
+        full_name:
+          type: string
+        name:
+          type: string
+        owner:
+          type: string
+        private:
+          type: boolean
 
     ModelSettings:
       type: object
