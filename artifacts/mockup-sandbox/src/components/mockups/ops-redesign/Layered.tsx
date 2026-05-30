@@ -44,7 +44,7 @@ export function Layered() {
             >
               <LayoutDashboard className="w-3.5 h-3.5" style={{ color: "#818cf8" }} />
             </div>
-            <span className="font-semibold text-sm tracking-tight">Ops Bridge</span>
+            <span className="font-semibold text-sm tracking-tight">Oncident</span>
           </div>
           <div className="flex items-center gap-2">
             <div

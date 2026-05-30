@@ -31,7 +31,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
               <Zap className="w-3.5 h-3.5 text-primary" />
             </div>
-            <span className="font-semibold text-sm tracking-tight">Ops Bridge</span>
+            <span className="font-semibold text-sm tracking-tight">Oncident</span>
           </div>
         </div>
 
@@ -77,7 +77,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
                   <Zap className="w-3.5 h-3.5 text-primary" />
                 </div>
-                <span className="font-semibold text-sm tracking-tight">Ops Bridge</span>
+                <span className="font-semibold text-sm tracking-tight">Oncident</span>
               </div>
               <button
                 onClick={() => setDrawerOpen(false)}
@@ -134,7 +134,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center">
               <Zap className="w-3 h-3 text-primary" />
             </div>
-            <span className="font-semibold text-sm tracking-tight">Ops Bridge</span>
+            <span className="font-semibold text-sm tracking-tight">Oncident</span>
           </div>
           <div className="w-8" />
         </header>

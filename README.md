@@ -1,4 +1,4 @@
-# Ops Bridge
+# Oncident
 
 An operations intelligence platform that acts as a control plane for GitHub, Linear, Better Stack, Sentry, Slack, and email. It receives operational events via webhooks, creates AI agent sessions, gathers context, produces drafted analysis, and routes outputs through a human approval gate before anything is sent.
 

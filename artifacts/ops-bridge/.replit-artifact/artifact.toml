@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Ops Bridge"
+title = "Oncident"
 version = "1.0.0"
 id = "artifacts/ops-bridge"
 router = "path"
