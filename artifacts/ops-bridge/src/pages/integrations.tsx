@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useListIntegrations, useUpsertIntegration, useListIntegrationRepos, getListIntegrationsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -6,12 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Webhook, Copy, Check, GitBranch } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Webhook, Copy, Check, GitBranch, ChevronsUpDown } from "lucide-react";
 import { SourceIcon } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 
 const PROVIDERS = [
-  { id: "github",      label: "GitHub",       description: "Push events, pull requests, issue updates" },
+  { id: "github",      label: "GitHub",       description: "Webhook events & codebase access — two integrations in one" },
   { id: "linear",      label: "Linear",       description: "Ticket creation, status changes, comments" },
   { id: "sentry",      label: "Sentry",       description: "Error events, issue alerts, performance issues" },
   { id: "betterstack", label: "Better Stack", description: "Uptime monitors, incident alerts, log anomalies" },
@@ -49,6 +51,31 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
   const [webhookSecret, setWebhookSecret] = useState("");
   const [enabled, setEnabled]             = useState(current?.enabled ?? false);
   const [selectedRepo, setSelectedRepo]   = useState<string>((current?.config as { selected_repo?: string } | null)?.selected_repo ?? "");
+  const [eventTypes, setEventTypes] = useState(() => {
+    const cfg = (current?.config ?? {}) as Record<string, unknown>;
+    const et = (cfg.event_types ?? {}) as Record<string, boolean>;
+    return {
+      issues: et.issues ?? true,
+      pull_requests: et.pull_requests ?? true,
+      releases: et.releases ?? true,
+    };
+  });
+
+  const hasSynced = useRef(false);
+  useEffect(() => {
+    if (current && !hasSynced.current) {
+      hasSynced.current = true;
+      setEnabled(current.enabled);
+      setSelectedRepo((current.config as { selected_repo?: string } | null)?.selected_repo ?? "");
+      const cfg = (current.config ?? {}) as Record<string, unknown>;
+      const et = (cfg.event_types ?? {}) as Record<string, boolean>;
+      setEventTypes({
+        issues: et.issues ?? true,
+        pull_requests: et.pull_requests ?? true,
+        releases: et.releases ?? true,
+      });
+    }
+  }, [current]);
 
   const { data: repos, isLoading: reposLoading } = useListIntegrationRepos(
     provider.id === "github" && current?.api_key_masked ? provider.id : ""
@@ -86,7 +113,7 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
         enabled,
         api_key: apiKey || undefined,
         webhook_secret: webhookSecret || undefined,
-        config: provider.id === "github" ? { selected_repo: selectedRepo || undefined } : undefined,
+        config: provider.id === "github" ? { selected_repo: selectedRepo || undefined, event_types: eventTypes } : undefined,
       }
     }, {
       onSuccess: () => {
@@ -123,17 +150,6 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
         </div>
       </div>
 
-      {/* Webhook URL */}
-      {provider.id !== "email" && (
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Webhook URL</Label>
-          <div className="flex items-center gap-1 bg-muted/50 rounded-lg border border-border/60 px-3 py-2">
-            <code className="text-xs flex-1 truncate text-foreground">{webhookUrl}</code>
-            <CopyButton value={webhookUrl} />
-          </div>
-        </div>
-      )}
-
       {/* API Key */}
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">
@@ -151,48 +167,147 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
         />
       </div>
 
-      {/* Webhook Secret */}
-      {provider.id !== "email" && (
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">
-            Webhook Secret
-            {current?.webhook_secret && <span className="text-emerald-400 ml-1.5">(set)</span>}
-          </Label>
-          <Input
-            type="password"
-            placeholder="Enter signing secret…"
-            value={webhookSecret}
-            onChange={(e) => setWebhookSecret(e.target.value)}
-            className="bg-muted/50 border-border/60 rounded-lg text-sm"
-          />
-        </div>
-      )}
+      {provider.id === "github" ? (
+        <>
+          {/* Incoming Events */}
+          <div className="space-y-3 pt-2 border-t border-border/40">
+            <p className="text-xs font-medium text-muted-foreground">Incoming Events</p>
 
-      {/* Repository Selector (GitHub only) */}
-      {provider.id === "github" && (
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground flex items-center gap-1">
-            <GitBranch className="w-3 h-3" />
-            Primary Repository
-            {selectedRepo && <span className="text-emerald-400 ml-1.5">({selectedRepo})</span>}
-          </Label>
-          <Select value={selectedRepo} onValueChange={setSelectedRepo}>
-            <SelectTrigger className="bg-muted/50 border-border/60 rounded-lg text-sm h-9">
-              <SelectValue placeholder={reposLoading ? "Loading repositories…" : "Select a repository…"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">None</SelectItem>
-              {repos?.map((repo) => (
-                <SelectItem key={repo.id} value={repo.full_name}>
-                  {repo.full_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {!current?.api_key_masked && (
-            <p className="text-[11px] text-muted-foreground">Add an API key above to load your repositories.</p>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Webhook URL</Label>
+              <div className="flex items-center gap-1 bg-muted/50 rounded-lg border border-border/60 px-3 py-2">
+                <code className="text-xs flex-1 truncate text-foreground">{webhookUrl}</code>
+                <CopyButton value={webhookUrl} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                Webhook Secret
+                {current?.webhook_secret && <span className="text-emerald-400 ml-1.5">(set)</span>}
+              </Label>
+              <Input
+                type="password"
+                placeholder="Enter signing secret…"
+                value={webhookSecret}
+                onChange={(e) => setWebhookSecret(e.target.value)}
+                className="bg-muted/50 border-border/60 rounded-lg text-sm"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Receive events for</Label>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { key: "issues" as const, label: "Issues" },
+                  { key: "pull_requests" as const, label: "Pull Requests" },
+                  { key: "releases" as const, label: "Releases" },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-1.5 cursor-pointer">
+                    <Switch
+                      checked={eventTypes[key]}
+                      onCheckedChange={(checked) =>
+                        setEventTypes((prev) => ({ ...prev, [key]: checked }))
+                      }
+                      className="data-[state=checked]:bg-primary scale-75 origin-left"
+                    />
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Codebase Access */}
+          <div className="space-y-3 pt-2 border-t border-border/40">
+            <p className="text-xs font-medium text-muted-foreground">Codebase Access</p>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <GitBranch className="w-3 h-3" />
+                Primary Repository
+                {selectedRepo && <span className="text-emerald-400 ml-1.5">({selectedRepo})</span>}
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between bg-muted/50 border-border/60 rounded-lg text-sm h-9 font-normal"
+                    disabled={reposLoading}
+                  >
+                    <span className="truncate">
+                      {selectedRepo || (reposLoading ? "Loading repositories…" : "Select a repository…")}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search repositories…" className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No repository found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="__none__"
+                          onSelect={() => setSelectedRepo("")}
+                          className="text-sm"
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${!selectedRepo ? "opacity-100" : "opacity-0"}`} />
+                          None
+                        </CommandItem>
+                        {repos?.map((repo) => (
+                          <CommandItem
+                            key={repo.id}
+                            value={repo.full_name}
+                            onSelect={() => setSelectedRepo(repo.full_name)}
+                            className="text-sm"
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${selectedRepo === repo.full_name ? "opacity-100" : "opacity-0"}`} />
+                            {repo.full_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {!current?.api_key_masked && (
+                <p className="text-[11px] text-muted-foreground">Add an API key above to load your repositories.</p>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Webhook URL */}
+          {provider.id !== "email" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Webhook URL</Label>
+              <div className="flex items-center gap-1 bg-muted/50 rounded-lg border border-border/60 px-3 py-2">
+                <code className="text-xs flex-1 truncate text-foreground">{webhookUrl}</code>
+                <CopyButton value={webhookUrl} />
+              </div>
+            </div>
           )}
-        </div>
+
+          {/* Webhook Secret */}
+          {provider.id !== "email" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                Webhook Secret
+                {current?.webhook_secret && <span className="text-emerald-400 ml-1.5">(set)</span>}
+              </Label>
+              <Input
+                type="password"
+                placeholder="Enter signing secret…"
+                value={webhookSecret}
+                onChange={(e) => setWebhookSecret(e.target.value)}
+                className="bg-muted/50 border-border/60 rounded-lg text-sm"
+              />
+            </div>
+          )}
+        </>
       )}
 
       <Button onClick={handleSave} disabled={upsertMutation.isPending} className="w-full rounded-lg text-sm" size="sm">

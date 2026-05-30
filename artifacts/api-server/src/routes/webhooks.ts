@@ -1,8 +1,39 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { eventsTable, sessionsTable } from "@workspace/db";
+import { eventsTable, sessionsTable, integrationsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const router = Router();
+
+const GITHUB_EVENT_TYPE_MAP: Record<string, string> = {
+  issues: "issues",
+  pull_request: "pull_requests",
+  release: "releases",
+};
+
+async function isAllowedGithubEvent(eventHeader: string | undefined): Promise<{ allowed: boolean; reason?: string }> {
+  if (!eventHeader) return { allowed: false, reason: "Missing X-GitHub-Event header" };
+
+  const configKey = GITHUB_EVENT_TYPE_MAP[eventHeader];
+  if (!configKey) return { allowed: false, reason: `Event type '${eventHeader}' is not supported` };
+
+  try {
+    const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "github"));
+    const config = (row?.config ?? {}) as Record<string, unknown>;
+    const eventTypes = (config.event_types ?? {}) as Record<string, boolean>;
+
+    // Default to allowing all if not configured (backward compatible)
+    if (Object.keys(eventTypes).length === 0) return { allowed: true };
+
+    if (!eventTypes[configKey]) {
+      return { allowed: false, reason: `Event type '${eventHeader}' is disabled in GitHub integration config` };
+    }
+    return { allowed: true };
+  } catch {
+    // If DB fails, allow through to avoid dropping events silently
+    return { allowed: true };
+  }
+}
 
 function detectSeverity(source: string, payload: Record<string, unknown>): string {
   if (source === "sentry" || source === "betterstack") {
@@ -90,8 +121,13 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>, r
 }
 
 router.post("/github", async (req, res) => {
+  const eventHeader = req.headers["x-github-event"] as string | undefined;
+  const { allowed, reason } = await isAllowedGithubEvent(eventHeader);
+  if (!allowed) {
+    return res.status(202).json({ accepted: false, reason });
+  }
   const { event, session } = await ingestWebhook("github", req.body);
-  res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
+  return res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
 });
 
 router.post("/linear", async (req, res) => {
