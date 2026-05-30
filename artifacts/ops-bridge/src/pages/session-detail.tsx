@@ -1,11 +1,12 @@
 import { useRoute, Link } from "wouter";
-import { useGetSession, useRetrySession, getListSessionsQueryKey } from "@workspace/api-client-react";
+import { useGetSession, useRetrySession, getGetSessionQueryKey, getListSessionsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, RefreshCw, ExternalLink } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
+import Markdown from "@/components/markdown";
 
 const objectiveColors: Record<string, string> = {
   diagnose: "bg-orange-500/10 text-orange-400",
@@ -17,7 +18,7 @@ const objectiveColors: Record<string, string> = {
 export default function SessionDetail() {
   const [, params] = useRoute("/sessions/:id");
   const id = Number(params?.id);
-  const { data: session, isLoading, refetch } = useGetSession(id, { query: { enabled: !!id } });
+  const { data: session, isLoading, refetch } = useGetSession(id, { query: { queryKey: getGetSessionQueryKey(id), enabled: !!id } });
   const retryMutation = useRetrySession();
   const queryClient = useQueryClient();
 
@@ -144,7 +145,7 @@ export default function SessionDetail() {
       {session.output_summary && (
         <div className="rounded-xl bg-card border border-primary/20 p-4 space-y-3">
           <p className="text-xs font-medium text-muted-foreground">Agent Output</p>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{session.output_summary}</p>
+          <Markdown>{session.output_summary}</Markdown>
         </div>
       )}
 

@@ -10,6 +10,7 @@ import { ArrowLeft, CheckCircle, XCircle, Edit3, Save, X, ExternalLink } from "l
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
+import Markdown from "@/components/markdown";
 
 function ApprovalBadge({ state }: { state: string }) {
   const colors: Record<string, string> = {
@@ -24,7 +25,7 @@ function ApprovalBadge({ state }: { state: string }) {
 export default function ArtifactDetail() {
   const [, params] = useRoute("/artifacts/:id");
   const id = Number(params?.id);
-  const { data: artifact, isLoading, refetch } = useGetArtifact(id, { query: { enabled: !!id } });
+  const { data: artifact, isLoading, refetch } = useGetArtifact(id, { query: { queryKey: getGetArtifactQueryKey(id), enabled: !!id } });
   const queryClient = useQueryClient();
   const approveMutation = useApproveArtifact();
   const rejectMutation = useRejectArtifact();
@@ -194,9 +195,7 @@ export default function ArtifactDetail() {
               className="font-mono text-sm min-h-[400px] bg-muted/40 border-border resize-y"
             />
           ) : (
-            <pre className="text-sm font-mono bg-muted/40 rounded-md p-4 whitespace-pre-wrap text-foreground leading-relaxed max-h-[600px] overflow-auto">
-              {artifact.content}
-            </pre>
+            <Markdown>{artifact.content}</Markdown>
           )}
         </CardContent>
       </Card>

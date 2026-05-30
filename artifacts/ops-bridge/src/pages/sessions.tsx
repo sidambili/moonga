@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useListSessions } from "@workspace/api-client-react";
+import { useListSessions, getListSessionsQueryKey } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
 import { SourceIcon, StatusBadge } from "@/components/ui-helpers";
 import { Link } from "wouter";
 import { Cpu, ChevronRight } from "lucide-react";
+import { MarkdownPreview } from "@/components/markdown";
 
 const objectiveColors: Record<string, string> = {
   diagnose: "bg-orange-500/10 text-orange-400",
@@ -32,10 +33,13 @@ function Confidence({ score }: { score: number | null | undefined }) {
 export default function Sessions() {
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: sessionsList, isLoading } = useListSessions({
+  const listParams = {
     status: statusFilter === "all" ? undefined : statusFilter,
     limit: 50,
-  }, { query: { refetchInterval: 15000 } });
+  };
+  const { data: sessionsList, isLoading } = useListSessions(listParams, {
+    query: { queryKey: getListSessionsQueryKey(listParams), refetchInterval: 15000 },
+  });
 
   const items = sessionsList?.items ?? [];
 
@@ -86,12 +90,12 @@ export default function Sessions() {
                     <ObjectivePill objective={session.objective} />
                     <span className="text-xs text-muted-foreground">#{session.id}</span>
                   </div>
-                  <p className="text-sm font-medium leading-snug">
+                  <div className="text-sm font-medium leading-snug line-clamp-2">
                     {session.output_summary
-                      ? session.output_summary.slice(0, 90) + (session.output_summary.length > 90 ? "…" : "")
+                      ? <MarkdownPreview>{session.output_summary}</MarkdownPreview>
                       : <span className="text-muted-foreground italic">In progress…</span>
                     }
-                  </p>
+                  </div>
                   {session.event && (
                     <div className="flex items-center gap-1.5">
                       <SourceIcon source={session.event.source} className="w-3 h-3 text-muted-foreground" />

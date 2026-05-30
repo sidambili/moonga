@@ -8,6 +8,7 @@ import { formatRelative } from "@/lib/format";
 import { Link } from "wouter";
 import { FileCheck2, CheckCircle, XCircle, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { MarkdownPreview } from "@/components/markdown";
 
 const approvalColors: Record<string, string> = {
   draft:    "bg-yellow-500/10 text-yellow-400",
@@ -33,11 +34,14 @@ export default function ArtifactsReview() {
   const approveMutation = useApproveArtifact();
   const rejectMutation = useRejectArtifact();
 
-  const { data: artifactsList, isLoading } = useListArtifacts({
+  const listParams = {
     approval_state: approvalFilter === "all" ? undefined : approvalFilter,
     session_id: sessionIdParam ? Number(sessionIdParam) : undefined,
     limit: 50,
-  }, { query: { refetchInterval: 15000 } });
+  };
+  const { data: artifactsList, isLoading } = useListArtifacts(listParams, {
+    query: { queryKey: getListArtifactsQueryKey(listParams), refetchInterval: 15000 },
+  });
 
   const handleApprove = (id: number) => {
     approveMutation.mutate({ id }, {
@@ -122,9 +126,9 @@ export default function ArtifactsReview() {
 
               {/* Content preview */}
               <Link href={`/artifacts/${artifact.id}`}>
-                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 hover:text-foreground transition-colors cursor-pointer">
-                  {artifact.content.slice(0, 200)}{artifact.content.length > 200 ? "…" : ""}
-                </p>
+                <div className="text-sm text-muted-foreground leading-relaxed line-clamp-2 hover:text-foreground transition-colors cursor-pointer">
+                  <MarkdownPreview>{artifact.content}</MarkdownPreview>
+                </div>
               </Link>
 
               {/* Bottom row */}
