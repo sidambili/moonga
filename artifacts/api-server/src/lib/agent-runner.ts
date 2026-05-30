@@ -155,6 +155,7 @@ async function persistStep(
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; cost?: number },
   toolCalls?: unknown[],
   toolName?: string,
+  toolResult?: unknown,
 ) {
   await db.insert(sessionStepsTable).values({
     session_id: sessionId,
@@ -163,6 +164,7 @@ async function persistStep(
     content: content.slice(0, 50_000) || null,
     tool_calls: toolCalls ?? null,
     tool_name: toolName ?? null,
+    tool_result: toolResult !== undefined ? toolResult : null,
     model: model ?? null,
     tokens_used: usage?.totalTokens ?? null,
     prompt_tokens: usage?.promptTokens ?? null,
@@ -625,7 +627,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       }
 
       for (const tr of step.toolResults ?? []) {
-        await persistStep(sessionId, stepNum, "tool", String(tr.result ?? "No result"), modelString, undefined, undefined, tr.toolName);
+        await persistStep(sessionId, stepNum, "tool", String(tr.result ?? "No result"), modelString, undefined, undefined, tr.toolName, tr.result);
       }
 
       stepNum++;
