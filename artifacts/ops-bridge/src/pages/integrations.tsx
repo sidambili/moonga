@@ -60,6 +60,8 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
       releases: et.releases ?? true,
     };
   });
+  const [linearTeamNames, setLinearTeamNames] = useState<string>((current?.config as { linear_team_names?: string } | null)?.linear_team_names ?? "");
+  const [linearDefaultRepo, setLinearDefaultRepo] = useState<string>((current?.config as { default_repo?: string } | null)?.default_repo ?? "");
 
   const hasSynced = useRef(false);
   useEffect(() => {
@@ -74,6 +76,8 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
         pull_requests: et.pull_requests ?? true,
         releases: et.releases ?? true,
       });
+      setLinearTeamNames((current.config as { linear_team_names?: string } | null)?.linear_team_names ?? "");
+      setLinearDefaultRepo((current.config as { default_repo?: string } | null)?.default_repo ?? "");
     }
   }, [current]);
 
@@ -113,7 +117,12 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
         enabled,
         api_key: apiKey || undefined,
         webhook_secret: webhookSecret || undefined,
-        config: provider.id === "github" ? { selected_repo: selectedRepo || undefined, event_types: eventTypes } : undefined,
+        config:
+          provider.id === "github"
+            ? { selected_repo: selectedRepo || undefined, event_types: eventTypes }
+            : provider.id === "linear"
+            ? { linear_team_names: linearTeamNames || undefined, default_repo: linearDefaultRepo || undefined }
+            : undefined,
       }
     }, {
       onSuccess: () => {
@@ -276,6 +285,54 @@ function IntegrationCard({ provider }: { provider: typeof PROVIDERS[0] }) {
                 <p className="text-[11px] text-muted-foreground">Add an API key above to load your repositories.</p>
               )}
             </div>
+          </div>
+        </>
+      ) : provider.id === "linear" ? (
+        <>
+          {/* Webhook URL */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Webhook URL</Label>
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg border border-border/60 px-3 py-2">
+              <code className="text-xs flex-1 truncate text-foreground">{webhookUrl}</code>
+              <CopyButton value={webhookUrl} />
+            </div>
+          </div>
+
+          {/* Webhook Secret */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Webhook Secret
+              {current?.webhook_secret && <span className="text-emerald-400 ml-1.5">(set)</span>}
+            </Label>
+            <Input
+              type="password"
+              placeholder="Enter signing secret…"
+              value={webhookSecret}
+              onChange={(e) => setWebhookSecret(e.target.value)}
+              className="bg-muted/50 border-border/60 rounded-lg text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5 pt-2 border-t border-border/40">
+            <Label className="text-xs text-muted-foreground">Engineering Team Names</Label>
+            <Input
+              placeholder="e.g. Engineering, Platform, SRE"
+              value={linearTeamNames}
+              onChange={(e) => setLinearTeamNames(e.target.value)}
+              className="bg-muted/50 border-border/60 rounded-lg text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground">Comma-separated list of Linear team names that should trigger the agent.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Default Repository</Label>
+            <Input
+              placeholder="owner/repo"
+              value={linearDefaultRepo}
+              onChange={(e) => setLinearDefaultRepo(e.target.value)}
+              className="bg-muted/50 border-border/60 rounded-lg text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground">GitHub repo used for code context when Linear tickets have no linked repository.</p>
           </div>
         </>
       ) : (

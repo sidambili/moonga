@@ -29,6 +29,19 @@ async function getGithubToken(): Promise<string | undefined> {
   return undefined;
 }
 
+async function getSelectedRepo(): Promise<string | undefined> {
+  try {
+    const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "github"));
+    if (row?.enabled && row.config) {
+      const config = row.config as Record<string, unknown>;
+      return config.selected_repo as string | undefined;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
 async function gatherEventContext(
   eventType: string,
   payload: Record<string, unknown>,
@@ -352,7 +365,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       : (settings.triage_model ?? "gpt-4o-mini");
 
   const githubToken = await getGithubToken();
-  const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, event.repo_id ?? undefined);
+  const selectedRepo = await getSelectedRepo();
+  const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, event.repo_id ?? selectedRepo ?? undefined);
 
   const techStack = repo && githubToken
     ? await detectTechStack(new Octokit({ auth: githubToken }), repo.owner, repo.repo)
@@ -363,7 +377,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     event.event_type,
     event.payload_raw as Record<string, unknown>,
     githubToken,
-    event.repo_id ?? undefined,
+    event.repo_id ?? selectedRepo ?? undefined,
   );
 
   const systemPrompt = buildSystemPrompt(techStack || undefined);

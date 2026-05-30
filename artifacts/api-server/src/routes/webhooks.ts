@@ -82,16 +82,30 @@ function getLinearTeamName(payload: Record<string, unknown>): string | undefined
   return team?.name as string | undefined;
 }
 
-function isEngineeringTeam(teamName: string | undefined): boolean {
+async function getLinearConfig(): Promise<{ linear_team_names?: string; default_repo?: string }> {
+  try {
+    const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "linear"));
+    if (row?.config) {
+      return row.config as { linear_team_names?: string; default_repo?: string };
+    }
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+async function isEngineeringTeam(teamName: string | undefined): Promise<boolean> {
   if (!teamName) return false;
-  const allowed = (process.env.LINEAR_ENG_TEAM_NAMES ?? "Engineering")
+  const config = await getLinearConfig();
+  const allowed = (config.linear_team_names ?? "Engineering")
     .split(",")
     .map((s) => s.trim().toLowerCase());
   return allowed.includes(teamName.toLowerCase());
 }
 
-function getLinearRepoId(): string | undefined {
-  return process.env.LINEAR_DEFAULT_REPO;
+async function getLinearRepoId(): Promise<string | undefined> {
+  const config = await getLinearConfig();
+  return config.default_repo || undefined;
 }
 
 function shouldProcessLinearEvent(payload: Record<string, unknown>): { process: boolean; reason?: string } {
@@ -145,7 +159,7 @@ router.post("/github", async (req, res) => {
 
 router.post("/linear", async (req, res) => {
   const teamName = getLinearTeamName(req.body);
-  if (!isEngineeringTeam(teamName)) {
+  if (!await isEngineeringTeam(teamName)) {
     return res.status(202).json({
       accepted: false,
       reason: `Team '${teamName ?? "unknown"}' is not in the engineering list`,
@@ -157,7 +171,7 @@ router.post("/linear", async (req, res) => {
     return res.status(202).json({ accepted: false, reason });
   }
 
-  const { event, session } = await ingestWebhook("linear", req.body, getLinearRepoId());
+  const { event, session } = await ingestWebhook("linear", req.body, await getLinearRepoId());
   return res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
 });
 
