@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    document.documentElement.classList.add("dark");
-  }, []);
+type ThemeProviderProps = React.ComponentProps<typeof NextThemesProvider>;
 
-  return <>{children}</>;
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return (
+    <NextThemesProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange {...props}>
+      {children}
+    </NextThemesProvider>
+  );
 }

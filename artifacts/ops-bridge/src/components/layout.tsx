@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap } from "lucide-react";
 import { cn } from "@/lib/format";
+import { ModeToggle } from "@/components/mode-toggle";
 
 const nav = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -26,13 +27,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* ── Desktop Sidebar ── */}
       <aside className="hidden md:flex w-60 flex-shrink-0 flex-col border-r border-border/60">
-        <div className="h-14 flex items-center px-5 border-b border-border/40">
+        <div className="h-14 flex items-center justify-between px-5 border-b border-border/40">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
               <Zap className="w-3.5 h-3.5 text-primary" />
             </div>
             <span className="font-semibold text-sm tracking-tight">Oncident</span>
           </div>
+          <ModeToggle />
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
