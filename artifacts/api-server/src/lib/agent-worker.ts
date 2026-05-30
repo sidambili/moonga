@@ -14,21 +14,23 @@ async function pollPendingSessions(): Promise<void> {
       .where(eq(sessionsTable.status, "pending"))
       .limit(5);
 
-    for (const session of pending) {
-      try {
-        await runAgentSession(session.id);
-      } catch (err) {
-        logger.error({ err, sessionId: session.id }, "Failed to process session");
+    await Promise.all(
+      pending.map(async (session) => {
         try {
-          await db
-            .update(sessionsTable)
-            .set({ status: "failed", updated_at: new Date() })
-            .where(eq(sessionsTable.id, session.id));
-        } catch (dbErr) {
-          logger.error({ dbErr }, "Failed to mark session as failed");
+          await runAgentSession(session.id);
+        } catch (err) {
+          logger.error({ err, sessionId: session.id }, "Failed to process session");
+          try {
+            await db
+              .update(sessionsTable)
+              .set({ status: "failed", updated_at: new Date() })
+              .where(eq(sessionsTable.id, session.id));
+          } catch (dbErr) {
+            logger.error({ dbErr }, "Failed to mark session as failed");
+          }
         }
-      }
-    }
+      }),
+    );
   } catch (err) {
     logger.error({ err }, "Agent worker poll error");
   }

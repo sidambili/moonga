@@ -9,7 +9,8 @@ import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost } from "./model-prices";
 
-const MAX_STEPS = 10;
+const MAX_STEPS = 5;
+const MAX_TOOL_CALLS = 20;
 const MAX_PAYLOAD_CHARS = 2_000;
 
 async function getModelSettings() {
@@ -17,29 +18,20 @@ async function getModelSettings() {
   return rows[0] ?? null;
 }
 
-async function getGithubToken(): Promise<string | undefined> {
+async function getGithubIntegration(): Promise<{ token: string | undefined; selectedRepo: string | undefined }> {
   try {
     const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "github"));
-    if (row?.enabled && row.api_key) {
-      return row.api_key;
+    if (row?.enabled) {
+      const config = row.config as Record<string, unknown> | null;
+      return {
+        token: row.api_key ?? undefined,
+        selectedRepo: (config?.selected_repo as string | undefined) ?? undefined,
+      };
     }
   } catch {
     // ignore
   }
-  return undefined;
-}
-
-async function getSelectedRepo(): Promise<string | undefined> {
-  try {
-    const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "github"));
-    if (row?.enabled && row.config) {
-      const config = row.config as Record<string, unknown>;
-      return config.selected_repo as string | undefined;
-    }
-  } catch {
-    // ignore
-  }
-  return undefined;
+  return { token: undefined, selectedRepo: undefined };
 }
 
 async function gatherEventContext(
@@ -135,15 +127,17 @@ async function gatherEventContext(
       }
     }
 
-    // Always list repo root for orientation
-    try {
-      const { data: root } = await client.rest.repos.getContent({ owner, repo: repoName, path: "" });
-      if (Array.isArray(root)) {
-        parts.push("Repository root:");
-        parts.push(root.map((e) => `${e.type === "dir" ? "📁" : "📄"} ${e.name}`).join("\n"));
+    // List repo root only for ticket events — saves tokens for events that already have file context
+    if (eventType === "ticket_created" || eventType === "issue_opened") {
+      try {
+        const { data: root } = await client.rest.repos.getContent({ owner, repo: repoName, path: "" });
+        if (Array.isArray(root)) {
+          parts.push("Repository root:");
+          parts.push(root.map((e) => `${e.type === "dir" ? "📁" : "📄"} ${e.name}`).join("\n"));
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
   } catch (err) {
     logger.warn({ err }, "Context gathering failed");
@@ -177,6 +171,29 @@ async function persistStep(
   });
 }
 
+function extractLinearTicketInfo(payload: Record<string, unknown>): string {
+  const data = payload.data as Record<string, unknown> | undefined;
+  if (!data) return JSON.stringify(payload, null, 2).slice(0, MAX_PAYLOAD_CHARS);
+
+  const priorityLabel: Record<number, string> = { 0: "No priority", 1: "Urgent", 2: "High", 3: "Medium", 4: "Low" };
+  const labels = (data.labels as Array<{ name: string }> | undefined)?.map((l) => l.name).join(", ") || "None";
+  const assignee = (data.assignee as { name?: string } | undefined)?.name || "Unassigned";
+  const state = (data.state as { name?: string } | undefined)?.name || "Unknown";
+  const description = (data.description as string | undefined) || "";
+
+  const lines = [
+    `Title: ${data.title}`,
+    `State: ${state}`,
+    `Priority: ${priorityLabel[data.priority as number] ?? "Unknown"}`,
+    `Assignee: ${assignee}`,
+    `Labels: ${labels}`,
+  ];
+  if (data.url) lines.push(`URL: ${data.url}`);
+  if (description) lines.push(`\nDescription:\n${description.slice(0, 3_000)}`);
+
+  return lines.join("\n");
+}
+
 function parseConfidence(text: string): number {
   const match = text.match(/CONFIDENCE:\s*([\d.]+)\s*$/im);
   return match ? Math.min(1, Math.max(0, parseFloat(match[1]))) : 0.75;
@@ -191,13 +208,18 @@ function buildSystemPrompt(techStack?: string): string {
     ? `\nThis repository uses ${techStack}. Use language-idiomatic patterns in your analysis.\n`
     : "";
   return `You are an expert SRE and engineering analyst. You analyze inbound engineering events (tickets, PRs, errors) and produce actionable, source-code-grounded analysis.${stackLine}
-You have access to GitHub repository tools to read files, list directories, and search code. Use these tools when the pre-fetched repository context is insufficient.
+You have access to GitHub tools: get_file_contents, list_directory, search_code, get_recent_commits, get_commit_diff, get_pull_request, get_issue. Use them when the pre-fetched context is insufficient.
+
+Tool use strategy:
+- For errors/regressions: start with get_recent_commits to find the likely culprit, then read specific files
+- For tickets/features: start with list_directory to understand structure, then read relevant files
+- For PRs: the diff is usually pre-fetched; only call tools if you need surrounding context
+- Avoid reading files larger than needed; prefer search_code to locate relevant symbols first
 
 Rules:
-- Always base your analysis on actual source code, not assumptions
-- If you need to see more code, use the available tools
-- Be concise (max 300 words for the final answer)
-- On the very last line write exactly: CONFIDENCE: <0.0–1.0>`;
+- Base analysis on actual source code, not assumptions
+- Be concise (max 300 words)
+- End your response with exactly: CONFIDENCE: <0.0–1.0>`;
 }
 
 function buildUserPrompt(
@@ -208,7 +230,9 @@ function buildUserPrompt(
   payload: unknown,
   context: string,
 ): string {
-  const payloadStr = JSON.stringify(payload, null, 2).slice(0, MAX_PAYLOAD_CHARS);
+  const ticketInfo = source === "linear"
+    ? extractLinearTicketInfo(payload as Record<string, unknown>)
+    : JSON.stringify(payload, null, 2).slice(0, MAX_PAYLOAD_CHARS);
   const contextBlock = context ? `\n\nRepository context:\n${context}` : "";
 
   if (objective === "diagnose") {
@@ -217,33 +241,32 @@ function buildUserPrompt(
 Source: ${source}
 Event type: ${eventType}
 Title: ${title}
-Payload:
-${payloadStr}${contextBlock}
+${ticketInfo}${contextBlock}
 
 Respond with:
 1. Root cause assessment
 2. Severity justification
 3. Recommended immediate actions
-4. Estimated resolution time
-
-Be concise (max 300 words). On the very last line write exactly: CONFIDENCE: <0.0–1.0>`;
+4. Estimated resolution time`;
   }
 
-  return `Analyze this ticket/task and produce an action plan.
+  return `Analyze this ticket and produce a source-code-grounded action plan.
 
 Source: ${source}
 Event type: ${eventType}
 Title: ${title}
-Payload:
-${payloadStr}${contextBlock}
+${ticketInfo}${contextBlock}
+
+Before writing the plan:
+- Use search_code or list_directory to find the files most relevant to this ticket
+- Read those files to understand the current implementation
+- Base every task on what you actually find in the code
 
 Respond with:
 1. Objective summary
-2. Key tasks (numbered)
+2. Key tasks (numbered, each referencing the relevant file/function)
 3. Dependencies or blockers
-4. Estimated complexity (Low / Medium / High)
-
-Be concise (max 300 words). On the very last line write exactly: CONFIDENCE: <0.0–1.0>`;
+4. Estimated complexity (Low / Medium / High)`;
 }
 
 function getModelConfig(settings: NonNullable<Awaited<ReturnType<typeof getModelSettings>>>, modelString: string) {
@@ -364,21 +387,21 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       ? (settings.plan_model ?? "gpt-4o")
       : (settings.triage_model ?? "gpt-4o-mini");
 
-  const githubToken = await getGithubToken();
-  const selectedRepo = await getSelectedRepo();
+  const { token: githubToken, selectedRepo } = await getGithubIntegration();
   const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, event.repo_id ?? selectedRepo ?? undefined);
 
-  const techStack = repo && githubToken
-    ? await detectTechStack(new Octokit({ auth: githubToken }), repo.owner, repo.repo)
-    : "";
-
-  // Pre-fetch repository context based on event type
-  const context = await gatherEventContext(
-    event.event_type,
-    event.payload_raw as Record<string, unknown>,
-    githubToken,
-    event.repo_id ?? selectedRepo ?? undefined,
-  );
+  // Fetch tech stack and event context in parallel
+  const [techStack, context] = await Promise.all([
+    repo && githubToken
+      ? detectTechStack(new Octokit({ auth: githubToken }), repo.owner, repo.repo)
+      : Promise.resolve(""),
+    gatherEventContext(
+      event.event_type,
+      event.payload_raw as Record<string, unknown>,
+      githubToken,
+      event.repo_id ?? selectedRepo ?? undefined,
+    ),
+  ]);
 
   const systemPrompt = buildSystemPrompt(techStack || undefined);
   const userPrompt = buildUserPrompt(
@@ -396,24 +419,30 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   }
   await persistStep(sessionId, 0, "user", userPrompt);
 
-  // Define GitHub tools — execute returns error if repo/token missing
+  // Shared client — avoids re-instantiating Octokit on every tool call
+  const ghClient = repo && githubToken ? new Octokit({ auth: githubToken }) : null;
+  const noGithub = "Error: GitHub integration not configured";
+
+  let toolCallsUsed = 0;
+  function checkToolLimit(): string | null {
+    if (++toolCallsUsed > MAX_TOOL_CALLS) {
+      return "Tool call limit reached. Write your final answer using the information gathered so far.";
+    }
+    return null;
+  }
+
   const githubTools = {
     get_file_contents: tool({
-      description: "Fetch the contents of a file from the GitHub repository",
+      description: "Fetch the contents of a file from the GitHub repository. Also use this for package manifests (package.json, Cargo.toml, go.mod, etc.).",
       parameters: z.object({
         path: z.string().describe("File path within the repo, e.g. 'src/index.ts'"),
         ref: z.string().optional().describe("Git ref (branch, tag, or commit SHA)"),
       }),
       execute: async ({ path, ref }) => {
-        if (!repo || !githubToken) return "Error: GitHub integration not configured";
-        const client = new Octokit({ auth: githubToken });
+        const limit = checkToolLimit(); if (limit) return limit;
+        if (!ghClient || !repo) return noGithub;
         try {
-          const { data } = await client.rest.repos.getContent({
-            owner: repo.owner,
-            repo: repo.repo,
-            path,
-            ref,
-          });
+          const { data } = await ghClient.rest.repos.getContent({ owner: repo.owner, repo: repo.repo, path, ref });
           if (Array.isArray(data)) return "Error: path is a directory, not a file";
           if (data.type === "file") {
             const content = data.content ? Buffer.from(data.content, "base64").toString("utf-8") : "";
@@ -431,10 +460,10 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         sha: z.string().describe("Commit SHA"),
       }),
       execute: async ({ sha }) => {
-        if (!repo || !githubToken) return "Error: GitHub integration not configured";
-        const client = new Octokit({ auth: githubToken });
+        const limit = checkToolLimit(); if (limit) return limit;
+        if (!ghClient || !repo) return noGithub;
         try {
-          const { data } = await client.rest.repos.getCommit({ owner: repo.owner, repo: repo.repo, ref: sha });
+          const { data } = await ghClient.rest.repos.getCommit({ owner: repo.owner, repo: repo.repo, ref: sha });
           const files = data.files?.map((f) => ({
             filename: f.filename,
             status: f.status,
@@ -454,11 +483,13 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         number: z.number().describe("Pull request number"),
       }),
       execute: async ({ number }) => {
-        if (!repo || !githubToken) return "Error: GitHub integration not configured";
-        const client = new Octokit({ auth: githubToken });
+        const limit = checkToolLimit(); if (limit) return limit;
+        if (!ghClient || !repo) return noGithub;
         try {
-          const { data: pr } = await client.rest.pulls.get({ owner: repo.owner, repo: repo.repo, pull_number: number });
-          const { data: files } = await client.rest.pulls.listFiles({ owner: repo.owner, repo: repo.repo, pull_number: number });
+          const [{ data: pr }, { data: files }] = await Promise.all([
+            ghClient.rest.pulls.get({ owner: repo.owner, repo: repo.repo, pull_number: number }),
+            ghClient.rest.pulls.listFiles({ owner: repo.owner, repo: repo.repo, pull_number: number }),
+          ]);
           return JSON.stringify({
             title: pr.title,
             body: pr.body,
@@ -479,11 +510,13 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         number: z.number().describe("Issue number"),
       }),
       execute: async ({ number }) => {
-        if (!repo || !githubToken) return "Error: GitHub integration not configured";
-        const client = new Octokit({ auth: githubToken });
+        const limit = checkToolLimit(); if (limit) return limit;
+        if (!ghClient || !repo) return noGithub;
         try {
-          const { data: issue } = await client.rest.issues.get({ owner: repo.owner, repo: repo.repo, issue_number: number });
-          const { data: comments } = await client.rest.issues.listComments({ owner: repo.owner, repo: repo.repo, issue_number: number });
+          const [{ data: issue }, { data: comments }] = await Promise.all([
+            ghClient.rest.issues.get({ owner: repo.owner, repo: repo.repo, issue_number: number }),
+            ghClient.rest.issues.listComments({ owner: repo.owner, repo: repo.repo, issue_number: number }),
+          ]);
           return JSON.stringify({
             title: issue.title,
             body: issue.body,
@@ -496,34 +529,16 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         }
       },
     }),
-    get_package_manifest: tool({
-      description: "Fetch the primary package manifest (package.json, Cargo.toml, pyproject.toml, go.mod, etc.) to understand dependencies and tech stack.",
-      parameters: z.object({
-        path: z.string().describe("Manifest file path, e.g. 'package.json' or 'Cargo.toml'"),
-      }),
-      execute: async ({ path }) => {
-        if (!repo || !githubToken) return "Error: GitHub integration not configured";
-        const client = new Octokit({ auth: githubToken });
-        try {
-          const { data } = await client.rest.repos.getContent({ owner: repo.owner, repo: repo.repo, path });
-          if (Array.isArray(data) || data.type !== "file") return "Error: not a file";
-          const content = data.content ? Buffer.from(data.content, "base64").toString("utf-8") : "";
-          return content.length > 100_000 ? content.slice(0, 100_000) + "\n\n[...truncated]" : content;
-        } catch (err) {
-          return `Error: ${err instanceof Error ? err.message : String(err)}`;
-        }
-      },
-    }),
     get_recent_commits: tool({
       description: "Get the most recent commits on the default branch. Useful for spotting regressions.",
       parameters: z.object({
         per_page: z.number().optional().describe("Number of commits to fetch (max 30)"),
       }),
       execute: async ({ per_page }) => {
-        if (!repo || !githubToken) return "Error: GitHub integration not configured";
-        const client = new Octokit({ auth: githubToken });
+        const limit = checkToolLimit(); if (limit) return limit;
+        if (!ghClient || !repo) return noGithub;
         try {
-          const { data } = await client.rest.repos.listCommits({
+          const { data } = await ghClient.rest.repos.listCommits({
             owner: repo.owner,
             repo: repo.repo,
             per_page: Math.min(per_page || 10, 30),
@@ -546,15 +561,10 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         ref: z.string().optional(),
       }),
       execute: async ({ path, ref }) => {
-        if (!repo || !githubToken) return "Error: GitHub integration not configured";
-        const client = new Octokit({ auth: githubToken });
+        const limit = checkToolLimit(); if (limit) return limit;
+        if (!ghClient || !repo) return noGithub;
         try {
-          const { data } = await client.rest.repos.getContent({
-            owner: repo.owner,
-            repo: repo.repo,
-            path: path || "",
-            ref,
-          });
+          const { data } = await ghClient.rest.repos.getContent({ owner: repo.owner, repo: repo.repo, path: path || "", ref });
           if (!Array.isArray(data)) return "Error: not a directory";
           return JSON.stringify(data.map((e) => ({ name: e.name, type: e.type, path: e.path, size: e.size })), null, 2);
         } catch (err) {
@@ -568,11 +578,11 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         query: z.string().describe("Search query, e.g. 'filename:package.json' or 'class User'"),
       }),
       execute: async ({ query }) => {
-        if (!repo || !githubToken) return "Error: GitHub integration not configured";
-        const client = new Octokit({ auth: githubToken });
+        const limit = checkToolLimit(); if (limit) return limit;
+        if (!ghClient || !repo) return noGithub;
         try {
           const q = `${query} repo:${repo.owner}/${repo.repo}`;
-          const { data } = await client.rest.search.code({ q });
+          const { data } = await ghClient.rest.search.code({ q });
           return JSON.stringify({
             total_count: data.total_count,
             items: data.items.map((item) => ({ path: item.path, url: item.html_url, score: item.score })),
@@ -592,6 +602,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       system: systemPrompt,
       prompt: userPrompt,
       maxSteps: MAX_STEPS,
+      maxTokens: 1_500,
       tools: githubTools,
     });
 
