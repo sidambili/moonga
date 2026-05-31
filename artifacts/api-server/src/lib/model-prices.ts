@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { modelPricesTable } from "@workspace/db";
-import { eq, like, and, sql } from "drizzle-orm";
+import { eq, like, and } from "drizzle-orm";
 import { logger } from "./logger";
 
 const DEFAULT_INPUT_RATE = 2.5;
@@ -89,6 +89,7 @@ const DEFAULT_PRICES: Array<{ model_slug: string; display_name: string; provider
   { model_slug: "gemini-2.5-flash", display_name: "Gemini 2.5 Flash", provider: "google", input_rate: 0.075, output_rate: 0.30, context_window: 1_000_000, pricing_unit: "1M" },
   { model_slug: "deepseek-v3", display_name: "DeepSeek-V3", provider: "deepseek", input_rate: 0.27, output_rate: 1.10, context_window: 64_000, pricing_unit: "1M" },
   { model_slug: "deepseek-r1", display_name: "DeepSeek-R1", provider: "deepseek", input_rate: 0.55, output_rate: 2.19, context_window: 64_000, pricing_unit: "1M" },
+  { model_slug: "deepseek-v4-pro", display_name: "DeepSeek V4 Pro", provider: "deepseek", input_rate: 0.435, output_rate: 0.87, context_window: 1_000_000, pricing_unit: "1M" },
   { model_slug: "grok-3", display_name: "Grok 3", provider: "xai", input_rate: 3.0, output_rate: 15.0, context_window: 131_072, pricing_unit: "1M" },
   { model_slug: "gpt-5.5", display_name: "GPT-5.5", provider: "openai", input_rate: 5.0, output_rate: 30.0, context_window: 256_000, pricing_unit: "1M" },
   { model_slug: "gpt-5.4-mini", display_name: "GPT-5.4 Mini", provider: "openai", input_rate: 0.75, output_rate: 4.50, context_window: 256_000, pricing_unit: "1M" },
@@ -109,16 +110,9 @@ const DEFAULT_PRICES: Array<{ model_slug: string; display_name: string; provider
 ];
 
 export async function seedModelPrices(): Promise<void> {
-  const existing = await db.select({ count: sql<number>`count(*)::int` }).from(modelPricesTable);
-  const count = existing[0]?.count ?? 0;
-
-  if (count > 0) {
-    logger.info({ count }, "Model prices already seeded");
-    return;
-  }
-
+  let inserted = 0;
   for (const p of DEFAULT_PRICES) {
-    await db.insert(modelPricesTable).values({
+    const result = await db.insert(modelPricesTable).values({
       model_slug: p.model_slug,
       display_name: p.display_name,
       provider: p.provider,
@@ -127,8 +121,8 @@ export async function seedModelPrices(): Promise<void> {
       pricing_unit: p.pricing_unit,
       context_window: p.context_window,
       is_active: true,
-    });
+    }).onConflictDoNothing({ target: modelPricesTable.model_slug });
+    if (result.rowCount) inserted += result.rowCount;
   }
-
-  logger.info({ seeded: DEFAULT_PRICES.length }, "Seeded default model prices");
+  if (inserted > 0) logger.info({ inserted }, "Seeded missing model prices");
 }
