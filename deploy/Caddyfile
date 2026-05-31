@@ -1,0 +1,11 @@
+# Caddy reverse proxy for Oncident
+# Place this file at deploy/Caddyfile and uncomment the caddy service in docker-compose.yml
+# Caddy will automatically obtain and renew HTTPS certificates.
+
+{
+  auto_https off
+}
+
+:80 {
+  reverse_proxy api:3000
+}

@@ -1,0 +1,79 @@
+# ---------------------------------------------------------------------------
+# Oncident — VPS Docker Compose (PostgreSQL + API + optional Caddy)
+#
+# Usage:
+#   cp .env.example .env
+#   # edit .env with your secrets
+#   docker compose up -d
+#
+# For HTTPS, uncomment the caddy service and update the Caddyfile.
+# ---------------------------------------------------------------------------
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: oncident-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: oncident
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: oncident
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oncident -d oncident"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - oncident
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oncident-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://oncident:${POSTGRES_PASSWORD:-changeme}@postgres:5432/oncident
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Add any additional secrets here (they are forwarded from .env)
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - oncident
+
+  # -------------------------------------------------------------------------
+  # Optional: Caddy reverse proxy with automatic HTTPS
+  # Uncomment this block and the caddy volume below if you want HTTPS.
+  # Make sure ports 80 and 443 are open on your VPS firewall.
+  # -------------------------------------------------------------------------
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: oncident-caddy
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   networks:
+  #     - oncident
+  #   depends_on:
+  #     - api
+
+volumes:
+  postgres_data:
+  # caddy_data:
+  # caddy_config:
+
+networks:
+  oncident:
+    driver: bridge

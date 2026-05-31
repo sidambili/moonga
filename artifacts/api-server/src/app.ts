@@ -3,6 +3,8 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const app: Express = express();
 
@@ -42,5 +44,20 @@ app.use(
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Serve frontend static files in production
+if (process.env.NODE_ENV === "production") {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const staticPath =
+    process.env.STATIC_FILES_PATH ||
+    path.join(__dirname, "../../../ops-bridge/dist/public");
+  app.use(express.static(staticPath));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api")) {
+      return next();
+    }
+    res.sendFile(path.join(staticPath, "index.html"));
+  });
+}
 
 export default app;

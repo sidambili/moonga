@@ -1,0 +1,10 @@
+node_modules
+.git
+.env
+.env.local
+*.md
+dev.mjs
+.replit
+.replitignore
+.claude
+scripts/post-merge.sh
