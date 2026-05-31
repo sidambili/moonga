@@ -34,7 +34,7 @@ ENV VITE_ALLOW_SIGNUP=${VITE_ALLOW_SIGNUP}
 COPY . .
 
 # Build the workspace (typechecks + builds artifacts)
-RUN pnpm run build
+RUN pnpm -r --if-present run build
 
 # ---------------------------------------------------------------------------
 # Production stage
