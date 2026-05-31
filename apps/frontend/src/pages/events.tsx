@@ -3,17 +3,11 @@ import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-reac
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge } from "@/components/ui-helpers";
-import { Link } from "wouter";
-import { Radio, ChevronRight } from "lucide-react";
-
-const severityDot: Record<string, string> = {
-  critical: "bg-red-500",
-  high: "bg-orange-400",
-  medium: "bg-yellow-400",
-  low: "bg-blue-400",
-};
+import { useLocation } from "wouter";
+import { ChevronRight } from "lucide-react";
 
 export default function EventsFeed() {
+  const [, navigate] = useLocation();
   const [sourceFilter, setSourceFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -31,103 +25,120 @@ export default function EventsFeed() {
   const items = eventsList?.items ?? [];
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <Radio className="w-5 h-5 text-primary" />
-            Events Feed
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Inbound intelligence stream</p>
-        </div>
-      </div>
+    <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-[130px] h-8 text-xs bg-card border-border/60 rounded-lg">
-            <SelectValue placeholder="Source" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All sources</SelectItem>
-            <SelectItem value="github">GitHub</SelectItem>
-            <SelectItem value="linear">Linear</SelectItem>
-            <SelectItem value="sentry">Sentry</SelectItem>
-            <SelectItem value="betterstack">Better Stack</SelectItem>
-            <SelectItem value="slack">Slack</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={severityFilter} onValueChange={setSeverityFilter}>
-          <SelectTrigger className="w-[130px] h-8 text-xs bg-card border-border/60 rounded-lg">
-            <SelectValue placeholder="Severity" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All severities</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px] h-8 text-xs bg-card border-border/60 rounded-lg">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="new">New</SelectItem>
-            <SelectItem value="open">Open</SelectItem>
-            <SelectItem value="in_progress">In progress</SelectItem>
-            <SelectItem value="resolved">Resolved</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* List */}
-      <div className="space-y-2">
-        {isLoading ? (
-          <div className="rounded-xl bg-card border border-border/60 py-12 text-center text-sm text-muted-foreground">
-            Loading events...
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        {/* Panel header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Events</span>
+            {items.length > 0 && (
+              <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+                {items.length}
+              </span>
+            )}
           </div>
+          {/* Filters */}
+          <div className="flex items-center gap-2">
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-[120px] h-7 text-xs">
+                <SelectValue placeholder="Source" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All sources</SelectItem>
+                <SelectItem value="github">GitHub</SelectItem>
+                <SelectItem value="linear">Linear</SelectItem>
+                <SelectItem value="sentry">Sentry</SelectItem>
+                <SelectItem value="betterstack">Better Stack</SelectItem>
+                <SelectItem value="slack">Slack</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={severityFilter} onValueChange={setSeverityFilter}>
+              <SelectTrigger className="w-[120px] h-7 text-xs hidden sm:flex">
+                <SelectValue placeholder="Severity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All severities</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[120px] h-7 text-xs hidden sm:flex">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="in_progress">In progress</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</div>
         ) : items.length === 0 ? (
-          <div className="rounded-xl bg-card border border-border/60 py-12 text-center text-sm text-muted-foreground">
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
             No events match the current filters.
           </div>
         ) : (
-          items.map((event) => (
-            <Link key={event.id} href={`/events/${event.id}`}>
-              <div className="flex items-center gap-3 rounded-xl bg-card border border-border/60 px-4 py-3.5 hover:bg-accent/50 transition-colors cursor-pointer">
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${severityDot[event.severity] ?? "bg-muted-foreground"}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {event.title || `${event.source} ${event.event_type}`}
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <SourceIcon source={event.source} className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground capitalize">{event.source}</span>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground w-24">Severity</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground">Title</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground w-28 hidden sm:table-cell">Source</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground w-32 hidden md:table-cell">Status</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-medium text-muted-foreground w-28">Time</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {items.map((event) => (
+                <tr
+                  key={event.id}
+                  className="hover:bg-muted/40 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/events/${event.id}`)}
+                >
+                  <td className="px-4 py-3">
+                    <SeverityBadge severity={event.severity} />
+                  </td>
+                  <td className="px-4 py-3 max-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {event.title || `${event.source} ${event.event_type}`}
+                    </p>
                     {event.event_type && (
-                      <>
-                        <span className="text-xs text-muted-foreground/40">·</span>
-                        <span className="text-xs text-muted-foreground">{event.event_type}</span>
-                      </>
+                      <p className="text-xs text-muted-foreground mt-0.5">{event.event_type}</p>
                     )}
-                    <span className="text-xs text-muted-foreground/40">·</span>
-                    <span className="text-xs text-muted-foreground">{formatRelative(event.created_at)}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <SeverityBadge severity={event.severity} />
-                  <StatusBadge status={event.status} />
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 hidden md:block" />
-                </div>
-              </div>
-            </Link>
-          ))
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <div className="flex items-center gap-1.5">
+                      <SourceIcon source={event.source} className="w-3.5 h-3.5 text-muted-foreground/60" />
+                      <span className="text-xs text-muted-foreground capitalize">{event.source}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <StatusBadge status={event.status} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {formatRelative(event.created_at)}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/20 hidden md:block" />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
+
     </div>
   );
 }

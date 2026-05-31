@@ -71,3 +71,65 @@ Polling cadence (already in the code): Dashboard refetches every 30s; Events/Ses
 ## Webhook endpoints
 
 `POST /api/webhooks/{github,linear,sentry,betterstack,slack}` — each handler creates an Event and spawns a Session. GitHub and Linear handlers filter by action/event type (see route files for the allow-list).
+
+## Frontend design system (locked)
+
+All pages must follow these patterns. Do not introduce ad-hoc spacing values or one-off card styles.
+
+### Page wrapper
+Every list/detail page uses this outer container — no exceptions:
+```tsx
+<div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
+```
+
+### Panels (sections)
+All content lives inside panels. A panel is a bordered card that acts as a table/section container:
+```tsx
+<div className="rounded-lg border border-border bg-card overflow-hidden">
+```
+
+### Panel header
+Every panel that has a title or filters uses this header bar:
+```tsx
+<div className="flex items-center justify-between px-4 py-3 border-b border-border">
+  <div className="flex items-center gap-2">
+    <span className="text-sm font-medium">Title</span>
+    {/* optional count badge */}
+    <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">{count}</span>
+  </div>
+  {/* right side: filters or actions */}
+</div>
+```
+
+### Data tables
+List pages render data as `<table>` elements inside panels:
+- `<thead>` row: `bg-muted/30`, cells use `text-[11px] font-medium text-muted-foreground`
+- `<tbody>` rows: `divide-y divide-border`, each row `hover:bg-muted/40 transition-colors cursor-pointer`
+- Row navigation: `onClick={() => navigate(...)}` via `useLocation` — never wrap `<tr>` in `<Link>`
+- Main content column: `max-w-0` on `<td>` + `truncate` on inner `<p>` to contain overflow
+- Responsive hiding: `hidden sm:table-cell` / `hidden md:table-cell` for secondary columns
+- Numbers/times: always `tabular-nums`
+
+### Filter selects in panel header
+```tsx
+<Select ...>
+  <SelectTrigger className="w-[120px] h-7 text-xs">
+```
+Use `h-7 text-xs` — never `h-9` or `h-8` in panel headers.
+
+### Empty/loading states
+```tsx
+<div className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</div>
+```
+
+### Topbar
+The global topbar in `Layout` (`components/layout.tsx`) derives the current page name from the `nav` array via `isActive`. It has three stub icon buttons (Search, Bell, RefreshCw) that are `disabled` until wired up. To activate one: remove `disabled`, add `onClick`, and remove the `/40` opacity class.
+
+### Hard rules — never do these
+- No `framer-motion` on page-level elements or list items
+- No `backdrop-blur-sm` on cards or panels
+- No gradient accent bars on stat cards (`bg-gradient-to-r from-*/60`)
+- No `active:scale-[0.985]` or `active:scale-[0.99]` on list rows
+- No decorative page headers (icon + uppercase label + `text-2xl h1`) — the topbar handles page identity
+- No `rounded-xl border-border/60 bg-card/80` — use `rounded-lg border-border bg-card`
+- No ad-hoc Tailwind values (e.g. `p-4 md:p-6`, `max-w-4xl`) — use the locked wrapper above

@@ -7,12 +7,11 @@ import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/lib/format";
 import { ApprovalBadge, ArtifactTypeBadge } from "@/components/ui-helpers";
 import { Link } from "wouter";
-import { FileCheck2, CheckCircle, XCircle, ChevronRight } from "lucide-react";
+import { CheckCircle, XCircle, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { MarkdownPreview } from "@/components/markdown";
 
 export default function ArtifactsReview() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const searchParams = new URLSearchParams(location.split("?")[1] || "");
   const sessionIdParam = searchParams.get("session_id");
 
@@ -30,7 +29,8 @@ export default function ArtifactsReview() {
     query: { queryKey: getListArtifactsQueryKey(listParams), refetchInterval: 15000 },
   });
 
-  const handleApprove = (id: number) => {
+  const handleApprove = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
     approveMutation.mutate({ id }, {
       onSuccess: () => {
         toast({ title: "Artifact approved" });
@@ -39,7 +39,8 @@ export default function ArtifactsReview() {
     });
   };
 
-  const handleReject = (id: number) => {
+  const handleReject = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
     rejectMutation.mutate({ id }, {
       onSuccess: () => {
         toast({ title: "Artifact rejected" });
@@ -49,104 +50,126 @@ export default function ArtifactsReview() {
   };
 
   const items = artifactsList?.items ?? [];
+  const draftCount = items.filter((a) => a.approval_state === "draft").length;
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <FileCheck2 className="w-5 h-5 text-primary" />
-            Review Queue
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Human approval gate</p>
-        </div>
-        <Select value={approvalFilter} onValueChange={setApprovalFilter}>
-          <SelectTrigger className="w-[130px] h-8 text-xs bg-card border-border/60 rounded-lg">
-            <SelectValue placeholder="Filter" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All states</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="edited">Edited</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
 
-      {/* List */}
-      <div className="space-y-2">
-        {isLoading ? (
-          <div className="rounded-xl bg-card border border-border/60 py-12 text-center text-sm text-muted-foreground">
-            Loading review queue...
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        {/* Panel header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Review Queue</span>
+            {draftCount > 0 && (
+              <span className="text-[11px] font-medium text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded tabular-nums">
+                {draftCount} pending
+              </span>
+            )}
+            {items.length > 0 && draftCount === 0 && (
+              <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+                {items.length}
+              </span>
+            )}
           </div>
+          <Select value={approvalFilter} onValueChange={setApprovalFilter}>
+            <SelectTrigger className="w-[130px] h-7 text-xs">
+              <SelectValue placeholder="State" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All states</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="edited">Edited</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {isLoading ? (
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</div>
         ) : items.length === 0 ? (
-          <div className="rounded-xl bg-card border border-border/60 py-12 text-center text-sm text-muted-foreground">
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
             No artifacts match the current filter.
           </div>
         ) : (
-          items.map((artifact) => (
-            <div key={artifact.id} className="rounded-xl bg-card border border-border/60 px-4 py-3.5 space-y-3">
-              {/* Top row */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <ArtifactTypeBadge type={artifact.type} />
-                  <ApprovalBadge state={artifact.approval_state} />
-                  <span className="text-xs text-muted-foreground">#{artifact.id}</span>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <span className="text-xs text-muted-foreground">{formatRelative(artifact.created_at)}</span>
-                  <Link href={`/artifacts/${artifact.id}`}>
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0 rounded-lg">
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Content preview */}
-              <Link href={`/artifacts/${artifact.id}`}>
-                <div className="text-sm text-muted-foreground leading-relaxed line-clamp-2 hover:text-foreground transition-colors cursor-pointer">
-                  <MarkdownPreview>{artifact.content}</MarkdownPreview>
-                </div>
-              </Link>
-
-              {/* Bottom row */}
-              <div className="flex items-center justify-between">
-                <Link href={`/sessions/${artifact.session_id}`} className="text-xs text-primary hover:underline">
-                  Session #{artifact.session_id}
-                </Link>
-
-                {artifact.approval_state === "draft" && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-3 text-xs rounded-lg text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-400"
-                      onClick={() => handleApprove(artifact.id)}
-                      disabled={approveMutation.isPending}
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground w-20">Type</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground">Content</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground w-24 hidden sm:table-cell">Session</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground w-24 hidden sm:table-cell">State</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-medium text-muted-foreground w-24 hidden md:table-cell">Time</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-medium text-muted-foreground w-44">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {items.map((artifact) => (
+                <tr
+                  key={artifact.id}
+                  className="hover:bg-muted/40 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/artifacts/${artifact.id}`)}
+                >
+                  <td className="px-4 py-3">
+                    <ArtifactTypeBadge type={artifact.type} />
+                  </td>
+                  <td className="px-4 py-3 max-w-0">
+                    <p className="text-sm text-muted-foreground truncate">
+                      {artifact.content.replace(/[#*_`[\]]/g, "").slice(0, 140)}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <Link
+                      href={`/sessions/${artifact.session_id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs text-primary hover:underline"
                     >
-                      <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-3 text-xs rounded-lg text-red-400 border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
-                      onClick={() => handleReject(artifact.id)}
-                      disabled={rejectMutation.isPending}
-                    >
-                      <XCircle className="w-3.5 h-3.5 mr-1" />
-                      Reject
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))
+                      #{artifact.session_id}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <ApprovalBadge state={artifact.approval_state} />
+                  </td>
+                  <td className="px-4 py-3 text-right hidden md:table-cell">
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {formatRelative(artifact.created_at)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {artifact.approval_state === "draft" ? (
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 text-xs text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500"
+                          onClick={(e) => handleApprove(e, artifact.id)}
+                          disabled={approveMutation.isPending}
+                        >
+                          <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 text-xs text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-500"
+                          onClick={(e) => handleReject(e, artifact.id)}
+                          disabled={rejectMutation.isPending}
+                        >
+                          <XCircle className="w-3.5 h-3.5 mr-1" />
+                          Reject
+                        </Button>
+                      </div>
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/20 ml-auto" />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
+
     </div>
   );
 }

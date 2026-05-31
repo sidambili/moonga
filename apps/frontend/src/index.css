@@ -147,7 +147,44 @@
   * {
     @apply border-border;
   }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    touch-action: manipulation;
+  }
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior-y: none;
+  }
+  /* Allow text selection in content areas */
+  p, h1, h2, h3, h4, h5, h6, span, div, li, td, th, pre, code {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  /* Prevent selection on interactive elements */
+  button, a, [role="button"], nav, .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* Touch-friendly active states */
+  button:active, a:active, [role="button"]:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+  }
+  /* Smooth scrolling but respect reduced motion */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

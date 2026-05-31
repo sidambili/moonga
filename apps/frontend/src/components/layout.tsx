@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap, LogOut } from "lucide-react";
+import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap, LogOut, Bell, Search, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/format";
 import { ModeToggle } from "@/components/mode-toggle";
 import { authClient } from "@/lib/auth-client";
@@ -115,7 +115,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     onClick={() => setDrawerOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                      "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all active:scale-[0.98]",
                       active
                         ? "bg-primary/10 text-primary"
                         : "text-muted-foreground hover:text-foreground hover:bg-accent"
@@ -146,23 +146,56 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* ── Main Content ── */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        {/* Subtle ambient background */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05]"
+          style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground)) 1px, transparent 0)`,
+            backgroundSize: '32px 32px',
+          }}
+        />
 
-        {/* Mobile top bar */}
-        <header className="md:hidden flex items-center justify-between h-14 px-4 border-b border-border/40 flex-shrink-0">
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center">
-              <Zap className="w-3 h-3 text-primary" />
-            </div>
-            <span className="font-semibold text-sm tracking-tight">Oncident</span>
+        {/* Top bar — unified across all breakpoints */}
+        <header className="flex items-center justify-between h-14 px-4 border-b border-border/40 flex-shrink-0">
+          {/* Left: hamburger (mobile) + page title */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-semibold tracking-tight">
+              {nav.find((item) => isActive(item.href))?.label ?? "Oncident"}
+            </span>
           </div>
-          <div className="w-8" />
+
+          {/* Right: action slots */}
+          <div className="flex items-center gap-1">
+            <button
+              disabled
+              title="Search — coming soon"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/40 cursor-not-allowed"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+            <button
+              disabled
+              title="Notifications — coming soon"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/40 cursor-not-allowed"
+            >
+              <Bell className="w-4 h-4" />
+            </button>
+            <button
+              disabled
+              title="Refresh — coming soon"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground/40 cursor-not-allowed"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <div className="w-px h-4 bg-border mx-1" />
+            <ModeToggle />
+          </div>
         </header>
 
         {/* Scrollable content, padded above bottom nav on mobile */}
@@ -171,18 +204,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* ── Mobile Bottom Tab Bar ── */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-end border-t border-border/40 bg-background pb-safe">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-end border-t border-border/40 bg-background/95 backdrop-blur-md pb-safe">
           {bottomNav.map((item) => {
             const active = isActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex-1 flex flex-col items-center gap-1 pt-2 pb-6 transition-colors"
+                className="flex-1 flex flex-col items-center gap-1 pt-2 pb-5 transition-colors active:opacity-60"
               >
                 <div
                   className={cn(
-                    "flex items-center justify-center w-10 h-10 rounded-xl transition-colors",
+                    "flex items-center justify-center w-11 h-11 rounded-2xl transition-all active:scale-90",
                     active ? "bg-primary/10" : "bg-transparent"
                   )}
                 >

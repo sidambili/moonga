@@ -158,7 +158,7 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>, r
     model_used: null,
   }).returning();
 
-  await db.update(eventsTable).set({ session_id: session.id, status: "processing" }).returning();
+  await db.update(eventsTable).set({ session_id: session.id, status: "processing" }).where(eq(eventsTable.id, event.id)).returning();
 
   return { event, session };
 }

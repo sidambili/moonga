@@ -3,18 +3,18 @@ import { useListSessions, getListSessionsQueryKey } from "@workspace/api-client-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
 import { SourceIcon, StatusBadge, ObjectivePill } from "@/components/ui-helpers";
-import { Link } from "wouter";
-import { Cpu, ChevronRight } from "lucide-react";
-import { MarkdownPreview } from "@/components/markdown";
+import { useLocation } from "wouter";
+import { ChevronRight } from "lucide-react";
 
 function Confidence({ score }: { score: number | null | undefined }) {
-  if (score == null) return <span className="text-xs text-muted-foreground">—</span>;
+  if (score == null) return <span className="text-xs text-muted-foreground tabular-nums">—</span>;
   const pct = Math.round(score * 100);
-  const color = score >= 0.8 ? "text-emerald-400" : score >= 0.6 ? "text-yellow-400" : "text-orange-400";
-  return <span className={`text-xs font-medium ${color}`}>{pct}%</span>;
+  const color = score >= 0.8 ? "text-emerald-500" : score >= 0.6 ? "text-yellow-500" : "text-orange-500";
+  return <span className={`text-xs font-medium tabular-nums ${color}`}>{pct}%</span>;
 }
 
 export default function Sessions() {
+  const [, navigate] = useLocation();
   const [statusFilter, setStatusFilter] = useState("all");
 
   const listParams = {
@@ -28,95 +28,103 @@ export default function Sessions() {
   const items = sessionsList?.items ?? [];
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-primary" />
-            Agent Sessions
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">AI work units — one per event</p>
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px] h-8 text-xs bg-card border-border/60 rounded-lg">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="running">Running</SelectItem>
-            <SelectItem value="needs_review">Needs review</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
 
-      {/* List */}
-      <div className="space-y-2">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        {/* Panel header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Sessions</span>
+            {items.length > 0 && (
+              <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+                {items.length}
+              </span>
+            )}
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px] h-7 text-xs">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="running">Running</SelectItem>
+              <SelectItem value="needs_review">Needs review</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {isLoading ? (
-          <div className="rounded-xl bg-card border border-border/60 py-12 text-center text-sm text-muted-foreground">
-            Loading sessions...
-          </div>
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</div>
         ) : items.length === 0 ? (
-          <div className="rounded-xl bg-card border border-border/60 py-12 text-center text-sm text-muted-foreground">
-            No sessions found.
-          </div>
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">No sessions found.</div>
         ) : (
-          items.map((session) => (
-            <Link key={session.id} href={`/sessions/${session.id}`}>
-              <div className="flex items-start gap-3 rounded-xl bg-card border border-border/60 px-4 py-3.5 hover:bg-accent/50 transition-colors cursor-pointer">
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div className="flex items-center gap-2">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground w-24">Objective</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground">Event</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground w-28 hidden sm:table-cell">Source</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium text-muted-foreground w-32 hidden md:table-cell">Status</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-medium text-muted-foreground w-20 hidden md:table-cell">Confidence</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-medium text-muted-foreground w-28">Updated</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {items.map((session) => (
+                <tr
+                  key={session.id}
+                  className="hover:bg-muted/40 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/sessions/${session.id}`)}
+                >
+                  <td className="px-4 py-3">
                     <ObjectivePill objective={session.objective} />
-                    <span className="text-xs text-muted-foreground">#{session.id}</span>
-                  </div>
-                  <div className="text-sm font-medium leading-snug line-clamp-2">
-                    {session.output_summary
-                      ? <MarkdownPreview>{session.output_summary}</MarkdownPreview>
-                      : <span className="text-muted-foreground italic">In progress…</span>
-                    }
-                  </div>
-                  {session.event && (
-                    <div className="flex items-center gap-1.5">
-                      <SourceIcon source={session.event.source} className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground capitalize">{session.event.source}</span>
-                      <span className="text-xs text-muted-foreground/40">·</span>
-                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                        {session.event.title?.slice(0, 50) || session.event.event_type}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                  <StatusBadge status={session.status} />
-                  <div className="flex items-center gap-2">
+                  </td>
+                  <td className="px-4 py-3 max-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {session.event?.title || session.event?.event_type || `Session #${session.id}`}
+                    </p>
+                    {session.output_summary ? (
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {session.output_summary.replace(/[#*_`[\]]/g, "").slice(0, 120)}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground/50 mt-0.5 italic">In progress…</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    {session.event && (
+                      <div className="flex items-center gap-1.5">
+                        <SourceIcon source={session.event.source} className="w-3.5 h-3.5 text-muted-foreground/60" />
+                        <span className="text-xs text-muted-foreground capitalize">{session.event.source}</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <StatusBadge status={session.status} />
+                  </td>
+                  <td className="px-4 py-3 text-right hidden md:table-cell">
                     <Confidence score={session.confidence_score} />
-                    <span className="text-xs text-muted-foreground">{formatRelative(session.updated_at)}</span>
-                  </div>
-                  {(session.step_count != null && session.step_count > 0) && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-muted-foreground/60">{session.step_count} steps</span>
-                      {session.total_cost != null && session.total_cost > 0 && (
-                        <>
-                          <span className="text-[10px] text-muted-foreground/30">·</span>
-                          <span className="text-[10px] text-muted-foreground/60">
-                            {session.total_cost < 0.001 ? "<$0.001" : `$${session.total_cost.toFixed(4)}`}
-                          </span>
-                        </>
-                      )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {formatRelative(session.updated_at)}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/20 hidden md:block" />
                     </div>
-                  )}
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 flex-shrink-0 self-center hidden md:block" />
-              </div>
-            </Link>
-          ))
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
+
     </div>
   );
 }
