@@ -180,7 +180,7 @@ function IntegrationConfig({
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${enabled ? "bg-primary/10" : "bg-muted"}`}>
           <SourceIcon
             source={provider.id}
-            className={`w-4 h-4 ${enabled ? "text-primary" : "text-muted-foreground"}`}
+            className={`w-4 h-4 ${enabled ? "" : "opacity-60"}`}
           />
         </div>
         <div className="flex-1 min-w-0">
@@ -438,7 +438,7 @@ export default function Integrations() {
                       <div className={`w-8 h-8 rounded-md flex items-center justify-center ${isActive ? "bg-primary/10" : "bg-muted"}`}>
                         <SourceIcon
                           source={provider.id}
-                          className={`w-4 h-4 ${isActive ? "text-primary" : "text-muted-foreground"}`}
+                          className={`w-4 h-4 ${isActive ? "" : "opacity-60"}`}
                         />
                       </div>
                     </td>

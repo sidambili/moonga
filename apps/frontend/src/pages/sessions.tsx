@@ -99,7 +99,7 @@ export default function Sessions() {
                   <td className="px-4 py-3 hidden sm:table-cell">
                     {session.event && (
                       <div className="flex items-center gap-1.5">
-                        <SourceIcon source={session.event.source} className="w-3.5 h-3.5 text-muted-foreground/60" />
+                        <SourceIcon source={session.event.source} className="w-3.5 h-3.5 opacity-60" />
                         <span className="text-xs text-muted-foreground capitalize">{session.event.source}</span>
                       </div>
                     )}

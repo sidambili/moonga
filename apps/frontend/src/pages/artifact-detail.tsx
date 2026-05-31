@@ -161,7 +161,7 @@ export default function ArtifactDetail() {
             <div className="flex items-start gap-3">
               {artifact.session.event && (
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <SourceIcon source={artifact.session.event.source} className="w-3.5 h-3.5 text-muted-foreground" />
+                  <SourceIcon source={artifact.session.event.source} className="w-3.5 h-3.5" />
                 </div>
               )}
               <div className="flex-1 min-w-0">

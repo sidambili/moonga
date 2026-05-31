@@ -1,15 +1,18 @@
-import { GitBranch, Layers, AlertTriangle, Activity, MessageSquare, Mail, HelpCircle } from "lucide-react";
+import { Mail, HelpCircle } from "lucide-react";
+import { FaGithub, FaSlack } from "react-icons/fa";
+import { SiLinear, SiSentry } from "react-icons/si";
+import { BetterStackIcon } from "@/components/icons/betterstack-icon";
 
 const badgeBase = "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium";
 
 export function SourceIcon({ source, className }: { source: string; className?: string }) {
   const normalized = source.toLowerCase();
   switch (normalized) {
-    case "github": return <GitBranch className={className} />;
-    case "linear": return <Layers className={className} />;
-    case "sentry": return <AlertTriangle className={className} />;
-    case "betterstack": return <Activity className={className} />;
-    case "slack": return <MessageSquare className={className} />;
+    case "github": return <FaGithub className={className} />;
+    case "linear": return <SiLinear className={className} />;
+    case "sentry": return <SiSentry className={className} />;
+    case "betterstack": return <BetterStackIcon className={className} />;
+    case "slack": return <FaSlack className={className} />;
     case "email": return <Mail className={className} />;
     default: return <HelpCircle className={className} />;
   }

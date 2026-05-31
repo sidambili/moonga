@@ -290,7 +290,7 @@ export default function Dashboard() {
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <div className="flex items-center gap-1.5">
-                      <SourceIcon source={event.source} className="w-3.5 h-3.5 text-muted-foreground/60" />
+                      <SourceIcon source={event.source} className="w-3.5 h-3.5 opacity-60" />
                       <span className="text-xs text-muted-foreground capitalize">{event.source}</span>
                     </div>
                   </td>

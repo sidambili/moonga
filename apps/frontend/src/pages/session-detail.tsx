@@ -120,7 +120,7 @@ export default function SessionDetail() {
                 <Link href={`/events/${session.event_id}`}>
                   <div className="flex items-start gap-3 group cursor-pointer">
                     <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                      <SourceIcon source={session.event.source} className="w-3.5 h-3.5 text-muted-foreground" />
+                      <SourceIcon source={session.event.source} className="w-3.5 h-3.5" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-1">
