@@ -35,7 +35,9 @@ install_deps() {
     ca-certificates \
     curl \
     git \
-    jq
+    jq \
+    openssl \
+    nano
 
   # Docker (official repo)
   if ! command -v docker &>/dev/null; then
