@@ -84,7 +84,7 @@ if (process.env.NODE_ENV === "production") {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const staticPath =
     process.env.STATIC_FILES_PATH ||
-    path.join(__dirname, "../../../ops-bridge/dist/public");
+    path.join(__dirname, "../../../frontend/dist/public");
   app.use(express.static(staticPath));
   app.get("/*splat", (req, res, next) => {
     if (req.path.startsWith("/api")) {

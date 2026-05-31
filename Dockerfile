@@ -14,8 +14,8 @@ RUN npm install -g pnpm@10
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc .dockerignore ./
 
 # Copy all package.json files so pnpm can compute the dependency graph
-COPY artifacts/api-server/package.json artifacts/api-server/
-COPY artifacts/ops-bridge/package.json artifacts/ops-bridge/
+COPY apps/api-server/package.json apps/api-server/
+COPY apps/frontend/package.json apps/frontend/
 COPY lib/db/package.json lib/db/
 COPY lib/api-zod/package.json lib/api-zod/
 COPY lib/api-client-react/package.json lib/api-client-react/
@@ -52,8 +52,8 @@ USER appuser
 # We copy node_modules because esbuild bundles most code, but some packages
 # (e.g. pg, dotenv) may have runtime files that are safer left unbundled.
 COPY --from=builder --chown=appuser:appgroup /app/package.json /app/pnpm-workspace.yaml /app/.npmrc ./
-COPY --from=builder --chown=appuser:appgroup /app/artifacts/api-server/package.json artifacts/api-server/
-COPY --from=builder --chown=appuser:appgroup /app/artifacts/ops-bridge/package.json artifacts/ops-bridge/
+COPY --from=builder --chown=appuser:appgroup /app/apps/api-server/package.json apps/api-server/
+COPY --from=builder --chown=appuser:appgroup /app/apps/frontend/package.json apps/frontend/
 COPY --from=builder --chown=appuser:appgroup /app/lib/db/package.json lib/db/
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/package.json lib/api-zod/
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/package.json lib/api-client-react/
@@ -62,8 +62,8 @@ COPY --from=builder --chown=appuser:appgroup /app/tsconfig.base.json tsconfig.js
 COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 
 # Copy built artifacts
-COPY --from=builder --chown=appuser:appgroup /app/artifacts/api-server/dist ./artifacts/api-server/dist
-COPY --from=builder --chown=appuser:appgroup /app/artifacts/ops-bridge/dist/public ./public
+COPY --from=builder --chown=appuser:appgroup /app/apps/api-server/dist ./apps/api-server/dist
+COPY --from=builder --chown=appuser:appgroup /app/apps/frontend/dist/public ./public
 
 # Copy lib package source files (these packages export ./src/index.ts directly — no dist/)
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/src ./lib/api-zod/src
@@ -81,4 +81,4 @@ ENV STATIC_FILES_PATH=/app/public
 
 EXPOSE 3000
 
-CMD ["node", "--enable-source-maps", "./artifacts/api-server/dist/index.mjs"]
+CMD ["node", "--enable-source-maps", "./apps/api-server/dist/index.mjs"]

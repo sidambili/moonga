@@ -1,4 +1,4 @@
-const CACHE = "ops-bridge-v1";
+const CACHE = "frontend-v1";
 const PRECACHE = ["/", "/manifest.json", "/favicon.svg"];
 
 self.addEventListener("install", (e) => {

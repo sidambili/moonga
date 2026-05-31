@@ -32,7 +32,7 @@ if (existsSync(envFileToLoad)) {
 
 const child = spawn(
   "pnpm",
-  ["--filter", "@workspace/api-server", "--filter", "@workspace/ops-bridge", "run", "dev"],
+  ["--filter", "@workspace/api-server", "--filter", "@workspace/frontend", "run", "dev"],
   { stdio: "inherit", shell: true, cwd: root }
 );
 

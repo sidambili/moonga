@@ -43,7 +43,7 @@ pnpm --filter @workspace/db run push
 pnpm --filter @workspace/api-server run dev
 
 # Start the frontend (in another terminal)
-pnpm --filter @workspace/ops-bridge run dev
+pnpm --filter @workspace/frontend run dev
 ```
 
 ## Webhook endpoints
@@ -65,10 +65,10 @@ lib/
   api-zod/                   # Generated Zod schemas
   api-client-react/          # Generated React Query hooks
 
-artifacts/
+apps/
   api-server/src/routes/     # Express route handlers
-  ops-bridge/src/pages/      # React pages
-  ops-bridge/src/components/ # Shared UI components
+  frontend/src/pages/      # React pages
+  frontend/src/components/ # Shared UI components
 ```
 
 ## Important conventions
