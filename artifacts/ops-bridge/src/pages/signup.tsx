@@ -19,12 +19,17 @@ export default function Signup() {
     e.preventDefault();
     setError("");
     setIsPending(true);
-    const { error } = await authClient.signUp.email({ email, password, name });
-    if (error) {
-      setError(error.message ?? "Sign up failed");
+    try {
+      const { error } = await authClient.signUp.email({ email, password, name });
+      if (error) {
+        setError(error.message ?? "Sign up failed");
+      } else {
+        window.location.href = "/";
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign up failed");
+    } finally {
       setIsPending(false);
-    } else {
-      window.location.href = "/";
     }
   };
 

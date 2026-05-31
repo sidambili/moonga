@@ -16,12 +16,17 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setIsPending(true);
-    const { error } = await authClient.signIn.email({ email, password });
-    if (error) {
-      setError(error.message ?? "Sign in failed");
+    try {
+      const { error } = await authClient.signIn.email({ email, password });
+      if (error) {
+        setError(error.message ?? "Sign in failed");
+      } else {
+        window.location.href = "/";
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed");
+    } finally {
       setIsPending(false);
-    } else {
-      window.location.href = "/";
     }
   };
 

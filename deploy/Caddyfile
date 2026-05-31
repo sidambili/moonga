@@ -1,6 +1,7 @@
-# Caddy reverse proxy for Oncident
-# Place this file at deploy/Caddyfile and uncomment the caddy service in docker-compose.yml
-# Caddy will automatically obtain and renew HTTPS certificates.
+# HTTP-only Caddy template for Oncident
+# This file is a placeholder: auto_https is off and the site listens on :80 only.
+# When a domain is configured, vps-setup.sh overwrites this file with a proper
+# HTTPS configuration and enables the caddy service via COMPOSE_PROFILES=https.
 
 {
   auto_https off

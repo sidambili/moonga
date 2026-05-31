@@ -26,8 +26,9 @@ COPY tsconfig.base.json tsconfig.json ./
 # Install dependencies (respects lockfile, downloads correct platform binaries inside container)
 RUN pnpm install --frozen-lockfile
 
-# Copy source code
-COPY . .
+# Forward build-time env vars to the frontend build
+ARG VITE_ALLOW_SIGNUP
+ENV VITE_ALLOW_SIGNUP=${VITE_ALLOW_SIGNUP}
 
 # Build the workspace (typechecks + builds artifacts)
 RUN pnpm run build

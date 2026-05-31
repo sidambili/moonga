@@ -29,13 +29,32 @@ app.use(
     },
   }),
 );
-app.use(cors({ origin: true, credentials: true }));
-app.use((req, res, next) => {
+const allowedOrigins = process.env.BETTER_AUTH_TRUSTED_ORIGINS
+  ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((o) => o.trim())
+  : [];
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+    credentials: true,
+  }),
+);
+
+const noCacheMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
   next();
-});
+};
+
+app.use("/api", noCacheMiddleware);
+app.use("/auth", noCacheMiddleware);
 
 // Block sign-up when ALLOW_SIGNUP is not explicitly "true"
 app.post(/^\/api\/auth\/sign-up/, (_req, res, next) => {

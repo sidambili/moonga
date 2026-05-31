@@ -29,6 +29,18 @@ function SafeRoute({ component: Component }: { component: React.ComponentType })
   );
 }
 
+function PublicRoute({ component: Component }: { component: React.ComponentType }) {
+  const { data: session } = authClient.useSession();
+  if (session) {
+    return <Redirect to="/" />;
+  }
+  return (
+    <ErrorBoundary>
+      <Component />
+    </ErrorBoundary>
+  );
+}
+
 function AuthenticatedApp() {
   return (
     <Layout>
@@ -61,8 +73,8 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/login" component={() => <SafeRoute component={Login} />} />
-      <Route path="/signup" component={() => <SafeRoute component={Signup} />} />
+      <Route path="/login" component={() => <PublicRoute component={Login} />} />
+      <Route path="/signup" component={() => <PublicRoute component={Signup} />} />
       <Route>
         {session ? <AuthenticatedApp /> : <Redirect to="/login" />}
       </Route>

@@ -40,10 +40,21 @@ install_deps() {
   # Docker (official repo)
   if ! command -v docker &>/dev/null; then
     info "Installing Docker..."
+
+    # Detect distro (Ubuntu vs Debian) for the correct repo URL
+    . /etc/os-release
+    DOCKER_DIST="${ID}"
+    DOCKER_CODENAME="${VERSION_CODENAME}"
+    if [ "$DOCKER_DIST" = "debian" ]; then
+      DOCKER_URL="https://download.docker.com/linux/debian"
+    else
+      DOCKER_URL="https://download.docker.com/linux/ubuntu"
+    fi
+
     sudo install -m 0755 -d /etc/apt/keyrings
-    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo curl -fsSL "${DOCKER_URL}/gpg" -o /etc/apt/keyrings/docker.asc
     sudo chmod a+r /etc/apt/keyrings/docker.asc
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] ${DOCKER_URL} ${DOCKER_CODENAME} stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
     sudo apt-get update
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     sudo usermod -aG docker "$USER"
@@ -132,25 +143,6 @@ setup_caddy() {
 
   info "Setting up Caddy for HTTPS on $DOMAIN..."
 
-  # Uncomment caddy service in docker-compose.yml
-  sed -i 's/^  # caddy:/  caddy:/' docker-compose.yml
-  sed -i 's/^  #   image:/    image:/' docker-compose.yml
-  sed -i 's/^  #   container_name:/    container_name:/' docker-compose.yml
-  sed -i 's/^  #   restart:/    restart:/' docker-compose.yml
-  sed -i 's/^  #   ports:/    ports:/' docker-compose.yml
-  sed -i 's/^  #     - "80:80"/      - "80:80"/' docker-compose.yml
-  sed -i 's/^  #     - "443:443"/      - "443:443"/' docker-compose.yml
-  sed -i 's/^  #   volumes:/    volumes:/' docker-compose.yml
-  sed -i 's/^  #     - .\/deploy\/Caddyfile/      - .\/deploy\/Caddyfile/' docker-compose.yml
-  sed -i 's/^  #     - caddy_data/      - caddy_data/' docker-compose.yml
-  sed -i 's/^  #     - caddy_config/      - caddy_config/' docker-compose.yml
-  sed -i 's/^  #   networks:/    networks:/' docker-compose.yml
-  sed -i 's/^  #     - oncident/      - oncident/' docker-compose.yml
-  sed -i 's/^  #   depends_on:/    depends_on:/' docker-compose.yml
-  sed -i 's/^  #     - api/      - api/' docker-compose.yml
-  sed -i 's/^  # caddy_data:/  caddy_data:/' docker-compose.yml
-  sed -i 's/^  # caddy_config:/  caddy_config:/' docker-compose.yml
-
   # Create Caddyfile
   mkdir -p deploy
   cat > deploy/Caddyfile <<EOF
@@ -159,8 +151,8 @@ $DOMAIN {
 }
 EOF
 
-  info "Caddy configured. Running docker compose up..."
-  docker compose up -d
+  info "Caddy configured. Running docker compose up with HTTPS profile..."
+  COMPOSE_PROFILES=https docker compose up -d
 
   info "Caddy will automatically request an HTTPS certificate for $DOMAIN."
   info "Make sure DNS for $DOMAIN points to this server's IP."

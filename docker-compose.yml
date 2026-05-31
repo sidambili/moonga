@@ -16,7 +16,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: oncident
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      # Set a strong password in your .env file.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: oncident
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -32,47 +33,52 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_ALLOW_SIGNUP: ${VITE_ALLOW_SIGNUP:-false}
     container_name: oncident-api
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://oncident:${POSTGRES_PASSWORD:-changeme}@postgres:5432/oncident
+      DATABASE_URL: postgres://oncident:${POSTGRES_PASSWORD}@postgres:5432/oncident
       NODE_ENV: production
       PORT: 3000
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      # Add any additional secrets here (they are forwarded from .env)
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
     ports:
       - "127.0.0.1:3000:3000"
     networks:
       - oncident
 
   # -------------------------------------------------------------------------
-  # Optional: Caddy reverse proxy with automatic HTTPS
-  # Uncomment this block and the caddy volume below if you want HTTPS.
+  # Caddy reverse proxy with automatic HTTPS.
+  # Enable by setting COMPOSE_PROFILES=https when running docker compose.
   # Make sure ports 80 and 443 are open on your VPS firewall.
   # -------------------------------------------------------------------------
-  # caddy:
-  #   image: caddy:2-alpine
-  #   container_name: oncident-caddy
-  #   restart: unless-stopped
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-  #     - caddy_data:/data
-  #     - caddy_config:/config
-  #   networks:
-  #     - oncident
-  #   depends_on:
-  #     - api
+  caddy:
+    image: caddy:2-alpine
+    container_name: oncident-caddy
+    restart: unless-stopped
+    profiles: ["https"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - oncident
+    depends_on:
+      - api
 
 volumes:
   postgres_data:
-  # caddy_data:
-  # caddy_config:
+  caddy_data:
+  caddy_config:
 
 networks:
   oncident:
