@@ -8,3 +8,9 @@ dev.mjs
 .replitignore
 .claude
 scripts/post-merge.sh
+dist/
+build/
+coverage/
+.DS_Store
+*.log
+deploy/

@@ -5,10 +5,13 @@
 # Builder stage
 # ---------------------------------------------------------------------------
 FROM node:22-slim AS builder
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 WORKDIR /app
+RUN chown appuser:appgroup /app
 
 # Install pnpm (same major version as workspace lockfile)
 RUN npm install -g pnpm@10
+USER appuser
 
 # Copy workspace manifest and lockfile first for layer caching
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc .dockerignore ./
@@ -37,30 +40,37 @@ RUN pnpm run build
 # Production stage
 # ---------------------------------------------------------------------------
 FROM node:22-slim AS production
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 WORKDIR /app
+RUN chown appuser:appgroup /app
 
-# Install pnpm so we can install workspace deps if needed at runtime
+# Install curl for Docker healthchecks and pnpm for runtime dependency management
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10
+USER appuser
 
 # Copy workspace files + all node_modules from builder
 # We copy node_modules because esbuild bundles most code, but some packages
 # (e.g. pg, dotenv) may have runtime files that are safer left unbundled.
-COPY --from=builder /app/package.json /app/pnpm-workspace.yaml /app/.npmrc ./
-COPY --from=builder /app/artifacts/api-server/package.json artifacts/api-server/
-COPY --from=builder /app/artifacts/ops-bridge/package.json artifacts/ops-bridge/
-COPY --from=builder /app/lib/db/package.json lib/db/
-COPY --from=builder /app/lib/api-zod/package.json lib/api-zod/
-COPY --from=builder /app/lib/api-client-react/package.json lib/api-client-react/
-COPY --from=builder /app/scripts/package.json scripts/
-COPY --from=builder /app/tsconfig.base.json tsconfig.json ./
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder --chown=appuser:appgroup /app/package.json /app/pnpm-workspace.yaml /app/.npmrc ./
+COPY --from=builder --chown=appuser:appgroup /app/artifacts/api-server/package.json artifacts/api-server/
+COPY --from=builder --chown=appuser:appgroup /app/artifacts/ops-bridge/package.json artifacts/ops-bridge/
+COPY --from=builder --chown=appuser:appgroup /app/lib/db/package.json lib/db/
+COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/package.json lib/api-zod/
+COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/package.json lib/api-client-react/
+COPY --from=builder --chown=appuser:appgroup /app/scripts/package.json scripts/
+COPY --from=builder --chown=appuser:appgroup /app/tsconfig.base.json tsconfig.json ./
+COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 
 # Copy built artifacts
-COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist
-COPY --from=builder /app/artifacts/ops-bridge/dist/public ./public
-COPY --from=builder /app/lib/api-zod/dist ./lib/api-zod/dist
-COPY --from=builder /app/lib/db/src ./lib/db/src
-COPY --from=builder /app/lib/db/drizzle.config.ts lib/db/
+COPY --from=builder --chown=appuser:appgroup /app/artifacts/api-server/dist ./artifacts/api-server/dist
+COPY --from=builder --chown=appuser:appgroup /app/artifacts/ops-bridge/dist/public ./public
+COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/dist ./lib/api-zod/dist
+# Drizzle migrations require the original TS source files (and migration metadata)
+# so drizzle-kit push runs against source rather than compiled output.
+# dist/ does not contain the required migration definitions.
+COPY --from=builder --chown=appuser:appgroup /app/lib/db/src ./lib/db/src
+COPY --from=builder --chown=appuser:appgroup /app/lib/db/drizzle.config.ts lib/db/
 
 ENV NODE_ENV=production
 ENV PORT=3000

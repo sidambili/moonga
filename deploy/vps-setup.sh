@@ -70,7 +70,10 @@ install_deps() {
 clone_repo() {
   if [ -d "$APP_DIR/.git" ]; then
     info "Repo already exists at $APP_DIR. Pulling latest..."
-    git -C "$APP_DIR" pull
+    BRANCH=$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD)
+    git -C "$APP_DIR" fetch origin "$BRANCH"
+    git -C "$APP_DIR" merge --ff-only "origin/$BRANCH" || \
+      error "Fast-forward failed on $APP_DIR. Resolve manually and re-run."
   else
     if [ -z "$REPO_URL" ]; then
       error "REPO_URL is not set. Either export it or clone the repo manually to $APP_DIR."
@@ -92,7 +95,7 @@ setup_env() {
 
     # Generate a random Postgres password
     RANDOM_PASS=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 24)
-    sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$RANDOM_PASS/" .env
+    sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$RANDOM_PASS/" .env
     info "Generated random POSTGRES_PASSWORD in .env"
   fi
 
@@ -117,11 +120,8 @@ deploy() {
   fi
 
   docker compose pull
-  docker compose build --no-cache
+  docker compose build
   docker compose up -d
-
-  info "Waiting for database to be ready..."
-  sleep 5
 
   # Run DB migrations
   info "Running database migrations (drizzle-kit push)..."

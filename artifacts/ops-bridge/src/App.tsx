@@ -41,19 +41,32 @@ function PublicRoute({ component: Component }: { component: React.ComponentType 
   );
 }
 
+// Stable route wrappers to prevent remounts on every render
+const DashboardRoute = () => <SafeRoute component={Dashboard} />;
+const EventsFeedRoute = () => <SafeRoute component={EventsFeed} />;
+const EventDetailRoute = () => <SafeRoute component={EventDetail} />;
+const SessionsRoute = () => <SafeRoute component={Sessions} />;
+const SessionDetailRoute = () => <SafeRoute component={SessionDetail} />;
+const ArtifactsReviewRoute = () => <SafeRoute component={ArtifactsReview} />;
+const ArtifactDetailRoute = () => <SafeRoute component={ArtifactDetail} />;
+const IntegrationsRoute = () => <SafeRoute component={Integrations} />;
+const ModelSettingsRoute = () => <SafeRoute component={ModelSettings} />;
+const LoginRoute = () => <PublicRoute component={Login} />;
+const SignupRoute = () => <PublicRoute component={Signup} />;
+
 function AuthenticatedApp() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={() => <SafeRoute component={Dashboard} />} />
-        <Route path="/events" component={() => <SafeRoute component={EventsFeed} />} />
-        <Route path="/events/:id" component={() => <SafeRoute component={EventDetail} />} />
-        <Route path="/sessions" component={() => <SafeRoute component={Sessions} />} />
-        <Route path="/sessions/:id" component={() => <SafeRoute component={SessionDetail} />} />
-        <Route path="/artifacts" component={() => <SafeRoute component={ArtifactsReview} />} />
-        <Route path="/artifacts/:id" component={() => <SafeRoute component={ArtifactDetail} />} />
-        <Route path="/integrations" component={() => <SafeRoute component={Integrations} />} />
-        <Route path="/settings" component={() => <SafeRoute component={ModelSettings} />} />
+        <Route path="/" component={DashboardRoute} />
+        <Route path="/events" component={EventsFeedRoute} />
+        <Route path="/events/:id" component={EventDetailRoute} />
+        <Route path="/sessions" component={SessionsRoute} />
+        <Route path="/sessions/:id" component={SessionDetailRoute} />
+        <Route path="/artifacts" component={ArtifactsReviewRoute} />
+        <Route path="/artifacts/:id" component={ArtifactDetailRoute} />
+        <Route path="/integrations" component={IntegrationsRoute} />
+        <Route path="/settings" component={ModelSettingsRoute} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -73,8 +86,8 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/login" component={() => <PublicRoute component={Login} />} />
-      <Route path="/signup" component={() => <PublicRoute component={Signup} />} />
+      <Route path="/login" component={LoginRoute} />
+      <Route path="/signup" component={SignupRoute} />
       <Route>
         {session ? <AuthenticatedApp /> : <Redirect to="/login" />}
       </Route>

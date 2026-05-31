@@ -17,7 +17,11 @@ const nav = [
 const bottomNav = nav.slice(0, 5);
 
 async function signOut() {
-  await authClient.signOut();
+  try {
+    await authClient.signOut();
+  } catch (err) {
+    console.error("Sign out failed:", err);
+  }
   window.location.href = "/login";
 }
 
