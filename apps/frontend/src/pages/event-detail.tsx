@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useGetEvent, getGetEventQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Copy, Check } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge } from "@/components/ui-helpers";
 
@@ -9,6 +10,15 @@ export default function EventDetail() {
   const [, params] = useRoute("/events/:id");
   const id = Number(params?.id);
   const { data: event, isLoading } = useGetEvent(id, { query: { queryKey: getGetEventQueryKey(id), enabled: !!id } });
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    if (!event) return;
+    const text = JSON.stringify(event.payload_raw, null, 2);
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (isLoading) {
     return (
@@ -101,7 +111,17 @@ export default function EventDetail() {
 
       {/* Raw Payload */}
       <div className="rounded-xl bg-card border border-border/60 p-4 space-y-3">
-        <p className="text-xs font-medium text-muted-foreground">Raw Payload</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-muted-foreground">Raw Payload</p>
+          <Button variant="ghost" size="sm" className="h-7 px-2 rounded-md" onClick={handleCopy}>
+            {copied ? (
+              <Check className="w-3.5 h-3.5 text-green-500" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+            <span className="ml-1.5 text-xs">{copied ? "Copied" : "Copy"}</span>
+          </Button>
+        </div>
         <pre className="text-xs bg-muted/50 rounded-lg p-4 overflow-auto max-h-96 text-foreground whitespace-pre-wrap break-words font-mono leading-relaxed">
           {JSON.stringify(event.payload_raw, null, 2)}
         </pre>

@@ -1,13 +1,29 @@
+import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useGetSession, useRetrySession, getGetSessionQueryKey, getListSessionsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, ExternalLink } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Copy, Check } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 import Markdown from "@/components/markdown";
 import SessionTrace from "@/components/session-trace";
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <Button variant="ghost" size="sm" className="h-7 px-2 rounded-md" onClick={handleCopy}>
+      {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+      <span className="ml-1.5 text-xs">{copied ? "Copied" : "Copy"}</span>
+    </Button>
+  );
+}
 
 export default function SessionDetail() {
   const [, params] = useRoute("/sessions/:id");
@@ -141,7 +157,10 @@ export default function SessionDetail() {
           {/* Agent output */}
           {session.output_summary && (
             <div className="rounded-xl bg-card border border-border/60 p-5 space-y-3">
-              <p className="text-xs font-medium text-muted-foreground">Output</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">Output</p>
+                <CopyButton text={session.output_summary} />
+              </div>
               <Markdown>{session.output_summary}</Markdown>
             </div>
           )}

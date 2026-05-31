@@ -4,11 +4,26 @@ import { useGetArtifact, useApproveArtifact, useRejectArtifact, useEditArtifact,
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, CheckCircle, XCircle, Edit3, Save, X, ExternalLink } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Edit3, Save, X, ExternalLink, Copy, Check } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, ApprovalBadge, ArtifactTypeBadge, ObjectivePill } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 import Markdown from "@/components/markdown";
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <Button variant="ghost" size="sm" className="h-7 px-2 rounded-md" onClick={handleCopy}>
+      {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+      <span className="ml-1.5 text-xs">{copied ? "Copied" : "Copy"}</span>
+    </Button>
+  );
+}
 
 export default function ArtifactDetail() {
   const [, params] = useRoute("/artifacts/:id");
@@ -193,7 +208,7 @@ export default function ArtifactDetail() {
       <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
         <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">Content</span>
-          {editing && (
+          {editing ? (
             <div className="flex gap-2">
               <Button size="sm" variant="ghost" onClick={() => setEditing(false)} className="h-7 text-xs">
                 <X className="w-3.5 h-3.5 mr-1" />Cancel
@@ -202,6 +217,8 @@ export default function ArtifactDetail() {
                 <Save className="w-3.5 h-3.5 mr-1" />Save
               </Button>
             </div>
+          ) : (
+            artifact.content && <CopyButton text={artifact.content} />
           )}
         </div>
         <div className="p-4">
