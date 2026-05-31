@@ -3,7 +3,7 @@ import { useGetSessionSteps, getGetSessionStepsQueryKey } from "@workspace/api-c
 import type { SessionStep } from "@workspace/api-client-react";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 
-const HARNESS_TOOL_NAMES = new Set([
+const SYSTEM_TOOL_NAMES = new Set([
   "create_artifact", "post_linear_comment", "post_slack_reply",
   "gather_event_context", "fetch_repo_instructions",
 ]);
@@ -36,10 +36,39 @@ type ToolCallItem = {
   result?: SessionStep;
 };
 
+type ArtifactOutput = {
+  content: string;
+  summary: string;
+  confidence?: number;
+};
+
+function tryParseArtifactOutput(text: string | null | undefined): ArtifactOutput | null {
+  if (!text) return null;
+  // Mirror server-side parseAgentOutput: strip fences, then find outermost { }
+  const stripped = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
+  const start = stripped.indexOf("{");
+  const end = stripped.lastIndexOf("}");
+  if (start === -1 || end <= start) return null;
+  try {
+    const p = JSON.parse(stripped.slice(start, end + 1)) as Record<string, unknown>;
+    if (typeof p.content === "string" && p.content.trim() && (typeof p.summary === "string" || typeof p.slack_summary === "string")) {
+      return {
+        content: p.content,
+        summary: (p.summary ?? p.slack_summary) as string,
+        confidence: typeof p.confidence === "number" ? p.confidence : undefined,
+      };
+    }
+  } catch {
+    // not parseable
+  }
+  return null;
+}
+
 type VisualGroup =
   | { kind: "thinking"; step: SessionStep; durationMs?: number }
-  | { kind: "tool_group"; call: SessionStep; items: ToolCallItem[]; isHarness: boolean }
-  | { kind: "user"; step: SessionStep };
+  | { kind: "tool_group"; call: SessionStep; items: ToolCallItem[]; isSystem: boolean }
+  | { kind: "user"; step: SessionStep }
+  | { kind: "artifact_output"; step: SessionStep; parsed: ArtifactOutput };
 
 function formatToolLabel(name: string, args?: unknown): string {
   const a = args && typeof args === "object" ? (args as Record<string, unknown>) : {};
@@ -76,6 +105,10 @@ function formatToolLabel(name: string, args?: unknown): string {
   }
 }
 
+function basename(path: string): string {
+  return path.split("/").pop() ?? path;
+}
+
 function toolGroupSummary(items: ToolCallItem[]): string {
   if (items.length === 0) return "Tool call";
   const first = formatToolLabel(items[0].name, items[0].args);
@@ -86,7 +119,9 @@ function toolGroupSummary(items: ToolCallItem[]): string {
     return `${first} and performed ${extra} other ${extra === 1 ? "query" : "queries"}`;
   }
   if (n0 === "get_file_contents") {
-    return `${first} and ${extra} other ${extra === 1 ? "file" : "files"}`;
+    const a0 = items[0].args && typeof items[0].args === "object" ? (items[0].args as Record<string, unknown>) : {};
+    const filename = a0.path ? basename(String(a0.path)) : first;
+    return `Read ${filename} and ${extra} more ${extra === 1 ? "file" : "files"}`;
   }
   return `${first} and ${extra} other ${extra === 1 ? "action" : "actions"}`;
 }
@@ -124,15 +159,20 @@ function buildVisualGroups(steps: SessionStep[]): VisualGroup[] {
         args: c.args,
         result: resultSteps[idx],
       }));
-      const isHarness = items.every((it) => HARNESS_TOOL_NAMES.has(it.name));
-      groups.push({ kind: "tool_group", call: s, items, isHarness });
+      const isSystem = items.every((it) => SYSTEM_TOOL_NAMES.has(it.name));
+      groups.push({ kind: "tool_group", call: s, items, isSystem });
       i = j;
     } else if (s.role === "assistant" && s.content) {
-      groups.push({
-        kind: "thinking",
-        step: s,
-        durationMs: durationMs != null && durationMs > 0 ? durationMs : undefined,
-      });
+      const parsed = tryParseArtifactOutput(s.content);
+      if (parsed) {
+        groups.push({ kind: "artifact_output", step: s, parsed });
+      } else {
+        groups.push({
+          kind: "thinking",
+          step: s,
+          durationMs: durationMs != null && durationMs > 0 ? durationMs : undefined,
+        });
+      }
       i++;
     } else if (s.role === "tool") {
       // Orphan tool step — wrap as single-item group
@@ -141,7 +181,7 @@ function buildVisualGroups(steps: SessionStep[]): VisualGroup[] {
         kind: "tool_group",
         call: s,
         items,
-        isHarness: HARNESS_TOOL_NAMES.has(s.tool_name ?? ""),
+        isSystem: SYSTEM_TOOL_NAMES.has(s.tool_name ?? ""),
       });
       i++;
     } else {
@@ -150,6 +190,60 @@ function buildVisualGroups(steps: SessionStep[]): VisualGroup[] {
   }
 
   return groups;
+}
+
+function ArtifactOutputRow({ step, parsed }: { step: SessionStep; parsed: ArtifactOutput }) {
+  const [open, setOpen] = useState(false);
+  const [showFull, setShowFull] = useState(false);
+  const confidencePct = parsed.confidence != null ? `${Math.round(parsed.confidence * 100)}%` : null;
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted/20 transition-colors text-left"
+      >
+        {open ? (
+          <ChevronDown className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
+        ) : (
+          <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
+        )}
+        <span className="text-[13px] text-foreground/80 flex-1 min-w-0 truncate">Created summary</span>
+        {confidencePct && (
+          <span className="text-[10px] tabular-nums text-muted-foreground/45 ml-2 flex-shrink-0">
+            {confidencePct} confidence
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="pb-1 space-y-0.5">
+          <div className="px-4 pl-9 pb-1.5">
+            <p className="text-[12px] text-foreground/65 leading-relaxed">{parsed.summary}</p>
+          </div>
+          <div>
+            <button
+              onClick={() => setShowFull((v) => !v)}
+              className="w-full flex items-center gap-1.5 py-1.5 pl-12 pr-4 hover:bg-muted/20 transition-colors text-left"
+            >
+              {showFull ? (
+                <ChevronDown className="w-3 h-3 text-muted-foreground/35 flex-shrink-0" />
+              ) : (
+                <ChevronRight className="w-3 h-3 text-muted-foreground/35 flex-shrink-0" />
+              )}
+              <span className="text-[11px] text-muted-foreground/50">Show full content</span>
+            </button>
+            {showFull && (
+              <div className="px-4 pb-2 pl-16">
+                <pre className="text-[11px] font-mono text-foreground/50 whitespace-pre-wrap overflow-auto max-h-64 rounded bg-muted/30 p-2 leading-relaxed">
+                  {step.content}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function SubToolItem({ item }: { item: ToolCallItem }) {
@@ -238,11 +332,11 @@ function ThinkingRow({ step, durationMs }: { step: SessionStep; durationMs?: num
 function ToolGroupRow({
   call,
   items,
-  isHarness,
+  isSystem,
 }: {
   call: SessionStep;
   items: ToolCallItem[];
-  isHarness: boolean;
+  isSystem: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const summary = toolGroupSummary(items);
@@ -260,14 +354,14 @@ function ToolGroupRow({
         )}
         <span
           className={`text-[13px] flex-1 min-w-0 truncate ${
-            isHarness ? "text-muted-foreground/50" : "text-foreground/80"
+            isSystem ? "text-muted-foreground/50" : "text-foreground/80"
           }`}
         >
           {summary}
         </span>
-        {isHarness && (
+        {isSystem && (
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground/30 font-medium ml-2 flex-shrink-0">
-            harness
+            system
           </span>
         )}
       </button>
@@ -303,7 +397,7 @@ function UserRow({ step }: { step: SessionStep }) {
         ) : (
           <ChevronRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
         )}
-        <span className="text-[12px] text-muted-foreground/55">Prompt</span>
+        <span className="text-[12px] text-muted-foreground/55">Instructions</span>
       </button>
       {open && step.content && (
         <div className="px-4 pb-2 pl-9">
@@ -364,9 +458,12 @@ export default function SessionTrace({ sessionId, totalCost }: SessionTraceProps
             if (g.kind === "thinking") {
               return <ThinkingRow key={i} step={g.step} durationMs={g.durationMs} />;
             }
+            if (g.kind === "artifact_output") {
+              return <ArtifactOutputRow key={i} step={g.step} parsed={g.parsed} />;
+            }
             if (g.kind === "tool_group") {
               return (
-                <ToolGroupRow key={i} call={g.call} items={g.items} isHarness={g.isHarness} />
+                <ToolGroupRow key={i} call={g.call} items={g.items} isSystem={g.isSystem} />
               );
             }
             return <UserRow key={i} step={g.step} />;
