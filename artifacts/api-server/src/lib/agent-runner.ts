@@ -605,7 +605,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       system: systemPrompt,
       prompt: userPrompt,
       maxSteps: MAX_STEPS,
-      maxTokens: 1_500,
+      maxTokens: 4_000,
       tools: githubTools,
     });
 
@@ -633,7 +633,26 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       stepNum++;
     }
 
-    const finalTextRaw = result.text;
+    let finalTextRaw = result.text;
+
+    // Fallback: some providers/models don't produce text after tool results.
+    // Retry without tools, feeding the tool results back as context.
+    if (!finalTextRaw && result.steps.some((s) => s.toolCalls && s.toolCalls.length > 0)) {
+      const toolResults = result.steps.flatMap((s) => s.toolResults ?? []);
+      const retryPrompt = `${userPrompt}\n\n[Tool results gathered]\n${toolResults
+        .map((tr) => `Tool: ${tr.toolName}\nResult: ${JSON.stringify(tr.result).slice(0, 10_000)}`)
+        .join("\n---\n")}\n\nBased on the above tool results, produce your final analysis now.`;
+
+      const retryResult = await generateText({
+        model: modelConfig,
+        system: systemPrompt,
+        prompt: retryPrompt,
+        maxTokens: 4_000,
+      });
+
+      finalTextRaw = retryResult.text;
+    }
+
     const finalText = stripConfidence(finalTextRaw);
 
     if (!finalText) {
