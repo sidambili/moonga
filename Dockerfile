@@ -5,13 +5,10 @@
 # Builder stage
 # ---------------------------------------------------------------------------
 FROM node:22-slim AS builder
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 WORKDIR /app
-RUN chown appuser:appgroup /app
 
 # Install pnpm (same major version as workspace lockfile)
 RUN npm install -g pnpm@10
-USER appuser
 
 # Copy workspace manifest and lockfile first for layer caching
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc .dockerignore ./
@@ -32,6 +29,9 @@ RUN pnpm install --frozen-lockfile
 # Forward build-time env vars to the frontend build
 ARG VITE_ALLOW_SIGNUP
 ENV VITE_ALLOW_SIGNUP=${VITE_ALLOW_SIGNUP}
+
+# Copy source code
+COPY . .
 
 # Build the workspace (typechecks + builds artifacts)
 RUN pnpm run build
