@@ -793,12 +793,15 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       .where(eq(sessionsTable.id, sessionId));
 
     const artifactType = session.objective === "plan" ? "action_plan" : "diagnosis";
-    await db.insert(artifactsTable).values({
+    const [insertedArtifact] = await db.insert(artifactsTable).values({
       session_id: sessionId,
       type: artifactType,
       content: parsed.content,
       approval_state: "draft",
-    });
+    }).returning({ id: artifactsTable.id });
+
+    await persistStep(sessionId, stepNum, "tool", `[Harness] Created artifact #${insertedArtifact?.id ?? "?"} (type=${artifactType}, approval=draft, ${parsed.content.length} chars)`, undefined, undefined, undefined, "create_artifact");
+    stepNum++;
 
     await db
       .update(eventsTable)
@@ -814,6 +817,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         postSlackReply(channel, threadTs, `*Analysis complete*\n${parsed.slack_summary}`, slackToken).catch((err) =>
           logger.warn({ err }, "Failed to post Slack reply"),
         );
+        await persistStep(sessionId, stepNum, "tool", `[Harness] Posted Slack reply to channel ${channel} (thread ${threadTs})\n\n${parsed.slack_summary}`, undefined, undefined, undefined, "post_slack_reply");
+        stepNum++;
       }
     }
 
@@ -821,6 +826,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       postLinearComment(event.ticket_id, parsed.slack_summary).catch((err) =>
         logger.warn({ err, sessionId }, "Failed to post Linear comment"),
       );
+      await persistStep(sessionId, stepNum, "tool", `[Harness] Posted Linear comment to ticket ${event.ticket_id}\n\n${parsed.slack_summary}`, undefined, undefined, undefined, "post_linear_comment");
+      stepNum++;
     }
 
     logger.info({ sessionId, model: modelString, confidence: parsed.confidence, steps: result.steps.length }, "Session completed → needs_review");
