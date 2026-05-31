@@ -12,7 +12,7 @@ import {
 } from "@workspace/api-client-react";
 import { Activity, LayoutGrid, Clock, ShieldAlert, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
 import { formatRelative } from "@/lib/format";
-import { SeverityBadge, StatusBadge, SourceIcon } from "@/components/ui-helpers";
+import { SeverityBadge, StatusBadge, SourceIcon, formatSource } from "@/components/ui-helpers";
 import { Link, useLocation } from "wouter";
 import {
   PieChart as RePieChart,
@@ -96,7 +96,7 @@ function SeverityChart({ data }: { data: Array<{ severity: string; count: number
               className="w-1.5 h-1.5 rounded-full flex-shrink-0"
               style={{ backgroundColor: d.fill }}
             />
-            <span className="text-xs text-muted-foreground capitalize flex-1">{d.name}</span>
+            <span className="text-xs text-muted-foreground flex-1">{d.name}</span>
             <span className="text-xs font-medium tabular-nums">{d.value}</span>
           </div>
         ))}
@@ -129,6 +129,7 @@ function SourceChart({ data }: { data: Array<{ source: string; count: number }> 
           tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
           axisLine={false}
           tickLine={false}
+          tickFormatter={(v: string) => formatSource(v)}
         />
         <YAxis
           tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
@@ -291,7 +292,7 @@ export default function Dashboard() {
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <div className="flex items-center gap-1.5">
                       <SourceIcon source={event.source} className="w-3.5 h-3.5 opacity-60" />
-                      <span className="text-xs text-muted-foreground capitalize">{event.source}</span>
+                      <span className="text-xs text-muted-foreground">{formatSource(event.source)}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">

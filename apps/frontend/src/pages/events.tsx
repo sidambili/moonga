@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
-import { SourceIcon, SeverityBadge, StatusBadge } from "@/components/ui-helpers";
+import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource } from "@/components/ui-helpers";
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
 
@@ -112,13 +112,13 @@ export default function EventsFeed() {
                       {event.title || `${event.source} ${event.event_type}`}
                     </p>
                     {event.event_type && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{event.event_type}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{formatEventType(event.event_type)}</p>
                     )}
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <div className="flex items-center gap-1.5">
                       <SourceIcon source={event.source} className="w-3.5 h-3.5 opacity-60" />
-                      <span className="text-xs text-muted-foreground capitalize">{event.source}</span>
+                      <span className="text-xs text-muted-foreground">{formatSource(event.source)}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">

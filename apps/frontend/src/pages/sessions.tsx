@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useListSessions, getListSessionsQueryKey } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
-import { SourceIcon, StatusBadge, ObjectivePill } from "@/components/ui-helpers";
+import { SourceIcon, StatusBadge, ObjectivePill, formatEventType, formatSource } from "@/components/ui-helpers";
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
 
@@ -86,7 +86,7 @@ export default function Sessions() {
                   </td>
                   <td className="px-4 py-3 max-w-0">
                     <p className="text-sm font-medium truncate">
-                      {session.event?.title || session.event?.event_type || `Session #${session.id}`}
+                      {session.event?.title || (session.event?.event_type ? formatEventType(session.event.event_type) : `Session #${session.id}`)}
                     </p>
                     {session.output_summary ? (
                       <p className="text-xs text-muted-foreground truncate mt-0.5">
@@ -100,7 +100,7 @@ export default function Sessions() {
                     {session.event && (
                       <div className="flex items-center gap-1.5">
                         <SourceIcon source={session.event.source} className="w-3.5 h-3.5 opacity-60" />
-                        <span className="text-xs text-muted-foreground capitalize">{session.event.source}</span>
+                        <span className="text-xs text-muted-foreground">{formatSource(session.event.source)}</span>
                       </div>
                     )}
                   </td>

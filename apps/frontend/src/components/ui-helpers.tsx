@@ -5,6 +5,63 @@ import { BetterStackIcon } from "@/components/icons/betterstack-icon";
 
 const badgeBase = "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium";
 
+export function formatEventType(type: string): string {
+  const map: Record<string, string> = {
+    ticket_created: "Ticket created",
+    issue_opened: "Issue opened",
+    issue_updated: "Issue updated",
+    pr_opened: "PR opened",
+    pr_merged: "PR merged",
+    pr_closed: "PR closed",
+    push: "Push",
+  };
+  return map[type] || type.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
+
+export function formatSource(source: string): string {
+  const map: Record<string, string> = {
+    github: "GitHub",
+    linear: "Linear",
+    sentry: "Sentry",
+    betterstack: "Better Stack",
+    slack: "Slack",
+    email: "Email",
+  };
+  return map[source.toLowerCase()] || source.replace(/^\w/, (c) => c.toUpperCase());
+}
+
+export function formatArtifactType(type: string): string {
+  const map: Record<string, string> = {
+    action_plan: "Action plan",
+    diagnosis: "Diagnosis",
+    slack_message: "Slack message",
+    linear_ticket: "Linear ticket",
+    incident_report: "Incident report",
+    implementation_plan: "Implementation plan",
+  };
+  return map[type] || type.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
+
+export function formatObjective(objective: string): string {
+  const map: Record<string, string> = {
+    diagnose: "Diagnose",
+    plan: "Plan",
+    summarize: "Summarize",
+    draft: "Draft",
+  };
+  return map[objective] || objective.replace(/^\w/, (c) => c.toUpperCase());
+}
+
+export function formatEventStatus(status: string): string {
+  const map: Record<string, string> = {
+    new: "New",
+    open: "Open",
+    in_progress: "In progress",
+    resolved: "Resolved",
+  };
+  return map[status] || status.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
+
 export function SourceIcon({ source, className }: { source: string; className?: string }) {
   const normalized = source.toLowerCase();
   switch (normalized) {
@@ -28,7 +85,7 @@ export function SeverityBadge({ severity }: { severity: string }) {
 
 export function StatusBadge({ status }: { status: string }) {
   const norm = status.toLowerCase();
-  const label = status.replace(/_/g, " ");
+  const label = status.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
   if (["failed", "rejected", "error"].includes(norm))
     return <span className={`${badgeBase} bg-red-500/10 text-red-400`}>{label}</span>;
@@ -45,22 +102,27 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 export function ArtifactTypeBadge({ type }: { type: string }) {
-  const labels: Record<string, string> = {
-    slack_message: "Slack",
-    linear_ticket: "Linear",
-    incident_report: "Incident",
-    implementation_plan: "Plan",
+  return <span className={`${badgeBase} bg-muted text-muted-foreground`}>{formatArtifactType(type)}</span>;
+}
+
+export function formatApprovalState(state: string): string {
+  const map: Record<string, string> = {
+    draft: "Draft",
+    approved: "Approved",
+    rejected: "Rejected",
+    edited: "Edited",
   };
-  return <span className={`${badgeBase} bg-muted text-muted-foreground`}>{labels[type] || type}</span>;
+  return map[state.toLowerCase()] || state.replace(/^\w/, (c) => c.toUpperCase());
 }
 
 export function ApprovalBadge({ state }: { state: string }) {
   const norm = state.toLowerCase();
-  if (norm === "draft")    return <span className={`${badgeBase} bg-yellow-500/10 text-yellow-400`}>Draft</span>;
-  if (norm === "approved") return <span className={`${badgeBase} bg-emerald-500/10 text-emerald-400`}>Approved</span>;
-  if (norm === "rejected") return <span className={`${badgeBase} bg-red-500/10 text-red-400`}>Rejected</span>;
-  if (norm === "edited")   return <span className={`${badgeBase} bg-primary/10 text-primary`}>Edited</span>;
-  return <span className={`${badgeBase} bg-muted text-muted-foreground`}>{state}</span>;
+  const label = formatApprovalState(state);
+  if (norm === "draft")    return <span className={`${badgeBase} bg-yellow-500/10 text-yellow-400`}>{label}</span>;
+  if (norm === "approved") return <span className={`${badgeBase} bg-emerald-500/10 text-emerald-400`}>{label}</span>;
+  if (norm === "rejected") return <span className={`${badgeBase} bg-red-500/10 text-red-400`}>{label}</span>;
+  if (norm === "edited")   return <span className={`${badgeBase} bg-primary/10 text-primary`}>{label}</span>;
+  return <span className={`${badgeBase} bg-muted text-muted-foreground`}>{label}</span>;
 }
 
 export function ObjectivePill({ objective }: { objective: string }) {
@@ -71,5 +133,5 @@ export function ObjectivePill({ objective }: { objective: string }) {
     draft:     "bg-teal-500/10 text-teal-400",
   };
   const cls = colors[objective] ?? "bg-muted text-muted-foreground";
-  return <span className={`${badgeBase} ${cls}`}>{objective}</span>;
+  return <span className={`${badgeBase} ${cls}`}>{formatObjective(objective)}</span>;
 }

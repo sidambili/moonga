@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
-import { SourceIcon, SeverityBadge, StatusBadge, ApprovalBadge, ArtifactTypeBadge } from "@/components/ui-helpers";
+import { SourceIcon, SeverityBadge, StatusBadge, ApprovalBadge, ArtifactTypeBadge, formatEventType, formatObjective, formatSource } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 import Markdown from "@/components/markdown";
 import SessionTrace from "@/components/session-trace";
@@ -208,7 +208,7 @@ export default function SessionDetail() {
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={session.status} />
             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${objectiveCls}`}>
-              {session.objective}
+              {formatObjective(session.objective)}
             </span>
             {session.model_used && (
               <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground">
@@ -261,11 +261,11 @@ export default function SessionDetail() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-1">
-                        {session.event.title || `${session.event.source} ${session.event.event_type}`}
+                        {session.event.title || `${formatSource(session.event.source)} ${formatEventType(session.event.event_type)}`}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <SeverityBadge severity={session.event.severity} />
-                        <span className="text-xs text-muted-foreground">{session.event.event_type}</span>
+                        <span className="text-xs text-muted-foreground">{formatEventType(session.event.event_type)}</span>
                       </div>
                     </div>
                     <ExternalLink className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 mt-0.5" />

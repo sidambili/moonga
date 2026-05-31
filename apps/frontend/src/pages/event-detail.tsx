@@ -4,7 +4,7 @@ import { useGetEvent, getGetEventQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ExternalLink, Copy, Check } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
-import { SourceIcon, SeverityBadge, StatusBadge } from "@/components/ui-helpers";
+import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource } from "@/components/ui-helpers";
 
 export default function EventDetail() {
   const [, params] = useRoute("/events/:id");
@@ -62,13 +62,13 @@ export default function EventDetail() {
           </div>
           <div>
             <h1 className="text-xl font-semibold tracking-tight leading-snug">
-              {event.title || `${event.source} ${event.event_type}`}
+              {event.title || `${formatSource(event.source)} ${formatEventType(event.event_type)}`}
             </h1>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <SeverityBadge severity={event.severity} />
               <StatusBadge status={event.status} />
               <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground">
-                {event.event_type}
+                {formatEventType(event.event_type)}
               </span>
             </div>
           </div>
@@ -81,8 +81,8 @@ export default function EventDetail() {
           <p className="text-xs font-medium text-muted-foreground">Event Metadata</p>
           {[
             ["ID", `#${event.id}`],
-            ["Source", event.source],
-            ["Type", event.event_type],
+            ["Source", formatSource(event.source)],
+            ["Type", formatEventType(event.event_type)],
             ["Received", formatDate(event.created_at)],
             ["Age", formatRelative(event.created_at)],
             ...(event.service ? [["Service", event.service]] : []),

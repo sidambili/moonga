@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, CheckCircle, XCircle, Edit3, Save, X, ExternalLink, Copy, Check } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
-import { SourceIcon, SeverityBadge, ApprovalBadge, ArtifactTypeBadge, ObjectivePill } from "@/components/ui-helpers";
+import { SourceIcon, SeverityBadge, ApprovalBadge, ArtifactTypeBadge, ObjectivePill, formatArtifactType, formatApprovalState } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 import Markdown from "@/components/markdown";
 
@@ -158,8 +158,8 @@ export default function ArtifactDetail() {
           <p className="text-xs font-medium text-muted-foreground">Artifact Info</p>
           {[
             ["ID", `#${artifact.id}`],
-            ["Type", artifact.type.replace(/_/g, " ")],
-            ["State", artifact.approval_state],
+            ["Type", formatArtifactType(artifact.type)],
+            ["State", formatApprovalState(artifact.approval_state)],
             ["Created", formatDate(artifact.created_at)],
             ["Age", formatRelative(artifact.created_at)],
           ].map(([label, value]) => (
