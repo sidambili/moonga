@@ -173,6 +173,20 @@ async function persistStep(
   });
 }
 
+function extractSlackMessageInfo(payload: Record<string, unknown>): string {
+  const slackEvent = payload.event as Record<string, unknown> | undefined;
+  if (!slackEvent) return JSON.stringify(payload, null, 2).slice(0, MAX_PAYLOAD_CHARS);
+
+  const rawText = (slackEvent.text as string | undefined) ?? "";
+  const text = rawText.replace(/<@[A-Z0-9]+>\s*/g, "").trim();
+
+  return [
+    `Message: ${text}`,
+    `Channel ID: ${(slackEvent.channel as string | undefined) ?? "unknown"}`,
+    `Posted by user ID: ${(slackEvent.user as string | undefined) ?? "unknown"}`,
+  ].join("\n");
+}
+
 function extractLinearTicketInfo(payload: Record<string, unknown>): string {
   const data = payload.data as Record<string, unknown> | undefined;
   if (!data) return JSON.stringify(payload, null, 2).slice(0, MAX_PAYLOAD_CHARS);
@@ -193,6 +207,26 @@ function extractLinearTicketInfo(payload: Record<string, unknown>): string {
   if (description) lines.push(`\nDescription:\n${description.slice(0, 3_000)}`);
 
   return lines.join("\n");
+}
+
+async function getSlackBotToken(): Promise<string | null> {
+  try {
+    const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "slack"));
+    if (row?.enabled && row.api_key) return row.api_key;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+async function postSlackReply(channel: string, threadTs: string, text: string, botToken: string): Promise<void> {
+  const resp = await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${botToken}` },
+    body: JSON.stringify({ channel, thread_ts: threadTs, text, mrkdwn: true }),
+  });
+  const data = await resp.json() as { ok: boolean; error?: string };
+  if (!data.ok) logger.warn({ channel, error: data.error }, "Slack reply failed");
 }
 
 function parseConfidence(text: string): number {
@@ -233,6 +267,8 @@ function buildUserPrompt(
 ): string {
   const ticketInfo = source === "linear"
     ? extractLinearTicketInfo(payload as Record<string, unknown>)
+    : source === "slack"
+    ? extractSlackMessageInfo(payload as Record<string, unknown>)
     : JSON.stringify(payload, null, 2).slice(0, MAX_PAYLOAD_CHARS);
   const contextBlock = context ? `\n\nRepository context:\n${context}` : "";
 
@@ -689,6 +725,18 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       .update(eventsTable)
       .set({ status: "needs_review" })
       .where(eq(eventsTable.id, event.id));
+
+    if (event.source === "slack") {
+      const slackToken = await getSlackBotToken();
+      const slackEvent = (event.payload_raw as Record<string, unknown>).event as Record<string, unknown> | undefined;
+      const channel = slackEvent?.channel as string | undefined;
+      const threadTs = slackEvent?.ts as string | undefined;
+      if (slackToken && channel && threadTs) {
+        postSlackReply(channel, threadTs, `*Analysis complete*\n${finalText.slice(0, 2_800)}`, slackToken).catch((err) =>
+          logger.warn({ err }, "Failed to post Slack reply"),
+        );
+      }
+    }
 
     logger.info({ sessionId, model: modelString, confidence: finalConfidence, steps: result.steps.length }, "Session completed → needs_review");
   } catch (err) {

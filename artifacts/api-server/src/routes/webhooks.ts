@@ -83,7 +83,12 @@ function extractTitle(source: string, payload: Record<string, unknown>): string 
     return (err?.title as string) || "Sentry error";
   }
   if (source === "betterstack") return "Better Stack alert";
-  if (source === "slack") return "Slack message";
+  if (source === "slack") {
+    const slackEvent = payload.event as Record<string, unknown> | undefined;
+    const rawText = (slackEvent?.text as string | undefined) ?? "";
+    const text = rawText.replace(/<@[A-Z0-9]+>\s*/g, "").trim();
+    return text.slice(0, 100) || "Slack message";
+  }
   return `${source} event`;
 }
 
