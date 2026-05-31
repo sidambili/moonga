@@ -110,13 +110,29 @@ async function getLinearConfig(): Promise<{ linear_team_names?: string; default_
   return {};
 }
 
-async function isEngineeringTeam(teamName: string | undefined): Promise<boolean> {
-  if (!teamName) return false;
+async function isEngineeringTeam(teamName: string | undefined): Promise<{ allowed: boolean; reason?: string }> {
   const config = await getLinearConfig();
-  const allowed = (config.linear_team_names ?? "Engineering")
+  const configValue = config.linear_team_names?.trim();
+
+  // If no team names are configured, accept all teams
+  if (!configValue) {
+    return { allowed: true };
+  }
+
+  // If we have a config but no team name in the payload, reject
+  if (!teamName) {
+    return { allowed: false, reason: "No team name present in webhook payload" };
+  }
+
+  const allowed = configValue
     .split(",")
     .map((s) => s.trim().toLowerCase());
-  return allowed.includes(teamName.toLowerCase());
+
+  if (allowed.includes(teamName.toLowerCase())) {
+    return { allowed: true };
+  }
+
+  return { allowed: false, reason: `Team '${teamName}' is not in the allowed teams list` };
 }
 
 async function getLinearRepoId(): Promise<string | undefined> {
@@ -183,11 +199,9 @@ router.post("/github", async (req, res) => {
 
 router.post("/linear", async (req, res) => {
   const teamName = getLinearTeamName(req.body);
-  if (!await isEngineeringTeam(teamName)) {
-    return res.status(202).json({
-      accepted: false,
-      reason: `Team '${teamName ?? "unknown"}' is not in the engineering list`,
-    });
+  const teamCheck = await isEngineeringTeam(teamName);
+  if (!teamCheck.allowed) {
+    return res.status(202).json({ accepted: false, reason: teamCheck.reason });
   }
 
   const { process, reason } = shouldProcessLinearEvent(req.body);
