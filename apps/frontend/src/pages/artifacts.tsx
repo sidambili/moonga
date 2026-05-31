@@ -8,6 +8,7 @@ import { formatRelative } from "@/lib/format";
 import { ApprovalBadge, ArtifactTypeBadge } from "@/components/ui-helpers";
 import { Link } from "wouter";
 import { CheckCircle, XCircle, ChevronRight } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 
 export default function ArtifactsReview() {
@@ -137,27 +138,35 @@ export default function ArtifactsReview() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     {artifact.approval_state === "draft" ? (
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2.5 text-xs text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500"
-                          onClick={(e) => handleApprove(e, artifact.id)}
-                          disabled={approveMutation.isPending}
-                        >
-                          <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2.5 text-xs text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-500"
-                          onClick={(e) => handleReject(e, artifact.id)}
-                          disabled={rejectMutation.isPending}
-                        >
-                          <XCircle className="w-3.5 h-3.5 mr-1" />
-                          Reject
-                        </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 rounded-full text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-emerald-800 dark:hover:bg-emerald-950"
+                              onClick={(e) => handleApprove(e, artifact.id)}
+                              disabled={approveMutation.isPending}
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Approve</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 rounded-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:hover:bg-red-950"
+                              onClick={(e) => handleReject(e, artifact.id)}
+                              disabled={rejectMutation.isPending}
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Reject</TooltipContent>
+                        </Tooltip>
                       </div>
                     ) : (
                       <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/20 ml-auto" />

@@ -124,18 +124,17 @@ export default function ArtifactDetail() {
           <div className="flex items-center gap-2">
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               onClick={handleStartEdit}
-              className="text-xs border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-400"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
               <Edit3 className="w-3.5 h-3.5 mr-1.5" />Edit
             </Button>
             <Button
               size="sm"
-              variant="outline"
               onClick={handleApprove}
               disabled={approveMutation.isPending}
-              className="text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-400"
+              className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm text-xs"
             >
               <CheckCircle className="w-3.5 h-3.5 mr-1.5" />Approve
             </Button>
@@ -144,7 +143,7 @@ export default function ArtifactDetail() {
               variant="outline"
               onClick={handleReject}
               disabled={rejectMutation.isPending}
-              className="text-xs border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-400"
+              className="text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
             >
               <XCircle className="w-3.5 h-3.5 mr-1.5" />Reject
             </Button>
