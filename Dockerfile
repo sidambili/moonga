@@ -16,7 +16,6 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc .dockerignore ./
 # Copy all package.json files so pnpm can compute the dependency graph
 COPY artifacts/api-server/package.json artifacts/api-server/
 COPY artifacts/ops-bridge/package.json artifacts/ops-bridge/
-COPY artifacts/mockup-sandbox/package.json artifacts/mockup-sandbox/
 COPY lib/db/package.json lib/db/
 COPY lib/api-zod/package.json lib/api-zod/
 COPY lib/api-client-react/package.json lib/api-client-react/
@@ -30,15 +29,11 @@ RUN pnpm install --frozen-lockfile
 ARG VITE_ALLOW_SIGNUP
 ENV VITE_ALLOW_SIGNUP=${VITE_ALLOW_SIGNUP}
 
-# mockup-sandbox requires these at build time even though its output is unused
-ENV PORT=3000
-ENV BASE_PATH=/
-
 # Copy source code
 COPY . .
 
 # Build artifacts (skip typecheck — esbuild/vite don't typecheck)
-RUN pnpm -r --if-present run build
+RUN pnpm --filter "!@workspace/mockup-sandbox" -r --if-present run build
 
 # ---------------------------------------------------------------------------
 # Production stage
@@ -69,7 +64,11 @@ COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 # Copy built artifacts
 COPY --from=builder --chown=appuser:appgroup /app/artifacts/api-server/dist ./artifacts/api-server/dist
 COPY --from=builder --chown=appuser:appgroup /app/artifacts/ops-bridge/dist/public ./public
-COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/dist ./lib/api-zod/dist
+
+# Copy lib package source files (these packages export ./src/index.ts directly — no dist/)
+COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/src ./lib/api-zod/src
+COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/src ./lib/api-client-react/src
+
 # Drizzle migrations require the original TS source files (and migration metadata)
 # so drizzle-kit push runs against source rather than compiled output.
 # dist/ does not contain the required migration definitions.
