@@ -19,7 +19,6 @@ COPY apps/frontend/package.json apps/frontend/
 COPY lib/db/package.json lib/db/
 COPY lib/api-zod/package.json lib/api-zod/
 COPY lib/api-client-react/package.json lib/api-client-react/
-COPY scripts/package.json scripts/
 COPY tsconfig.base.json tsconfig.json ./
 
 # Install dependencies (respects lockfile, downloads correct platform binaries inside container)
@@ -33,7 +32,7 @@ ENV VITE_ALLOW_SIGNUP=${VITE_ALLOW_SIGNUP}
 COPY . .
 
 # Build artifacts (skip typecheck — esbuild/vite don't typecheck)
-RUN pnpm --filter "!@workspace/mockup-sandbox" -r --if-present run build
+RUN pnpm -r --if-present run build
 
 # ---------------------------------------------------------------------------
 # Production stage
@@ -57,7 +56,6 @@ COPY --from=builder --chown=appuser:appgroup /app/apps/frontend/package.json app
 COPY --from=builder --chown=appuser:appgroup /app/lib/db/package.json lib/db/
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/package.json lib/api-zod/
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/package.json lib/api-client-react/
-COPY --from=builder --chown=appuser:appgroup /app/scripts/package.json scripts/
 COPY --from=builder --chown=appuser:appgroup /app/tsconfig.base.json tsconfig.json ./
 COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 
