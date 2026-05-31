@@ -134,10 +134,17 @@ function shouldProcessLinearEvent(payload: Record<string, unknown>): { process: 
   return { process: false, reason: `Linear action '${action}' is not processed — only new issues are handled` };
 }
 
+function extractLinearTicketId(payload: Record<string, unknown>): string | undefined {
+  const data = payload.data as Record<string, unknown> | undefined;
+  const id = data?.id as string | undefined;
+  return id || undefined;
+}
+
 async function ingestWebhook(source: string, payload: Record<string, unknown>, repoId?: string) {
   const eventType = detectEventType(source, payload);
   const severity = detectSeverity(source, payload);
   const title = extractTitle(source, payload);
+  const ticketId = source === "linear" ? extractLinearTicketId(payload) : undefined;
 
   const [event] = await db.insert(eventsTable).values({
     source,
@@ -146,6 +153,7 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>, r
     status: "new",
     title,
     repo_id: repoId ?? null,
+    ticket_id: ticketId ?? null,
     payload_raw: payload,
   }).returning();
 

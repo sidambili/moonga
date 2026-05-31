@@ -8,6 +8,7 @@ import { sessionsTable, sessionStepsTable, artifactsTable, eventsTable, integrat
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost } from "./model-prices";
+import { postLinearComment } from "./integrations/linear-client";
 
 const MAX_STEPS = 8;
 const MAX_TOOL_CALLS = 20;
@@ -767,6 +768,12 @@ export async function runAgentSession(sessionId: number): Promise<void> {
           logger.warn({ err }, "Failed to post Slack reply"),
         );
       }
+    }
+
+    if (event.source === "linear" && event.ticket_id) {
+      postLinearComment(event.ticket_id, parsed.slack_summary).catch((err) =>
+        logger.warn({ err, sessionId }, "Failed to post Linear comment"),
+      );
     }
 
     logger.info({ sessionId, model: modelString, confidence: parsed.confidence, steps: result.steps.length }, "Session completed → needs_review");
