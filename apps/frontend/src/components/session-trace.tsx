@@ -55,6 +55,40 @@ function groupSteps(steps: SessionStep[]): StepGroup[] {
   return groups;
 }
 
+function formatToolLabel(name: string, args?: unknown): string {
+  const a = args && typeof args === "object" ? args as Record<string, unknown> : {};
+  switch (name) {
+    case "get_file_contents":
+      return a.path ? `Read: ${a.path}` : "Read file";
+    case "get_commit_diff":
+      return a.sha ? `Commit: ${String(a.sha).slice(0, 12)}` : "Commit diff";
+    case "get_pull_request":
+      return a.number != null ? `PR #${a.number}` : "Pull request";
+    case "get_issue":
+      return a.number != null ? `Issue #${a.number}` : "Issue";
+    case "get_recent_commits":
+      return "Recent commits";
+    case "list_directory":
+      return a.path ? `List: ${a.path}` : "List: root";
+    case "search_code": {
+      const q = a.query ? String(a.query) : "";
+      return q ? (q.includes(" ") ? `Search: "${q}"` : `Search: ${q}`) : "Search code";
+    }
+    case "create_artifact":
+      return "Artifact created";
+    case "post_linear_comment":
+      return "Linear comment added";
+    case "post_slack_reply":
+      return "Slack reply sent";
+    case "gather_event_context":
+      return "Context gathered";
+    case "fetch_repo_instructions":
+      return "Instructions loaded";
+    default:
+      return name;
+  }
+}
+
 function resultSummary(r: SessionStep): string {
   const v = r.tool_result;
   if (!v) return r.content?.slice(0, 100) ?? "";
@@ -68,9 +102,9 @@ function ToolAction({ call, results }: { call: SessionStep; results: SessionStep
   const calls = (call.role === "assistant"
     ? (call.tool_calls ?? [])
     : []) as ToolCall[];
-  const names = calls.length
-    ? calls.map(c => c.toolName ?? c.function?.name ?? "tool")
-    : [call.tool_name ?? "tool"];
+  const labels = calls.length
+    ? calls.map(c => formatToolLabel(c.toolName ?? c.function?.name ?? "tool", c.args))
+    : [formatToolLabel(call.tool_name ?? "tool")];
   const preview = results[0]
     ? resultSummary(results[0])
     : call.role === "tool"
@@ -92,7 +126,7 @@ function ToolAction({ call, results }: { call: SessionStep; results: SessionStep
             {harness && (
               <span className="text-[9px] uppercase tracking-wider text-muted-foreground/40 font-medium">harness</span>
             )}
-            <span className="text-xs font-mono text-foreground/75">{names.join(", ")}</span>
+            <span className="text-xs font-mono text-foreground/75">{labels.join(", ")}</span>
           </div>
           {preview && !open && (
             <span className="text-[11px] text-muted-foreground block truncate">{preview}</span>
@@ -120,9 +154,6 @@ function ToolAction({ call, results }: { call: SessionStep; results: SessionStep
           )}
           {results.length > 0 ? results.map(r => (
             <div key={r.id}>
-              <p className="text-[10px] text-muted-foreground/50 mb-1 flex items-center gap-1">
-                <CornerDownRight className="w-2.5 h-2.5" /> result
-              </p>
               <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
                 {r.tool_result != null
                   ? (typeof r.tool_result === "string" ? r.tool_result : JSON.stringify(r.tool_result, null, 2))
@@ -131,9 +162,6 @@ function ToolAction({ call, results }: { call: SessionStep; results: SessionStep
             </div>
           )) : call.role === "tool" && call.content ? (
             <div>
-              <p className="text-[10px] text-muted-foreground/50 mb-1 flex items-center gap-1">
-                <CornerDownRight className="w-2.5 h-2.5" /> result
-              </p>
               <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
                 {call.content}
               </pre>
