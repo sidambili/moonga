@@ -229,13 +229,39 @@ async function postSlackReply(channel: string, threadTs: string, text: string, b
   if (!data.ok) logger.warn({ channel, error: data.error }, "Slack reply failed");
 }
 
-function parseConfidence(text: string): number {
-  const match = text.match(/CONFIDENCE:\s*([\d.]+)\s*$/im);
-  return match ? Math.min(1, Math.max(0, parseFloat(match[1]))) : 0.75;
+interface AgentOutput {
+  content: string;
+  slack_summary: string;
+  confidence: number;
 }
 
-function stripConfidence(text: string): string {
-  return text.replace(/\n?CONFIDENCE:\s*[\d.]+\s*$/im, "").trim();
+function parseAgentOutput(raw: string): AgentOutput {
+  // Strip markdown code fences the model sometimes wraps around JSON
+  const stripped = raw.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
+  const start = stripped.indexOf("{");
+  const end = stripped.lastIndexOf("}");
+
+  if (start !== -1 && end > start) {
+    try {
+      const parsed = JSON.parse(stripped.slice(start, end + 1)) as Record<string, unknown>;
+      const content = String(parsed.content ?? "").trim();
+      if (content) {
+        return {
+          content,
+          slack_summary: String(parsed.slack_summary ?? "").trim() || content.slice(0, 300),
+          confidence: Math.min(1, Math.max(0, Number(parsed.confidence ?? 0.75))),
+        };
+      }
+    } catch {
+      // fall through to legacy
+    }
+  }
+
+  // Legacy fallback: plain-text response with optional CONFIDENCE: trailer
+  const confidenceMatch = raw.match(/CONFIDENCE:\s*([\d.]+)\s*$/im);
+  const confidence = confidenceMatch ? Math.min(1, Math.max(0, parseFloat(confidenceMatch[1]))) : 0.75;
+  const content = raw.replace(/\n?CONFIDENCE:\s*[\d.]+\s*$/im, "").trim();
+  return { content, slack_summary: content.slice(0, 300), confidence };
 }
 
 function buildSystemPrompt(techStack?: string): string {
@@ -253,8 +279,13 @@ Tool use strategy:
 
 Rules:
 - Base analysis on actual source code, not assumptions
-- Be concise (max 300 words)
-- End your response with exactly: CONFIDENCE: <0.0–1.0>`;
+- Be concise (max 300 words in content)
+- Respond with valid JSON only — no surrounding text or code fences — in exactly this shape:
+{
+  "content": "<full markdown analysis, max 300 words>",
+  "slack_summary": "<2-3 plain-text sentences, no markdown, suitable for a Slack reply>",
+  "confidence": <float 0.0–1.0>
+}`;
 }
 
 function buildUserPrompt(
@@ -280,11 +311,12 @@ Event type: ${eventType}
 Title: ${title}
 ${ticketInfo}${contextBlock}
 
-Respond with:
-1. Root cause assessment
-2. Severity justification
-3. Recommended immediate actions
-4. Estimated resolution time`;
+Respond with valid JSON only — no surrounding text or code fences:
+{
+  "content": "<markdown diagnosis with: root cause assessment, severity justification, recommended immediate actions, estimated resolution time>",
+  "slack_summary": "<2-3 plain-text sentences: what the issue is and the top action to take>",
+  "confidence": <float 0.0–1.0>
+}`;
   }
 
   return `Analyze this ticket and produce a source-code-grounded action plan.
@@ -301,11 +333,12 @@ Before writing the plan:
 - If the ticket has no description, state that in the objective summary and skip to what you can infer from context
 - Base every task on what you actually find in the code
 
-Respond with:
-1. Objective summary
-2. Key tasks (numbered, each referencing the relevant file/function)
-3. Dependencies or blockers
-4. Estimated complexity (Low / Medium / High)`;
+Respond with valid JSON only — no surrounding text or code fences:
+{
+  "content": "<markdown action plan with: objective summary, key tasks each referencing file/function, dependencies or blockers, estimated complexity (Low / Medium / High)>",
+  "slack_summary": "<2-3 plain-text sentences: what the ticket is about and the first concrete step>",
+  "confidence": <float 0.0–1.0>
+}`;
 }
 
 function getModelConfig(settings: NonNullable<Awaited<ReturnType<typeof getModelSettings>>>, modelString: string) {
@@ -689,9 +722,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       finalTextRaw = retryResult.text;
     }
 
-    const finalText = stripConfidence(finalTextRaw);
+    const parsed = parseAgentOutput(finalTextRaw);
 
-    if (!finalText) {
+    if (!parsed.content) {
       logger.warn({ sessionId, steps: result.steps.length }, "Agent produced no final text — marking failed");
       await db
         .update(sessionsTable)
@@ -700,14 +733,12 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       return;
     }
 
-    const finalConfidence = parseConfidence(finalTextRaw);
-
     await db
       .update(sessionsTable)
       .set({
         status: "needs_review",
-        output_summary: finalText,
-        confidence_score: finalConfidence,
+        output_summary: parsed.slack_summary,
+        confidence_score: parsed.confidence,
         model_used: modelString,
         updated_at: new Date(),
       })
@@ -717,7 +748,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     await db.insert(artifactsTable).values({
       session_id: sessionId,
       type: artifactType,
-      content: finalText,
+      content: parsed.content,
       approval_state: "draft",
     });
 
@@ -732,13 +763,13 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       const channel = slackEvent?.channel as string | undefined;
       const threadTs = slackEvent?.ts as string | undefined;
       if (slackToken && channel && threadTs) {
-        postSlackReply(channel, threadTs, `*Analysis complete*\n${finalText.slice(0, 2_800)}`, slackToken).catch((err) =>
+        postSlackReply(channel, threadTs, `*Analysis complete*\n${parsed.slack_summary}`, slackToken).catch((err) =>
           logger.warn({ err }, "Failed to post Slack reply"),
         );
       }
     }
 
-    logger.info({ sessionId, model: modelString, confidence: finalConfidence, steps: result.steps.length }, "Session completed → needs_review");
+    logger.info({ sessionId, model: modelString, confidence: parsed.confidence, steps: result.steps.length }, "Session completed → needs_review");
   } catch (err) {
     const reason = categorizeError(err);
     logger.error({ err, sessionId, reason }, "Agent loop failed");
