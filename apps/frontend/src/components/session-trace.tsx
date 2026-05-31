@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { useGetSessionSteps, getGetSessionStepsQueryKey } from "@workspace/api-client-react";
 import type { SessionStep } from "@workspace/api-client-react";
-import { ChevronDown, ChevronRight, Wrench, Bot, Loader2, CornerDownRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Wrench, Bot, Loader2, CornerDownRight, Cpu } from "lucide-react";
+
+const HARNESS_TOOL_NAMES = new Set([
+  "create_artifact", "post_linear_comment", "post_slack_reply",
+  "gather_event_context", "fetch_repo_instructions",
+]);
+
+function isHarnessStep(step: SessionStep): boolean {
+  return !!(step.tool_name && HARNESS_TOOL_NAMES.has(step.tool_name));
+}
 
 function formatCost(cost: number | null | undefined) {
   if (cost == null || cost === 0) return null;
@@ -55,6 +64,7 @@ function resultSummary(r: SessionStep): string {
 
 function ToolAction({ call, results }: { call: SessionStep; results: SessionStep[] }) {
   const [open, setOpen] = useState(false);
+  const harness = isHarnessStep(call);
   const calls = (call.role === "assistant"
     ? (call.tool_calls ?? [])
     : []) as ToolCall[];
@@ -64,18 +74,26 @@ function ToolAction({ call, results }: { call: SessionStep; results: SessionStep
   const preview = results[0]
     ? resultSummary(results[0])
     : call.role === "tool"
-    ? (call.content?.replace(/\s+/g, " ").slice(0, 100) ?? null)
+    ? (call.content?.replace(/\[(?:System|Harness)\]\s*/g, "").replace(/\s+/g, " ").slice(0, 100) ?? null)
     : null;
 
   return (
-    <div>
+    <div className={harness ? "bg-muted/20" : undefined}>
       <button
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
       >
-        <Wrench className="w-3 h-3 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
+        {harness
+          ? <Cpu className="w-3 h-3 text-muted-foreground/40 mt-0.5 flex-shrink-0" />
+          : <Wrench className="w-3 h-3 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
+        }
         <div className="flex-1 min-w-0 space-y-0.5">
-          <span className="text-xs font-mono text-foreground/75 block">{names.join(", ")}</span>
+          <div className="flex items-center gap-1.5">
+            {harness && (
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/40 font-medium">harness</span>
+            )}
+            <span className="text-xs font-mono text-foreground/75">{names.join(", ")}</span>
+          </div>
           {preview && !open && (
             <span className="text-[11px] text-muted-foreground block truncate">{preview}</span>
           )}

@@ -417,6 +417,49 @@ function getRepoFromPayload(payload: Record<string, unknown>, repoId?: string): 
   return { owner, repo: name };
 }
 
+// Ordered by priority — first match wins per "slot" (agent instructions, cursor, windsurf, github)
+const INSTRUCTION_FILE_CANDIDATES = [
+  // Agent instruction files (Claude, OpenAI, generic)
+  "CLAUDE.md",
+  ".claude/CLAUDE.md",
+  "AGENTS.md",
+  ".github/AGENTS.md",
+  "agents.md",
+  // Cursor
+  ".cursorrules",
+  ".cursor/rules",
+  // Windsurf
+  ".windsurfrules",
+  ".windsurf/rules",
+  // GitHub Copilot / generic
+  ".github/copilot-instructions.md",
+  ".github/instructions/instructions.md",
+  ".github/instructions/coding.md",
+];
+
+async function fetchRepoInstructions(client: Octokit, owner: string, repoName: string): Promise<string> {
+  const found: string[] = [];
+
+  await Promise.all(
+    INSTRUCTION_FILE_CANDIDATES.map(async (path) => {
+      try {
+        const { data } = await client.rest.repos.getContent({ owner, repo: repoName, path });
+        if (!Array.isArray(data) && "content" in data && typeof data.content === "string") {
+          const decoded = Buffer.from(data.content, "base64").toString("utf-8");
+          if (decoded.trim()) {
+            found.push(`### ${path}\n${decoded.slice(0, 4_000)}`);
+          }
+        }
+      } catch {
+        // file doesn't exist — skip
+      }
+    }),
+  );
+
+  if (found.length === 0) return "";
+  return `Repository AI instructions (treat these as authoritative context for this codebase):\n\n${found.join("\n\n---\n\n")}`;
+}
+
 async function detectTechStack(
   client: Octokit,
   owner: string,
@@ -508,10 +551,12 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   const { token: githubToken, selectedRepo } = await getGithubIntegration();
   const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, event.repo_id ?? selectedRepo ?? undefined);
 
-  // Fetch tech stack and event context in parallel
-  const [techStack, context] = await Promise.all([
-    repo && githubToken
-      ? detectTechStack(new Octokit({ auth: githubToken }), repo.owner, repo.repo)
+  const ghClientEarly = repo && githubToken ? new Octokit({ auth: githubToken }) : null;
+
+  // Fetch tech stack, event context, and repo instruction files in parallel
+  const [techStack, context, repoInstructions] = await Promise.all([
+    ghClientEarly
+      ? detectTechStack(ghClientEarly, repo!.owner, repo!.repo)
       : Promise.resolve(""),
     gatherEventContext(
       event.event_type,
@@ -519,19 +564,26 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       githubToken,
       event.repo_id ?? selectedRepo ?? undefined,
     ),
+    ghClientEarly && (event.event_type === "ticket_created" || event.event_type === "issue_opened")
+      ? fetchRepoInstructions(ghClientEarly, repo!.owner, repo!.repo)
+      : Promise.resolve(""),
   ]);
 
   const systemPrompt = buildSystemPrompt(techStack || undefined, session.objective);
+  const fullContext = [repoInstructions, context].filter(Boolean).join("\n\n---\n\n");
   const userPrompt = buildUserPrompt(
     session.objective,
     event.source,
     event.event_type,
     event.title ?? "Untitled",
     event.payload_raw,
-    context,
+    fullContext,
   );
 
   // Persist pre-fetched context and user prompt
+  if (repoInstructions) {
+    await persistStep(sessionId, -2, "tool", `[System] Repo instruction files found:\n${repoInstructions}`, undefined, undefined, undefined, "fetch_repo_instructions");
+  }
   if (context) {
     await persistStep(sessionId, -1, "tool", `[System] Pre-fetched repository context:\n${context}`, undefined, undefined, undefined, "gather_event_context");
   }
