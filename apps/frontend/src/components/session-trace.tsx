@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useGetSessionSteps, getGetSessionStepsQueryKey } from "@workspace/api-client-react";
 import type { SessionStep } from "@workspace/api-client-react";
-import { ChevronDown, ChevronRight, Wrench, Bot, Loader2, CornerDownRight, Cpu } from "lucide-react";
+import { ChevronDown, ChevronRight, Wrench, Bot, Loader2, Cpu } from "lucide-react";
 
 const HARNESS_TOOL_NAMES = new Set([
   "create_artifact", "post_linear_comment", "post_slack_reply",
@@ -139,20 +139,46 @@ function ToolAction({ call, results }: { call: SessionStep; results: SessionStep
       </button>
 
       {open && (
-        <div className="px-4 pb-3 ml-6 space-y-2">
-          {calls.map((c, i) =>
-            c.args != null ? (
-              <div key={i}>
-                <p className="text-[10px] text-muted-foreground/50 mb-1 flex items-center gap-1">
-                  <CornerDownRight className="w-2.5 h-2.5" /> args
-                </p>
-                <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-36 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
-                  {JSON.stringify(c.args, null, 2)}
-                </pre>
-              </div>
-            ) : null
+        <div className="px-4 pb-3 ml-6 space-y-3">
+          {/* Assistant thought */}
+          {call.role === "assistant" && call.content && (
+            <div className="text-xs text-foreground/70 leading-relaxed italic border-l-2 border-muted-foreground/20 pl-3">
+              {call.content}
+            </div>
           )}
-          {results.length > 0 ? results.map(r => (
+
+          {/* Paired calls + results */}
+          {calls.map((c, i) => {
+            const result = results[i];
+            const label = formatToolLabel(c.toolName ?? c.function?.name ?? "tool", c.args);
+            return (
+              <div key={i} className="space-y-1.5">
+                <p className="text-[10px] font-medium text-muted-foreground/70">{label}</p>
+                {c.args != null && (
+                  <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-36 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
+                    {JSON.stringify(c.args, null, 2)}
+                  </pre>
+                )}
+                {result && (
+                  <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
+                    {result.tool_result != null
+                      ? (typeof result.tool_result === "string" ? result.tool_result : JSON.stringify(result.tool_result, null, 2))
+                      : (result.content ?? "")}
+                  </pre>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Standalone tool step (no preceding assistant calls) */}
+          {call.role === "tool" && call.content && (
+            <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
+              {call.content}
+            </pre>
+          )}
+
+          {/* Unmatched results (safety) */}
+          {results.length > calls.length && results.slice(calls.length).map(r => (
             <div key={r.id}>
               <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
                 {r.tool_result != null
@@ -160,13 +186,7 @@ function ToolAction({ call, results }: { call: SessionStep; results: SessionStep
                   : (r.content ?? "")}
               </pre>
             </div>
-          )) : call.role === "tool" && call.content ? (
-            <div>
-              <pre className="text-[11px] font-mono text-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded-lg bg-muted/40 p-2.5 leading-relaxed">
-                {call.content}
-              </pre>
-            </div>
-          ) : null}
+          ))}
         </div>
       )}
     </div>
