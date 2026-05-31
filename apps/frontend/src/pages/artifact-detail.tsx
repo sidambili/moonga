@@ -2,25 +2,13 @@ import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import { useGetArtifact, useApproveArtifact, useRejectArtifact, useEditArtifact, getGetArtifactQueryKey, getListArtifactsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, CheckCircle, XCircle, Edit3, Save, X, ExternalLink } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
-import { SourceIcon, SeverityBadge } from "@/components/ui-helpers";
+import { SourceIcon, SeverityBadge, ApprovalBadge, ArtifactTypeBadge, ObjectivePill } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 import Markdown from "@/components/markdown";
-
-function ApprovalBadge({ state }: { state: string }) {
-  const colors: Record<string, string> = {
-    draft: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-    approved: "bg-green-500/10 text-green-500 border-green-500/20",
-    rejected: "bg-destructive/10 text-destructive border-destructive/20",
-    edited: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  };
-  return <Badge variant="outline" className={`uppercase text-[10px] font-mono ${colors[state] || ""}`}>{state}</Badge>;
-}
 
 export default function ArtifactDetail() {
   const [, params] = useRoute("/artifacts/:id");
@@ -72,17 +60,21 @@ export default function ArtifactDetail() {
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
-        <div className="font-mono text-muted-foreground text-sm animate-pulse">Loading artifact...</div>
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
+        <div className="text-sm text-muted-foreground animate-pulse">Loading artifact…</div>
       </div>
     );
   }
 
   if (!artifact) {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
-        <Link href="/artifacts"><Button variant="ghost" size="sm" className="mb-4"><ArrowLeft className="w-4 h-4 mr-2" />Back</Button></Link>
-        <div className="font-mono text-muted-foreground">Artifact not found.</div>
+      <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
+        <Link href="/artifacts">
+          <Button variant="ghost" size="sm" className="rounded-lg h-8 px-2">
+            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />Review Queue
+          </Button>
+        </Link>
+        <p className="text-sm text-muted-foreground">Artifact not found.</p>
       </div>
     );
   }
@@ -90,22 +82,26 @@ export default function ArtifactDetail() {
   const isDraft = artifact.approval_state === "draft" || artifact.approval_state === "edited";
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Link href="/artifacts">
-          <Button variant="ghost" size="sm"><ArrowLeft className="w-4 h-4 mr-2" />Review Queue</Button>
+          <Button variant="ghost" size="sm" className="rounded-lg h-8 px-2">
+            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />Review Queue
+          </Button>
         </Link>
-        <span className="text-muted-foreground font-mono text-sm">/</span>
-        <span className="font-mono text-sm text-muted-foreground">#{artifact.id}</span>
+        <span>/</span>
+        <span>#{artifact.id}</span>
       </div>
 
+      {/* Title + actions */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight">Artifact #{artifact.id}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Artifact #{artifact.id}</h1>
           <div className="flex items-center gap-2 flex-wrap">
             <ApprovalBadge state={artifact.approval_state} />
-            <Badge variant="secondary" className="text-xs font-mono uppercase">{artifact.type.replace("_", " ")}</Badge>
-            <span className="text-xs text-muted-foreground font-mono">{formatRelative(artifact.created_at)}</span>
+            <ArtifactTypeBadge type={artifact.type} />
+            <span className="text-xs text-muted-foreground">{formatRelative(artifact.created_at)}</span>
           </div>
         </div>
 
@@ -115,79 +111,100 @@ export default function ArtifactDetail() {
               size="sm"
               variant="outline"
               onClick={handleStartEdit}
-              className="font-mono text-xs border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+              className="text-xs border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-400"
             >
-              <Edit3 className="w-3.5 h-3.5 mr-1.5" />EDIT
+              <Edit3 className="w-3.5 h-3.5 mr-1.5" />Edit
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={handleApprove}
               disabled={approveMutation.isPending}
-              className="font-mono text-xs border-green-500/30 text-green-400 hover:bg-green-500/10"
+              className="text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-400"
             >
-              <CheckCircle className="w-3.5 h-3.5 mr-1.5" />APPROVE
+              <CheckCircle className="w-3.5 h-3.5 mr-1.5" />Approve
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={handleReject}
               disabled={rejectMutation.isPending}
-              className="font-mono text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+              className="text-xs border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-400"
             >
-              <XCircle className="w-3.5 h-3.5 mr-1.5" />REJECT
+              <XCircle className="w-3.5 h-3.5 mr-1.5" />Reject
             </Button>
           </div>
         )}
       </div>
 
-      {artifact.session && (
-        <Card className="bg-card border-border">
-          <CardContent className="pt-4">
-            <div className="text-xs font-mono text-muted-foreground uppercase mb-3">Originating Session</div>
-            <div className="flex items-center gap-3">
+      {/* Metadata cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="rounded-xl bg-card border border-border/60 p-4 space-y-3">
+          <p className="text-xs font-medium text-muted-foreground">Artifact Info</p>
+          {[
+            ["ID", `#${artifact.id}`],
+            ["Type", artifact.type.replace(/_/g, " ")],
+            ["State", artifact.approval_state],
+            ["Created", formatDate(artifact.created_at)],
+            ["Age", formatRelative(artifact.created_at)],
+          ].map(([label, value]) => (
+            <div key={label} className="flex items-center justify-between gap-4">
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <span className="text-xs font-medium text-right truncate">{value}</span>
+            </div>
+          ))}
+        </div>
+
+        {artifact.session && (
+          <div className="rounded-xl bg-card border border-primary/20 p-4 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">Originating Session</p>
+            <div className="flex items-start gap-3">
               {artifact.session.event && (
-                <SourceIcon source={artifact.session.event.source} className="w-4 h-4 text-muted-foreground" />
-              )}
-              <div className="flex-1">
-                <div className="text-sm font-medium">
-                  {artifact.session.event?.title || `Session #${artifact.session_id}`}
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  <SourceIcon source={artifact.session.event.source} className="w-3.5 h-3.5 text-muted-foreground" />
                 </div>
-                <div className="flex items-center gap-2 mt-1">
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {artifact.session.event?.title || `Session #${artifact.session_id}`}
+                </p>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   {artifact.session.event && <SeverityBadge severity={artifact.session.event.severity} />}
-                  <Badge variant="outline" className="font-mono text-xs uppercase">{artifact.session.objective}</Badge>
+                  <ObjectivePill objective={artifact.session.objective} />
                   {artifact.session.confidence_score != null && (
-                    <span className="text-xs font-mono text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {Math.round(artifact.session.confidence_score * 100)}% confidence
                     </span>
                   )}
                 </div>
               </div>
-              <Link href={`/sessions/${artifact.session_id}`}>
-                <Button variant="ghost" size="sm" className="font-mono text-xs">
-                  <ExternalLink className="w-3.5 h-3.5 mr-1" />SESSION
-                </Button>
-              </Link>
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <Link href={`/sessions/${artifact.session_id}`}>
+              <Button variant="outline" size="sm" className="w-full rounded-lg text-xs">
+                <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                View Session #{artifact.session_id}
+              </Button>
+            </Link>
+          </div>
+        )}
+      </div>
 
-      <Card className="bg-card border-border border-primary/10">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-xs font-mono text-muted-foreground uppercase">Content</CardTitle>
+      {/* Content */}
+      <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
+        <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">Content</span>
           {editing && (
             <div className="flex gap-2">
-              <Button size="sm" variant="ghost" onClick={() => setEditing(false)} className="h-7 font-mono text-xs">
-                <X className="w-3.5 h-3.5 mr-1" />CANCEL
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)} className="h-7 text-xs">
+                <X className="w-3.5 h-3.5 mr-1" />Cancel
               </Button>
-              <Button size="sm" onClick={handleSaveEdit} disabled={editMutation.isPending} className="h-7 font-mono text-xs">
-                <Save className="w-3.5 h-3.5 mr-1" />SAVE
+              <Button size="sm" onClick={handleSaveEdit} disabled={editMutation.isPending} className="h-7 text-xs">
+                <Save className="w-3.5 h-3.5 mr-1" />Save
               </Button>
             </div>
           )}
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div className="p-4">
           {editing ? (
             <Textarea
               value={editContent}
@@ -197,11 +214,7 @@ export default function ArtifactDetail() {
           ) : (
             <Markdown>{artifact.content}</Markdown>
           )}
-        </CardContent>
-      </Card>
-
-      <div className="text-xs text-muted-foreground font-mono">
-        Created: {formatDate(artifact.created_at)}
+        </div>
       </div>
     </div>
   );

@@ -2,26 +2,10 @@ import { useState } from "react";
 import { useListSessions, getListSessionsQueryKey } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
-import { SourceIcon, StatusBadge } from "@/components/ui-helpers";
+import { SourceIcon, StatusBadge, ObjectivePill } from "@/components/ui-helpers";
 import { Link } from "wouter";
 import { Cpu, ChevronRight } from "lucide-react";
 import { MarkdownPreview } from "@/components/markdown";
-
-const objectiveColors: Record<string, string> = {
-  diagnose: "bg-orange-500/10 text-orange-400",
-  plan:     "bg-primary/10 text-primary",
-  summarize:"bg-purple-500/10 text-purple-400",
-  draft:    "bg-teal-500/10 text-teal-400",
-};
-
-function ObjectivePill({ objective }: { objective: string }) {
-  const cls = objectiveColors[objective] ?? "bg-muted text-muted-foreground";
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}`}>
-      {objective}
-    </span>
-  );
-}
 
 function Confidence({ score }: { score: number | null | undefined }) {
   if (score == null) return <span className="text-xs text-muted-foreground">—</span>;

@@ -5,24 +5,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/lib/format";
+import { ApprovalBadge, ArtifactTypeBadge } from "@/components/ui-helpers";
 import { Link } from "wouter";
 import { FileCheck2, CheckCircle, XCircle, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { MarkdownPreview } from "@/components/markdown";
-
-const approvalColors: Record<string, string> = {
-  draft:    "bg-yellow-500/10 text-yellow-400",
-  approved: "bg-emerald-500/10 text-emerald-400",
-  rejected: "bg-red-500/10 text-red-400",
-  edited:   "bg-primary/10 text-primary",
-};
-
-const typeLabels: Record<string, string> = {
-  slack_message: "Slack",
-  linear_ticket: "Linear",
-  incident_report: "Incident",
-  implementation_plan: "Plan",
-};
 
 export default function ArtifactsReview() {
   const [location] = useLocation();
@@ -104,14 +91,8 @@ export default function ArtifactsReview() {
               {/* Top row */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground">
-                    {typeLabels[artifact.type] || artifact.type}
-                  </span>
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${approvalColors[artifact.approval_state] ?? "bg-muted text-muted-foreground"}`}
-                  >
-                    {artifact.approval_state}
-                  </span>
+                  <ArtifactTypeBadge type={artifact.type} />
+                  <ApprovalBadge state={artifact.approval_state} />
                   <span className="text-xs text-muted-foreground">#{artifact.id}</span>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">

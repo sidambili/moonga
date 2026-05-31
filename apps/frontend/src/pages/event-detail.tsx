@@ -1,5 +1,5 @@
 import { useRoute, Link } from "wouter";
-import { useGetEvent } from "@workspace/api-client-react";
+import { useGetEvent, getGetEventQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
@@ -8,11 +8,11 @@ import { SourceIcon, SeverityBadge, StatusBadge } from "@/components/ui-helpers"
 export default function EventDetail() {
   const [, params] = useRoute("/events/:id");
   const id = Number(params?.id);
-  const { data: event, isLoading } = useGetEvent(id, { query: { enabled: !!id } });
+  const { data: event, isLoading } = useGetEvent(id, { query: { queryKey: getGetEventQueryKey(id), enabled: !!id } });
 
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 max-w-4xl mx-auto">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
         <div className="text-sm text-muted-foreground animate-pulse">Loading event…</div>
       </div>
     );
@@ -20,10 +20,10 @@ export default function EventDetail() {
 
   if (!event) {
     return (
-      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
         <Link href="/events">
-          <Button variant="ghost" size="sm" className="rounded-lg">
-            <ArrowLeft className="w-4 h-4 mr-2" />Back
+          <Button variant="ghost" size="sm" className="rounded-lg h-8 px-2">
+            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />Events
           </Button>
         </Link>
         <p className="text-sm text-muted-foreground">Event not found.</p>
@@ -32,7 +32,7 @@ export default function EventDetail() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Link href="/events">
@@ -73,15 +73,15 @@ export default function EventDetail() {
             ["ID", `#${event.id}`],
             ["Source", event.source],
             ["Type", event.event_type],
-            event.service && ["Service", event.service],
-            event.repo_id && ["Repo", event.repo_id],
-            event.ticket_id && ["Ticket", event.ticket_id],
             ["Received", formatDate(event.created_at)],
             ["Age", formatRelative(event.created_at)],
-          ].filter(Boolean).map(([label, value]) => (
-            <div key={label as string} className="flex items-center justify-between gap-4">
+            ...(event.service ? [["Service", event.service]] : []),
+            ...(event.repo_id ? [["Repo", event.repo_id]] : []),
+            ...(event.ticket_id ? [["Ticket", event.ticket_id]] : []),
+          ].map(([label, value]) => (
+            <div key={label} className="flex items-center justify-between gap-4">
               <span className="text-xs text-muted-foreground">{label}</span>
-              <span className="text-xs font-medium text-right truncate">{value as string}</span>
+              <span className="text-xs font-medium text-right truncate">{value}</span>
             </div>
           ))}
         </div>

@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useListEvents } from "@workspace/api-client-react";
+import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge } from "@/components/ui-helpers";
 import { Link } from "wouter";
-import { ChevronRight } from "lucide-react";
+import { Radio, ChevronRight } from "lucide-react";
 
 const severityDot: Record<string, string> = {
   critical: "bg-red-500",
@@ -18,21 +18,29 @@ export default function EventsFeed() {
   const [severityFilter, setSeverityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: eventsList, isLoading } = useListEvents({
+  const listParams = {
     source: sourceFilter === "all" ? undefined : sourceFilter,
     severity: severityFilter === "all" ? undefined : severityFilter,
     status: statusFilter === "all" ? undefined : statusFilter,
     limit: 50,
-  }, { query: { refetchInterval: 15000 } });
+  };
+  const { data: eventsList, isLoading } = useListEvents(listParams, {
+    query: { queryKey: getListEventsQueryKey(listParams), refetchInterval: 15000 },
+  });
 
   const items = eventsList?.items ?? [];
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Events Feed</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Inbound intelligence stream</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+            <Radio className="w-5 h-5 text-primary" />
+            Events Feed
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Inbound intelligence stream</p>
+        </div>
       </div>
 
       {/* Filters */}
