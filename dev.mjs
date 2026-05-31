@@ -7,7 +7,6 @@ const envLocalPath = new URL(".env.local", import.meta.url);
 const envPath = new URL(".env", import.meta.url);
 
 // Load .env.local if it exists, without overriding existing env vars.
-// On Replit, Secrets provide env vars directly so this is a no-op.
 // Fall back to .env if .env.local is missing.
 const envFileToLoad = existsSync(envLocalPath) ? envLocalPath : envPath;
 if (existsSync(envFileToLoad)) {

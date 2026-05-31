@@ -44,10 +44,6 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
-# Replit
-.cache/
-.local/
-
 # Capacitor native projects
 ios/
 android/
@@ -55,3 +51,6 @@ android/
 # Environment variables
 .env
 .env.local
+
+# Local files
+.local/
