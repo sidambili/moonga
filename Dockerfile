@@ -30,10 +30,14 @@ RUN pnpm install --frozen-lockfile
 ARG VITE_ALLOW_SIGNUP
 ENV VITE_ALLOW_SIGNUP=${VITE_ALLOW_SIGNUP}
 
+# mockup-sandbox requires these at build time even though its output is unused
+ENV PORT=3000
+ENV BASE_PATH=/
+
 # Copy source code
 COPY . .
 
-# Build the workspace (typechecks + builds artifacts)
+# Build artifacts (skip typecheck — esbuild/vite don't typecheck)
 RUN pnpm -r --if-present run build
 
 # ---------------------------------------------------------------------------
