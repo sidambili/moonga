@@ -8,7 +8,7 @@ import { sessionsTable, sessionStepsTable, artifactsTable, eventsTable, integrat
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost } from "./model-prices";
-import { postLinearComment } from "./integrations/linear-client";
+import { postLinearComment, gatherLinearContext } from "./integrations/linear-client";
 
 const MAX_STEPS = 15;
 const MAX_TOOL_CALLS = 30;
@@ -553,8 +553,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
   const ghClientEarly = repo && githubToken ? new Octokit({ auth: githubToken }) : null;
 
-  // Fetch tech stack, event context, and repo instruction files in parallel
-  const [techStack, context, repoInstructions] = await Promise.all([
+  // Fetch tech stack, event context, repo instruction files, and Linear context in parallel
+  const [techStack, context, repoInstructions, linearContext] = await Promise.all([
     ghClientEarly
       ? detectTechStack(ghClientEarly, repo!.owner, repo!.repo)
       : Promise.resolve(""),
@@ -567,10 +567,13 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     ghClientEarly && (event.event_type === "ticket_created" || event.event_type === "issue_opened")
       ? fetchRepoInstructions(ghClientEarly, repo!.owner, repo!.repo)
       : Promise.resolve(""),
+    event.source === "linear" && event.ticket_id
+      ? gatherLinearContext(event.ticket_id)
+      : Promise.resolve(""),
   ]);
 
   const systemPrompt = buildSystemPrompt(techStack || undefined, session.objective);
-  const fullContext = [repoInstructions, context].filter(Boolean).join("\n\n---\n\n");
+  const fullContext = [repoInstructions, linearContext, context].filter(Boolean).join("\n\n---\n\n");
   const userPrompt = buildUserPrompt(
     session.objective,
     event.source,
@@ -582,7 +585,10 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
   // Persist pre-fetched context and user prompt
   if (repoInstructions) {
-    await persistStep(sessionId, -2, "tool", `[System] Repo instruction files found:\n${repoInstructions}`, undefined, undefined, undefined, "fetch_repo_instructions");
+    await persistStep(sessionId, -3, "tool", `[System] Repo instruction files found:\n${repoInstructions}`, undefined, undefined, undefined, "fetch_repo_instructions");
+  }
+  if (linearContext) {
+    await persistStep(sessionId, -2, "tool", `[System] Linear ticket context:\n${linearContext}`, undefined, undefined, undefined, "gather_linear_context");
   }
   if (context) {
     await persistStep(sessionId, -1, "tool", `[System] Pre-fetched repository context:\n${context}`, undefined, undefined, undefined, "gather_event_context");
