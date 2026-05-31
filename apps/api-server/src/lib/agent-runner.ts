@@ -10,8 +10,8 @@ import { logger } from "./logger";
 import { estimateCost } from "./model-prices";
 import { postLinearComment } from "./integrations/linear-client";
 
-const MAX_STEPS = 8;
-const MAX_TOOL_CALLS = 20;
+const MAX_STEPS = 15;
+const MAX_TOOL_CALLS = 30;
 const MAX_PAYLOAD_CHARS = 2_000;
 
 async function getModelSettings() {
@@ -123,18 +123,51 @@ async function gatherEventContext(
           const decoded = Buffer.from(readme.content, "base64").toString("utf8");
           parts.push(`README.md:\n${decoded.slice(0, 3_000)}`);
         }
-      } catch (err) {
-        parts.push(`Could not fetch README: ${err instanceof Error ? err.message : String(err)}`);
+      } catch {
+        // no readme
+      }
+
+      // Read package.json / go.mod / pyproject.toml to give the agent dependency context
+      for (const manifest of ["package.json", "go.mod", "pyproject.toml", "Cargo.toml"]) {
+        try {
+          const { data } = await client.rest.repos.getContent({ owner, repo: repoName, path: manifest });
+          if (!Array.isArray(data) && "content" in data && typeof data.content === "string") {
+            const decoded = Buffer.from(data.content, "base64").toString("utf8");
+            parts.push(`${manifest}:\n${decoded.slice(0, 2_000)}`);
+            break; // one manifest is enough
+          }
+        } catch {
+          // not present
+        }
       }
     }
 
-    // List repo root only for ticket events — saves tokens for events that already have file context
+    // List repo root + expand key source dirs one level deep so the agent has a map without burning tool calls
     if (eventType === "ticket_created" || eventType === "issue_opened") {
       try {
         const { data: root } = await client.rest.repos.getContent({ owner, repo: repoName, path: "" });
         if (Array.isArray(root)) {
           parts.push("Repository root:");
           parts.push(root.map((e) => `${e.type === "dir" ? "📁" : "📄"} ${e.name}`).join("\n"));
+
+          // Expand common source dirs so the agent has a file map
+          const expandDirs = root
+            .filter((e) => e.type === "dir" && ["src", "lib", "app", "apps", "packages", "services", "api", "server", "backend", "frontend"].includes(e.name))
+            .slice(0, 4);
+
+          await Promise.all(
+            expandDirs.map(async (dir) => {
+              try {
+                const { data: children } = await client.rest.repos.getContent({ owner, repo: repoName, path: dir.path });
+                if (Array.isArray(children)) {
+                  parts.push(`📁 ${dir.name}/`);
+                  parts.push(children.map((e) => `  ${e.type === "dir" ? "📁" : "📄"} ${e.name}`).join("\n"));
+                }
+              } catch {
+                // ignore
+              }
+            }),
+          );
         }
       } catch {
         // ignore
@@ -265,25 +298,29 @@ function parseAgentOutput(raw: string): AgentOutput {
   return { content, slack_summary: content.slice(0, 300), confidence };
 }
 
-function buildSystemPrompt(techStack?: string): string {
+function buildSystemPrompt(techStack?: string, objective?: string): string {
   const stackLine = techStack
     ? `\nThis repository uses ${techStack}. Use language-idiomatic patterns in your analysis.\n`
     : "";
+  const contentGuidance = objective === "plan"
+    ? "Write a detailed plan (600–1000 words). Every task must cite real file paths and function/class names you found in the code. Avoid vague instructions."
+    : "Be concise (200–300 words). Focus on root cause and the single most important action.";
   return `You are an expert SRE and engineering analyst. You analyze inbound engineering events (tickets, PRs, errors) and produce actionable, source-code-grounded analysis.${stackLine}
-You have access to GitHub tools: get_file_contents, list_directory, search_code, get_recent_commits, get_commit_diff, get_pull_request, get_issue. Use them when the pre-fetched context is insufficient.
+You have access to GitHub tools: get_file_contents, list_directory, search_code, get_recent_commits, get_commit_diff, get_pull_request, get_issue. Use them proactively — the pre-fetched context is a map, not the full picture.
 
 Tool use strategy:
-- For errors/regressions: start with get_recent_commits to find the likely culprit, then read specific files
-- For tickets/features: start with list_directory to understand structure, then read relevant files
-- For PRs: the diff is usually pre-fetched; only call tools if you need surrounding context
-- Avoid reading files larger than needed; prefer search_code to locate relevant symbols first
+- For tickets/features: the repository file map is pre-fetched. Use search_code with 2-3 key terms from the ticket to find relevant files, then read those files with get_file_contents before writing the plan.
+- Read at least 2-3 files directly relevant to the ticket before producing output. Plans based only on file names are not acceptable.
+- For errors/regressions: start with get_recent_commits to find the likely culprit, then read specific files.
+- For PRs: the diff is usually pre-fetched; only call tools if you need surrounding context.
+- Prefer search_code to locate symbols first, then get_file_contents to read the implementation.
 
 Rules:
-- Base analysis on actual source code, not assumptions
-- Be concise (max 300 words in content)
+- Base analysis on actual source code, not assumptions. Quote real function/class names and file paths.
+- ${contentGuidance}
 - Respond with valid JSON only — no surrounding text or code fences — in exactly this shape:
 {
-  "content": "<full markdown analysis, max 300 words>",
+  "content": "<full markdown analysis>",
   "slack_summary": "<2-3 plain-text sentences, no markdown, suitable for a Slack reply>",
   "confidence": <float 0.0–1.0>
 }`;
@@ -320,23 +357,31 @@ Respond with valid JSON only — no surrounding text or code fences:
 }`;
   }
 
-  return `Analyze this ticket and produce a source-code-grounded action plan.
+  return `Analyze this ticket and produce a source-code-grounded implementation plan.
 
 Source: ${source}
 Event type: ${eventType}
 Title: ${title}
 ${ticketInfo}${contextBlock}
 
-Before writing the plan:
-- Extract 2-3 key technical terms from the title/description (function names, feature areas, module names — not generic words)
-- Use search_code with those terms to find the relevant files; fall back to list_directory if needed
-- Read the relevant files to understand the current implementation
-- If the ticket has no description, state that in the objective summary and skip to what you can infer from context
-- Base every task on what you actually find in the code
+REQUIRED steps before writing the plan:
+1. Extract 2-4 key technical terms from the title/description (function names, service names, module names — not generic words like "add" or "update").
+2. Call search_code for each term to locate the relevant files.
+3. Call get_file_contents on the 2-4 most relevant files to read the actual implementation.
+4. Only then write the plan, referencing real file paths and function/class names you read.
+
+The plan MUST include:
+- Objective summary (what the ticket asks for and why)
+- Step-by-step tasks, each with: file path(s) to change, what to add/modify/remove, and why
+- Any new files or dependencies needed
+- Dependencies or blockers (e.g. DB migration, feature flag, other tickets)
+- Estimated complexity: Low / Medium / High with a 1-sentence justification
+
+If the ticket description is vague, say so in the objective summary and focus the plan on what can be inferred from the code you read.
 
 Respond with valid JSON only — no surrounding text or code fences:
 {
-  "content": "<markdown action plan with: objective summary, key tasks each referencing file/function, dependencies or blockers, estimated complexity (Low / Medium / High)>",
+  "content": "<detailed markdown plan, 600-1000 words, citing real file:function references>",
   "slack_summary": "<2-3 plain-text sentences: what the ticket is about and the first concrete step>",
   "confidence": <float 0.0–1.0>
 }`;
@@ -476,7 +521,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     ),
   ]);
 
-  const systemPrompt = buildSystemPrompt(techStack || undefined);
+  const systemPrompt = buildSystemPrompt(techStack || undefined, session.objective);
   const userPrompt = buildUserPrompt(
     session.objective,
     event.source,
@@ -670,12 +715,14 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   const modelConfig = getModelConfig(settings, modelString);
 
   try {
+    const maxTokens = session.objective === "plan" ? 10_000 : 4_000;
+
     const result = await generateText({
       model: modelConfig,
       system: systemPrompt,
       prompt: userPrompt,
       maxSteps: MAX_STEPS,
-      maxTokens: 4_000,
+      maxTokens,
       tools: githubTools,
     });
 
@@ -717,7 +764,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         model: modelConfig,
         system: systemPrompt,
         prompt: retryPrompt,
-        maxTokens: 4_000,
+        maxTokens,
       });
 
       finalTextRaw = retryResult.text;
