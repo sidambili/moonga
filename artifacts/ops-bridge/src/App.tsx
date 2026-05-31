@@ -15,6 +15,7 @@ import ArtifactsReview from "@/pages/artifacts";
 import ArtifactDetail from "@/pages/artifact-detail";
 import Integrations from "@/pages/integrations";
 import ModelSettings from "@/pages/settings";
+import { useAuth } from "@workspace/replit-auth-web";
 
 const queryClient = new QueryClient();
 
@@ -45,13 +46,51 @@ function Router() {
   );
 }
 
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { isLoading, isAuthenticated, login } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-6 bg-background">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center mb-1">
+            <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">Oncident</h1>
+          <p className="text-sm text-muted-foreground">Log in to access your operations bridge</p>
+        </div>
+        <button
+          onClick={login}
+          className="px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          Log in
+        </button>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
+            <AuthGate>
+              <Router />
+            </AuthGate>
           </WouterRouter>
           <Toaster />
         </TooltipProvider>

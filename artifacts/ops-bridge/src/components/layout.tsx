@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap } from "lucide-react";
+import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap, LogOut } from "lucide-react";
 import { cn } from "@/lib/format";
 import { ModeToggle } from "@/components/mode-toggle";
+import { useAuth } from "@workspace/replit-auth-web";
 
 const nav = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -18,6 +19,7 @@ const bottomNav = nav.slice(0, 5);
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location.startsWith(href);
@@ -58,11 +60,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border/40">
+        <div className="p-4 border-t border-border/40 space-y-3">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             <span className="text-xs text-muted-foreground">System nominal</span>
           </div>
+          {user && (
+            <div className="flex items-center gap-2.5">
+              {user.profileImageUrl ? (
+                <img src={user.profileImageUrl} alt="" className="w-6 h-6 rounded-full flex-shrink-0 object-cover" />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[10px] font-semibold text-primary">
+                    {(user.firstName?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+                {user.firstName ?? user.email ?? "User"}
+              </span>
+              <button
+                onClick={logout}
+                title="Log out"
+                className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex-shrink-0"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -111,11 +136,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
               })}
             </nav>
 
-            <div className="p-4 border-t border-border/40">
+            <div className="p-4 border-t border-border/40 space-y-3">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 <span className="text-xs text-muted-foreground">System nominal</span>
               </div>
+              {user && (
+                <div className="flex items-center gap-2.5">
+                  {user.profileImageUrl ? (
+                    <img src={user.profileImageUrl} alt="" className="w-6 h-6 rounded-full flex-shrink-0 object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[10px] font-semibold text-primary">
+                        {(user.firstName?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+                    {user.firstName ?? user.email ?? "User"}
+                  </span>
+                  <button
+                    onClick={logout}
+                    title="Log out"
+                    className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex-shrink-0"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           </aside>
         </div>
