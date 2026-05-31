@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap } from "lucide-react";
+import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap, LogOut } from "lucide-react";
 import { cn } from "@/lib/format";
 import { ModeToggle } from "@/components/mode-toggle";
+import { authClient } from "@/lib/auth-client";
 
 const nav = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -14,6 +15,11 @@ const nav = [
 ];
 
 const bottomNav = nav.slice(0, 5);
+
+async function signOut() {
+  await authClient.signOut();
+  window.location.href = "/login";
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -58,10 +64,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border/40">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-xs text-muted-foreground">System nominal</span>
+        <div className="p-3 border-t border-border/40">
+          <div className="flex items-center gap-2 px-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+            <span className="text-xs text-muted-foreground flex-1">System nominal</span>
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </aside>
@@ -111,10 +124,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
               })}
             </nav>
 
-            <div className="p-4 border-t border-border/40">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span className="text-xs text-muted-foreground">System nominal</span>
+            <div className="p-3 border-t border-border/40">
+              <div className="flex items-center gap-2 px-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                <span className="text-xs text-muted-foreground flex-1">System nominal</span>
+                <button
+                  onClick={signOut}
+                  title="Sign out"
+                  className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </aside>

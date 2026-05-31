@@ -1,10 +1,11 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Layout } from "@/components/layout";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { authClient } from "@/lib/auth-client";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import EventsFeed from "@/pages/events";
@@ -15,6 +16,8 @@ import ArtifactsReview from "@/pages/artifacts";
 import ArtifactDetail from "@/pages/artifact-detail";
 import Integrations from "@/pages/integrations";
 import ModelSettings from "@/pages/settings";
+import Login from "@/pages/login";
+import Signup from "@/pages/signup";
 
 const queryClient = new QueryClient();
 
@@ -26,7 +29,7 @@ function SafeRoute({ component: Component }: { component: React.ComponentType })
   );
 }
 
-function Router() {
+function AuthenticatedApp() {
   return (
     <Layout>
       <Switch>
@@ -42,6 +45,28 @@ function Router() {
         <Route component={NotFound} />
       </Switch>
     </Layout>
+  );
+}
+
+function Router() {
+  const { data: session, isPending } = authClient.useSession();
+
+  if (isPending) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
+      </div>
+    );
+  }
+
+  return (
+    <Switch>
+      <Route path="/login" component={() => <SafeRoute component={Login} />} />
+      <Route path="/signup" component={() => <SafeRoute component={Signup} />} />
+      <Route>
+        {session ? <AuthenticatedApp /> : <Redirect to="/login" />}
+      </Route>
+    </Switch>
   );
 }
 
