@@ -7,7 +7,7 @@ import { sessionsTable, sessionStepsTable, artifactsTable, eventsTable, integrat
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost, getModelPrice } from "./model-prices";
-import { postLinearComment, gatherLinearContext, extractLinearTicketInfo } from "./integrations/linear-client";
+import { gatherLinearContext, extractLinearTicketInfo } from "./integrations/linear-client";
 import { extractSlackMessageInfo, getSlackBotToken, postSlackReply } from "./integrations/slack-client";
 import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEventContext } from "./integrations/github-context";
 import { createGithubTools } from "./integrations/github-ai-tools";
@@ -334,18 +334,6 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         }
         stepNum++;
       }
-    }
-
-    if (event.source === "linear" && event.ticket_id) {
-      try {
-        await postLinearComment(event.ticket_id, parsed.slack_summary);
-        await persistStep(sessionId, stepNum, "tool", `[System] Posted Linear comment to ticket ${event.ticket_id}\n\n${parsed.slack_summary}`, undefined, undefined, undefined, "post_linear_comment", { success: true });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        logger.warn({ err, sessionId }, "Failed to post Linear comment");
-        await persistStep(sessionId, stepNum, "tool", `[System] Failed to post Linear comment: ${msg}`, undefined, undefined, undefined, "post_linear_comment", { success: false, error: msg });
-      }
-      stepNum++;
     }
 
     logger.info({ sessionId, model: modelString, confidence: parsed.confidence, steps: result.steps.length }, "Session completed → needs_review");
