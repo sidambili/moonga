@@ -72,6 +72,8 @@ COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/src ./lib
 # dist/ does not contain the required migration definitions.
 COPY --from=builder --chown=appuser:appgroup /app/lib/db/src ./lib/db/src
 COPY --from=builder --chown=appuser:appgroup /app/lib/db/drizzle.config.ts lib/db/
+COPY --from=builder --chown=appuser:appgroup /app/deploy/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -79,4 +81,4 @@ ENV STATIC_FILES_PATH=/app/public
 
 EXPOSE 3000
 
-CMD ["node", "--enable-source-maps", "./apps/api-server/dist/index.mjs"]
+CMD ["./docker-entrypoint.sh"]

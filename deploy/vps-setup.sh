@@ -101,6 +101,17 @@ setup_env() {
     info "Generated random POSTGRES_PASSWORD in .env"
   fi
 
+  # Ensure BETTER_AUTH_SECRET is set (required for auth to work)
+  if ! grep -q "^BETTER_AUTH_SECRET=" .env; then
+    AUTH_SECRET=$(openssl rand -base64 32)
+    echo "BETTER_AUTH_SECRET=$AUTH_SECRET" >> .env
+    info "Generated BETTER_AUTH_SECRET in .env"
+  elif grep -q "^BETTER_AUTH_SECRET=replace-with-a-32-char-secret" .env; then
+    AUTH_SECRET=$(openssl rand -base64 32)
+    sed -i "s/^BETTER_AUTH_SECRET=.*/BETTER_AUTH_SECRET=$AUTH_SECRET/" .env
+    info "Generated BETTER_AUTH_SECRET in .env"
+  fi
+
   if [ -n "$DOMAIN" ]; then
     info "Configuring for domain: $DOMAIN"
     # If Caddyfile exists, we can auto-configure it later
@@ -125,12 +136,7 @@ deploy() {
   docker compose build
   docker compose up -d
 
-  # Run DB migrations
-  info "Running database migrations (drizzle-kit push)..."
-  docker compose exec -T api npx drizzle-kit push --config ./lib/db/drizzle.config.ts || \
-    warn "Migration failed or already applied. Check logs with: docker compose logs api"
-
-  info "Deployment complete!"
+  info "Deployment complete! The API container will auto-push the DB schema on startup."
 }
 
 # ---------------------------------------------------------------------------

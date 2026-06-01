@@ -71,6 +71,43 @@ apps/
   frontend/src/components/ # Shared UI components
 ```
 
+## Self-hosting
+
+The easiest way to deploy is with Docker Compose on a VPS.
+
+### One-command deploy
+
+```bash
+# On your VPS (Ubuntu/Debian)
+export REPO_URL=https://github.com/YOUR_USER/YOUR_REPO.git
+export DOMAIN=your-domain.com  # optional, for HTTPS
+bash deploy/vps-setup.sh
+```
+
+The script will install Docker, clone the repo, generate secrets, build, and start everything.
+
+### Manual Docker Compose
+
+```bash
+cp .env.example .env
+# Edit .env — at minimum set POSTGRES_PASSWORD and BETTER_AUTH_SECRET
+docker compose up -d
+```
+
+The API container automatically pushes the database schema on startup, so no manual migration step is needed.
+
+### Creating the first user
+
+Sign-up is disabled by default. To create your first account:
+
+1. In `.env`, set `ALLOW_SIGNUP=true` and `VITE_ALLOW_SIGNUP=true`.
+2. Rebuild and redeploy:
+   ```bash
+   docker compose up -d --build
+   ```
+3. Open the app and register your account.
+4. Set both back to `false` in `.env`, then redeploy to close registration.
+
 ## Important conventions
 
 - After any OpenAPI spec change, regenerate client code before touching frontend code:
