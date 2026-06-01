@@ -26,27 +26,18 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "#ef4444",
-  high: "#f97316",
-  medium: "#eab308",
-  low: "#3b82f6",
-};
-
-const SOURCE_COLORS: Record<string, string> = {
-  github: "#6b7280",
-  linear: "#8b5cf6",
-  sentry: "#ef4444",
-  betterstack: "#f97316",
-  slack: "#3b82f6",
-};
+import {
+  SEVERITY_COLORS,
+  SOURCE_COLORS,
+  type SeverityLevel,
+  type SourceId,
+} from "@workspace/constants";
 
 function SeverityChart({ data }: { data: Array<{ severity: string; count: number }> }) {
   const chartData = data.map((d) => ({
     name: d.severity,
     value: d.count,
-    fill: SEVERITY_COLORS[d.severity] ?? "#6b7280",
+    fill: SEVERITY_COLORS[d.severity as SeverityLevel] ?? "#6b7280",
   }));
 
   if (chartData.length === 0) {
@@ -109,7 +100,7 @@ function SourceChart({ data }: { data: Array<{ source: string; count: number }> 
   const chartData = data.map((d) => ({
     name: d.source,
     count: d.count,
-    fill: SOURCE_COLORS[d.source] ?? "#6b7280",
+    fill: SOURCE_COLORS[d.source as SourceId] ?? "#6b7280",
   }));
 
   if (chartData.length === 0) {

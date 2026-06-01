@@ -5,6 +5,7 @@ import { formatRelative } from "@/lib/format";
 import { SourceIcon, StatusBadge, ObjectivePill, formatEventType, formatSource } from "@/components/ui-helpers";
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
+import { SESSION_STATUSES, SESSION_STATUS_LABELS } from "@workspace/constants";
 
 function Confidence({ score }: { score: number | null | undefined }) {
   if (score == null) return <span className="text-xs text-muted-foreground tabular-nums">—</span>;
@@ -47,13 +48,9 @@ export default function Sessions() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="running">Running</SelectItem>
-              <SelectItem value="needs_review">Needs review</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
+              {SESSION_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>{SESSION_STATUS_LABELS[s]}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

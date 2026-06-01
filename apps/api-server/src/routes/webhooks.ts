@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { db } from "@workspace/db";
 import { eventsTable, sessionsTable, integrationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { GITHUB_EVENT_TYPE_MAP } from "@workspace/constants";
 
 const router = Router();
 
@@ -24,12 +25,6 @@ function verifyLinearRequest(secret: string, rawBody: string, signature: string)
     return false;
   }
 }
-
-const GITHUB_EVENT_TYPE_MAP: Record<string, string> = {
-  issues: "issues",
-  pull_request: "pull_requests",
-  release: "releases",
-};
 
 async function isAllowedGithubEvent(eventHeader: string | undefined): Promise<{ allowed: boolean; reason?: string }> {
   if (!eventHeader) return { allowed: false, reason: "Missing X-GitHub-Event header" };

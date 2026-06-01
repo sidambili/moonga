@@ -25,15 +25,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Copy, Check, GitBranch, ChevronsUpDown, ChevronRight, X } from "lucide-react";
 import { SourceIcon } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
-
-const PROVIDERS = [
-  { id: "github",      label: "GitHub",       description: "Webhook events & codebase access" },
-  { id: "linear",      label: "Linear",       description: "Ticket creation, status changes, comments" },
-  { id: "sentry",      label: "Sentry",       description: "Error events, issue alerts, performance issues" },
-  { id: "betterstack", label: "Better Stack", description: "Uptime monitors, incident alerts, log anomalies" },
-  { id: "slack",       label: "Slack",        description: "Message events, slash commands, approvals" },
-  { id: "email",       label: "Email",        description: "Notification delivery for approvals and summaries" },
-];
+import {
+  INTEGRATION_PROVIDERS,
+  GITHUB_EVENT_TYPE_OPTIONS,
+  type IntegrationProvider,
+} from "@workspace/constants";
 
 type CurrentIntegration = {
   enabled?: boolean;
@@ -106,18 +102,12 @@ function SecretInput({
   );
 }
 
-const EVENT_TYPE_OPTIONS = [
-  { key: "issues" as const,        label: "Issues" },
-  { key: "pull_requests" as const, label: "Pull Requests" },
-  { key: "releases" as const,      label: "Releases" },
-];
-
 function IntegrationConfig({
   provider,
   current,
   onSaved,
 }: {
-  provider: (typeof PROVIDERS)[0];
+  provider: IntegrationProvider;
   current: CurrentIntegration;
   onSaved: () => void;
 }) {
@@ -251,7 +241,7 @@ function IntegrationConfig({
                 <div className="space-y-2">
                   <Label className="text-xs font-medium text-muted-foreground">Receive events for</Label>
                   <div className="flex flex-wrap gap-4">
-                    {EVENT_TYPE_OPTIONS.map(({ key, label }) => (
+                    {GITHUB_EVENT_TYPE_OPTIONS.map(({ key, label }) => (
                       <label key={key} className="flex items-center gap-2 cursor-pointer">
                         <Switch
                           checked={eventTypes[key]}
@@ -478,7 +468,7 @@ export default function Integrations() {
   const integrations = Array.isArray(integrationsRaw) ? integrationsRaw : [];
 
   const activeCount        = integrations.filter((i) => i.enabled).length;
-  const selectedProviderDef = PROVIDERS.find((p) => p.id === openProvider);
+  const selectedProviderDef = INTEGRATION_PROVIDERS.find((p) => p.id === openProvider);
   const currentIntegration  = integrations.find((i) => i.provider === openProvider);
 
   return (
@@ -502,7 +492,7 @@ export default function Integrations() {
         ) : (
           <table className="w-full text-sm">
             <tbody className="divide-y divide-border">
-              {PROVIDERS.map((provider) => {
+              {INTEGRATION_PROVIDERS.map((provider) => {
                 const integration  = integrations.find((i) => i.provider === provider.id);
                 const isActive     = integration?.enabled ?? false;
                 const isConfigured = !!(integration?.api_key_masked || integration?.webhook_secret);

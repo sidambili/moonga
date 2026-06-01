@@ -12,29 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { KeyRound, Cpu, CheckCircle2 } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
-
-const PROVIDERS = [
-  { id: "openai",    label: "OpenAI" },
-  { id: "anthropic", label: "Anthropic" },
-  { id: "openrouter", label: "OpenRouter" },
-  { id: "custom",    label: "Custom (OpenAI-compatible)" },
-];
-
-const MODEL_SUGGESTIONS: Record<string, { triage: string[]; plan: string[] }> = {
-  openai: {
-    triage: ["gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.5"],
-    plan:   ["gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.5"],
-  },
-  anthropic: {
-    triage: ["claude-sonnet-4-6"],
-    plan:   ["claude-opus-4-8", "claude-sonnet-4-6"],
-  },
-  openrouter: {
-    triage: ["qwen/qwen3.7-max", "google/gemini-3.5-flash", "deepseek/deepseek-v4-flash"],
-    plan:   ["deepseek/deepseek-v4-pro", "moonshotai/kimi-k2.6"],
-  },
-  custom: { triage: ["your-triage-model"], plan: ["your-plan-model"] },
-};
+import {
+  MODEL_PROVIDERS,
+  MODEL_SUGGESTIONS,
+  ROUTING_MODES,
+} from "@workspace/constants";
 
 export default function ModelSettings() {
   const queryClient = useQueryClient();
@@ -112,7 +94,7 @@ export default function ModelSettings() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROVIDERS.map((p) => (
+                    {MODEL_PROVIDERS.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -220,16 +202,7 @@ export default function ModelSettings() {
               <span className="text-sm font-medium">Routing Logic</span>
             </div>
             <div className="p-4 space-y-4">
-              {[
-                {
-                  tag: "Triage",
-                  desc: "Initial classification, severity scoring, and Slack summaries. Uses the faster, cheaper model.",
-                },
-                {
-                  tag: "Plan",
-                  desc: "Deep diagnosis, implementation planning, and incident reports. Uses the more capable model.",
-                },
-              ].map((r) => (
+              {ROUTING_MODES.map((r) => (
                 <div key={r.tag} className="flex items-start gap-3">
                   <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-primary/10 text-primary flex-shrink-0 mt-0.5">
                     {r.tag}

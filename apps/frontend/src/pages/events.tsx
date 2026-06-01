@@ -5,6 +5,14 @@ import { formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource } from "@/components/ui-helpers";
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
+import {
+  SOURCE_IDS,
+  SOURCE_LABELS,
+  SEVERITY_LEVELS,
+  SEVERITY_LABELS,
+  EVENT_STATUSES,
+  EVENT_STATUS_LABELS,
+} from "@workspace/constants";
 
 export default function EventsFeed() {
   const [, navigate] = useLocation();
@@ -46,11 +54,9 @@ export default function EventsFeed() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All sources</SelectItem>
-                <SelectItem value="github">GitHub</SelectItem>
-                <SelectItem value="linear">Linear</SelectItem>
-                <SelectItem value="sentry">Sentry</SelectItem>
-                <SelectItem value="betterstack">Better Stack</SelectItem>
-                <SelectItem value="slack">Slack</SelectItem>
+                {SOURCE_IDS.map((id) => (
+                  <SelectItem key={id} value={id}>{SOURCE_LABELS[id]}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={severityFilter} onValueChange={setSeverityFilter}>
@@ -59,10 +65,9 @@ export default function EventsFeed() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All severities</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
+                {SEVERITY_LEVELS.map((level) => (
+                  <SelectItem key={level} value={level}>{SEVERITY_LABELS[level]}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -71,10 +76,9 @@ export default function EventsFeed() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in_progress">In progress</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
+                {EVENT_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>{EVENT_STATUS_LABELS[s]}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

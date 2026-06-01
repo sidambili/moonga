@@ -2,11 +2,7 @@ import { useState } from "react";
 import { useGetSessionSteps, getGetSessionStepsQueryKey } from "@workspace/api-client-react";
 import type { SessionStep } from "@workspace/api-client-react";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
-
-const SYSTEM_TOOL_NAMES = new Set([
-  "create_artifact", "post_linear_comment", "post_slack_reply",
-  "gather_event_context", "fetch_repo_instructions",
-]);
+import { SYSTEM_TOOL_NAMES, getToolLabel } from "@workspace/constants";
 
 function formatCost(cost: number | null | undefined) {
   if (cost == null || cost === 0) return null;
@@ -70,48 +66,13 @@ type VisualGroup =
   | { kind: "user"; step: SessionStep }
   | { kind: "artifact_output"; step: SessionStep; parsed: ArtifactOutput };
 
-function formatToolLabel(name: string, args?: unknown): string {
-  const a = args && typeof args === "object" ? (args as Record<string, unknown>) : {};
-  switch (name) {
-    case "get_file_contents":
-      return a.path ? `Read ${a.path}` : "Read file";
-    case "get_commit_diff":
-      return a.sha ? `Commit ${String(a.sha).slice(0, 8)}` : "Commit diff";
-    case "get_pull_request":
-      return a.number != null ? `PR #${a.number}` : "Pull request";
-    case "get_issue":
-      return a.number != null ? `Issue #${a.number}` : "Issue";
-    case "get_recent_commits":
-      return "Recent commits";
-    case "list_directory":
-      return a.path ? `Listed ${a.path}` : "Listed root";
-    case "search_code": {
-      const q = a.query ? String(a.query) : "";
-      const p = a.path ? ` in ${a.path}` : "";
-      return q ? `Searched ${q.includes(" ") ? `"${q}"` : q}${p}` : "Searched code";
-    }
-    case "create_artifact":
-      return "Artifact created";
-    case "post_linear_comment":
-      return "Linear comment posted";
-    case "post_slack_reply":
-      return "Slack reply sent";
-    case "gather_event_context":
-      return "Gathered context";
-    case "fetch_repo_instructions":
-      return "Loaded instructions";
-    default:
-      return name.replace(/_/g, " ");
-  }
-}
-
 function basename(path: string): string {
   return path.split("/").pop() ?? path;
 }
 
 function toolGroupSummary(items: ToolCallItem[]): string {
   if (items.length === 0) return "Tool call";
-  const first = formatToolLabel(items[0].name, items[0].args);
+  const first = getToolLabel(items[0].name, items[0].args);
   if (items.length === 1) return first;
   const extra = items.length - 1;
   const n0 = items[0].name;
@@ -248,7 +209,7 @@ function ArtifactOutputRow({ step, parsed }: { step: SessionStep; parsed: Artifa
 
 function SubToolItem({ item }: { item: ToolCallItem }) {
   const [open, setOpen] = useState(false);
-  const label = formatToolLabel(item.name, item.args);
+  const label = getToolLabel(item.name, item.args);
   const hasDetail = item.args != null || item.result != null;
 
   if (!hasDetail) {
