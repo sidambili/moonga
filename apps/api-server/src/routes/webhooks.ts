@@ -17,9 +17,9 @@ function verifySlackRequest(signingSecret: string, timestamp: string, rawBody: s
 }
 
 function verifyLinearRequest(secret: string, rawBody: string, signature: string): boolean {
-  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const expected = crypto.createHmac("sha256", secret.trim()).update(rawBody).digest("hex");
   try {
-    return crypto.timingSafeEqual(Buffer.from(expected, "utf8"), Buffer.from(signature, "utf8"));
+    return crypto.timingSafeEqual(Buffer.from(expected, "utf8"), Buffer.from(signature.trim(), "utf8"));
   } catch {
     return false;
   }
@@ -233,7 +233,7 @@ router.post("/linear", async (req, res) => {
   const linearConfig = await getLinearConfig();
 
   if (linearConfig.webhook_secret) {
-    const signature = req.headers["x-linear-signature"] as string | undefined;
+    const signature = req.headers["linear-signature"] as string | undefined;
     const rawBody = (req as unknown as Record<string, unknown> & { rawBody?: string }).rawBody ?? "";
     if (!signature || !verifyLinearRequest(linearConfig.webhook_secret, rawBody, signature)) {
       return res.status(400).json({ accepted: false, reason: "Invalid Linear signature" });
