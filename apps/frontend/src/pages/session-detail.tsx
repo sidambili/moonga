@@ -16,6 +16,15 @@ import { toast } from "@/hooks/use-toast";
 import Markdown from "@/components/markdown";
 import SessionTrace from "@/components/session-trace";
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) return "<1s";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
+}
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
@@ -243,6 +252,7 @@ export default function SessionDetail() {
                 ["Created", formatDate(session.created_at)],
                 ["Updated", formatDate(session.updated_at)],
                 ["Age", formatRelative(session.updated_at)],
+                ...(session.duration_ms ? [["Duration", formatDuration(session.duration_ms)]] : []),
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-4">
                   <span className="text-xs text-muted-foreground">{label}</span>
@@ -251,8 +261,45 @@ export default function SessionDetail() {
               ))}
             </div>
 
+            <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground">Usage</p>
+              {session.total_tokens != null && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-xs text-muted-foreground">Tokens</span>
+                  <span className="text-xs font-medium tabular-nums">
+                    {session.total_tokens.toLocaleString()}
+                    {session.total_prompt_tokens != null && session.total_completion_tokens != null && (
+                      <span className="text-muted-foreground/60">
+                        {" "}({session.total_prompt_tokens.toLocaleString()}↑ {session.total_completion_tokens.toLocaleString()}↓)
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {session.total_cost != null && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-xs text-muted-foreground">Cost</span>
+                  <span className="text-xs font-medium tabular-nums">${session.total_cost.toFixed(4)}</span>
+                </div>
+              )}
+              {(session.prompt_token_cost != null || session.completion_token_cost != null) && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-xs text-muted-foreground">Rate</span>
+                  <span className="text-xs font-medium tabular-nums">
+                    ${session.prompt_token_cost?.toFixed(2) ?? "?"}/${session.completion_token_cost?.toFixed(2) ?? "?"} per 1M
+                  </span>
+                </div>
+              )}
+              {session.tool_calls_count != null && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-xs text-muted-foreground">Tools</span>
+                  <span className="text-xs font-medium tabular-nums">{session.tool_calls_count}</span>
+                </div>
+              )}
+            </div>
+
             {session.event && (
-              <div className="rounded-lg border border-border bg-card p-4 md:col-span-2 space-y-2">
+              <div className="rounded-lg border border-border bg-card p-4 space-y-2">
                 <p className="text-xs font-medium text-muted-foreground">Triggering Event</p>
                 <Link href={`/events/${session.event_id}`}>
                   <div className="flex items-start gap-3 group cursor-pointer">

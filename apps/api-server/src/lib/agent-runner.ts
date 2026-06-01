@@ -6,7 +6,7 @@ import { db } from "@workspace/db";
 import { sessionsTable, sessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
-import { estimateCost } from "./model-prices";
+import { estimateCost, getModelPrice } from "./model-prices";
 import { postLinearComment, gatherLinearContext, extractLinearTicketInfo } from "./integrations/linear-client";
 import { extractSlackMessageInfo, getSlackBotToken, postSlackReply } from "./integrations/slack-client";
 import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEventContext } from "./integrations/github-context";
@@ -183,6 +183,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   }
 
   const modelConfig = getModelConfig(settings, modelString);
+  const sessionStartTime = Date.now();
 
   try {
     const maxTokens = session.objective === "plan" ? 10_000 : 4_000;
@@ -196,8 +197,14 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       tools: createGithubTools(ghClient, repo, checkToolLimit),
     });
 
-    // Persist each step from the Vercel AI SDK result
+    // Accumulate session aggregates while persisting steps
     let stepNum = 1;
+    let totalPromptTokens = 0;
+    let totalCompletionTokens = 0;
+    let totalTokens = 0;
+    let totalCost = 0;
+    let toolCallsCount = 0;
+
     for (const step of result.steps) {
       const stepUsage = step.usage ? {
         promptTokens: step.usage.promptTokens,
@@ -208,6 +215,14 @@ export async function runAgentSession(sessionId: number): Promise<void> {
           completionTokens: step.usage.completionTokens,
         }),
       } : undefined;
+
+      if (stepUsage) {
+        totalPromptTokens += stepUsage.promptTokens;
+        totalCompletionTokens += stepUsage.completionTokens;
+        totalTokens += stepUsage.totalTokens;
+        totalCost += stepUsage.cost;
+      }
+      toolCallsCount += step.toolCalls?.length ?? 0;
 
       if (step.text || (step.toolCalls && step.toolCalls.length > 0)) {
         await persistStep(sessionId, stepNum, "assistant", step.text ?? "", modelString, stepUsage, step.toolCalls as unknown[]);
@@ -221,6 +236,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     }
 
     let finalTextRaw = result.text;
+    let retryResult: Awaited<ReturnType<typeof generateText>> | undefined;
 
     // Fallback: some providers/models don't produce text after tool results.
     // Retry without tools, feeding the tool results back as context.
@@ -230,7 +246,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         .map((tr) => `Tool: ${tr.toolName}\nResult: ${JSON.stringify(tr.result).slice(0, 10_000)}`)
         .join("\n---\n")}\n\nBased on the above tool results, produce your final analysis now.`;
 
-      const retryResult = await generateText({
+      retryResult = await generateText({
         model: modelConfig,
         system: systemPrompt,
         prompt: retryPrompt,
@@ -239,6 +255,21 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
       finalTextRaw = retryResult.text;
     }
+
+    // Add retry usage to aggregates
+    if (retryResult?.usage) {
+      totalPromptTokens += retryResult.usage.promptTokens;
+      totalCompletionTokens += retryResult.usage.completionTokens;
+      totalTokens += retryResult.usage.totalTokens;
+      const retryCost = await estimateCost(modelString, {
+        promptTokens: retryResult.usage.promptTokens,
+        completionTokens: retryResult.usage.completionTokens,
+      });
+      totalCost += retryCost;
+    }
+
+    const modelPrice = await getModelPrice(modelString);
+    const durationMs = Date.now() - sessionStartTime;
 
     const parsed = parseAgentOutput(finalTextRaw);
 
@@ -258,6 +289,14 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         output_summary: parsed.slack_summary,
         confidence_score: parsed.confidence,
         model_used: modelString,
+        total_tokens: totalTokens || null,
+        total_prompt_tokens: totalPromptTokens || null,
+        total_completion_tokens: totalCompletionTokens || null,
+        total_cost: totalCost || null,
+        prompt_token_cost: modelPrice.inputRate,
+        completion_token_cost: modelPrice.outputRate,
+        tool_calls_count: toolCallsCount || null,
+        duration_ms: durationMs || null,
         updated_at: new Date(),
       })
       .where(eq(sessionsTable.id, sessionId));

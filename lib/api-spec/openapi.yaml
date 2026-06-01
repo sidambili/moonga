@@ -700,8 +700,26 @@ components:
           type: ["number", "null"]
         step_count:
           type: ["integer", "null"]
+        total_tokens:
+          type: ["integer", "null"]
+        total_prompt_tokens:
+          type: ["integer", "null"]
+        total_completion_tokens:
+          type: ["integer", "null"]
         total_cost:
           type: ["number", "null"]
+        prompt_token_cost:
+          type: ["number", "null"]
+        completion_token_cost:
+          type: ["number", "null"]
+        cached_tokens:
+          type: ["integer", "null"]
+        cached_cost:
+          type: ["number", "null"]
+        tool_calls_count:
+          type: ["integer", "null"]
+        duration_ms:
+          type: ["integer", "null"]
         created_at:
           type: string
         updated_at:

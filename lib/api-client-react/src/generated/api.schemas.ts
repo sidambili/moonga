@@ -68,7 +68,25 @@ export interface Session {
   /** @nullable */
   step_count?: number | null;
   /** @nullable */
+  total_tokens?: number | null;
+  /** @nullable */
+  total_prompt_tokens?: number | null;
+  /** @nullable */
+  total_completion_tokens?: number | null;
+  /** @nullable */
   total_cost?: number | null;
+  /** @nullable */
+  prompt_token_cost?: number | null;
+  /** @nullable */
+  completion_token_cost?: number | null;
+  /** @nullable */
+  cached_tokens?: number | null;
+  /** @nullable */
+  cached_cost?: number | null;
+  /** @nullable */
+  tool_calls_count?: number | null;
+  /** @nullable */
+  duration_ms?: number | null;
   created_at: string;
   updated_at: string;
   event?: Event;

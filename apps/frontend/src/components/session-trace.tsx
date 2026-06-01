@@ -15,6 +15,17 @@ function formatTokens(n: number | null | undefined) {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k tok` : `${n} tok`;
 }
 
+function formatTokenPair(
+  prompt: number | null | undefined,
+  completion: number | null | undefined,
+) {
+  const p = prompt ?? 0;
+  const c = completion ?? 0;
+  if (p === 0 && c === 0) return null;
+  const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
+  return `${fmt(p)}↑ ${fmt(c)}↓`;
+}
+
 function formatDuration(ms: number): string {
   if (ms < 1000) return "<1s";
   const s = Math.round(ms / 1000);
@@ -279,6 +290,7 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
 
 function ThinkingRow({ step, durationMs }: { step: SessionStep; durationMs?: number }) {
   const [open, setOpen] = useState(false);
+  const tok = formatTokenPair(step.prompt_tokens, step.completion_tokens);
 
   return (
     <div>
@@ -291,12 +303,17 @@ function ThinkingRow({ step, durationMs }: { step: SessionStep; durationMs?: num
         ) : (
           <ChevronRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
         )}
-        <span className="text-[12px] text-muted-foreground/55">
+        <span className="text-[12px] text-muted-foreground/55 flex-1 min-w-0 truncate">
           Thought
           {durationMs != null && (
             <span className="text-muted-foreground/40"> for {formatDuration(durationMs)}</span>
           )}
         </span>
+        {tok && (
+          <span className="text-[10px] tabular-nums text-muted-foreground/40 ml-2 flex-shrink-0">
+            {tok}
+          </span>
+        )}
       </button>
       {open && step.content && (
         <div className="px-4 pb-2 pl-9">
@@ -320,6 +337,7 @@ function ToolGroupRow({
 }) {
   const [open, setOpen] = useState(false);
   const summary = toolGroupSummary(items);
+  const tok = formatTokenPair(call.prompt_tokens, call.completion_tokens);
 
   return (
     <div>
@@ -339,6 +357,11 @@ function ToolGroupRow({
         >
           {summary}
         </span>
+        {tok && (
+          <span className="text-[10px] tabular-nums text-muted-foreground/40 ml-2 flex-shrink-0">
+            {tok}
+          </span>
+        )}
         {isSystem && (
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground/30 font-medium ml-2 flex-shrink-0">
             system
@@ -402,6 +425,8 @@ export default function SessionTrace({ sessionId, totalCost }: SessionTraceProps
 
   const groups = steps ? buildVisualGroups(steps) : [];
   const totalTok = steps?.reduce((s, st) => s + (st.tokens_used ?? 0), 0) ?? 0;
+  const totalPrompt = steps?.reduce((s, st) => s + (st.prompt_tokens ?? 0), 0) ?? 0;
+  const totalCompletion = steps?.reduce((s, st) => s + (st.completion_tokens ?? 0), 0) ?? 0;
   const totalCostComputed = steps?.reduce((s, st) => s + (st.cost ?? 0), 0) ?? 0;
   const displayCost = formatCost(totalCostComputed || totalCost);
 
@@ -456,7 +481,7 @@ export default function SessionTrace({ sessionId, totalCost }: SessionTraceProps
         <div className="border-t border-border px-4 py-2 flex items-center justify-between flex-shrink-0">
           {totalTok > 0 && (
             <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-              {formatTokens(totalTok)}
+              {formatTokenPair(totalPrompt, totalCompletion) ?? formatTokens(totalTok)}
             </span>
           )}
           {displayCost && (
