@@ -98,15 +98,14 @@ The API container automatically pushes the database schema on startup, so no man
 
 ### Creating the first user
 
-Sign-up is disabled by default. To create your first account:
+Sign-up is enabled by default so you can create your first account immediately after deploying.
 
-1. In `.env`, set `ALLOW_SIGNUP=true` and `VITE_ALLOW_SIGNUP=true`.
-2. Rebuild and redeploy:
+1. Open the app and register your account.
+2. After creating your account, set `ALLOW_SIGNUP=false` and `VITE_ALLOW_SIGNUP=false` in `.env`.
+3. Rebuild and redeploy to close registration:
    ```bash
    docker compose up -d --build
    ```
-3. Open the app and register your account.
-4. Set both back to `false` in `.env`, then redeploy to close registration.
 
 ## Important conventions
 

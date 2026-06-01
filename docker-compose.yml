@@ -34,7 +34,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_ALLOW_SIGNUP: ${VITE_ALLOW_SIGNUP:-false}
+        VITE_ALLOW_SIGNUP: ${VITE_ALLOW_SIGNUP:-true}
     container_name: oncident-api
     restart: unless-stopped
     depends_on:
@@ -47,7 +47,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
-      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
     ports:
       - "127.0.0.1:3000:3000"
     healthcheck:
