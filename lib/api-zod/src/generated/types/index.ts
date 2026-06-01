@@ -19,6 +19,7 @@ export * from './integration';
 export * from './integrationConfig';
 export * from './integrationInput';
 export * from './integrationInputConfig';
+export * from './linearConfig';
 export * from './linearTeam';
 export * from './listArtifactsParams';
 export * from './listEventsParams';

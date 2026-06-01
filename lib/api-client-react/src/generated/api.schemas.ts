@@ -132,9 +132,37 @@ export interface ArtifactEdit {
 }
 
 /**
- * @nullable
+ * Integration-specific config for the Linear provider
  */
-export type IntegrationConfig = { [key: string]: unknown } | null;
+export interface LinearConfig {
+  /**
+     * Comma-separated team IDs allowed to trigger the agent. Empty string means allow all.
+     * @nullable
+     */
+  linear_team_ids?: string | null;
+  /**
+     * Legacy comma-separated team names (backward compatibility).
+     * @nullable
+     */
+  linear_team_names?: string | null;
+  /**
+     * Default GitHub repo to associate with Linear events.
+     * @nullable
+     */
+  default_repo?: string | null;
+  /**
+     * Linear workflow state UUID to transition to when an artifact is approved.
+     * @nullable
+     */
+  approved_state_id?: string | null;
+  /**
+     * Linear label UUID to apply when an artifact is approved.
+     * @nullable
+     */
+  approved_label_id?: string | null;
+}
+
+export type IntegrationConfig = LinearConfig | { [key: string]: unknown } | null;
 
 export interface Integration {
   id: number;
@@ -147,16 +175,12 @@ export interface Integration {
   webhook_secret?: string | null;
   /** @nullable */
   api_key_masked?: string | null;
-  /** @nullable */
   config?: IntegrationConfig;
   created_at: string;
   updated_at: string;
 }
 
-/**
- * @nullable
- */
-export type IntegrationInputConfig = { [key: string]: unknown } | null;
+export type IntegrationInputConfig = LinearConfig | { [key: string]: unknown } | null;
 
 export interface IntegrationInput {
   enabled?: boolean;
@@ -164,7 +188,6 @@ export interface IntegrationInput {
   api_key?: string | null;
   /** @nullable */
   webhook_secret?: string | null;
-  /** @nullable */
   config?: IntegrationInputConfig;
 }
 

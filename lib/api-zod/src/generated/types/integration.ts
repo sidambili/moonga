@@ -18,7 +18,6 @@ export interface Integration {
   webhook_secret?: string | null;
   /** @nullable */
   api_key_masked?: string | null;
-  /** @nullable */
   config?: IntegrationConfig;
   created_at: string;
   updated_at: string;

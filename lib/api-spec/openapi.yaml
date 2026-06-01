@@ -812,7 +812,9 @@ components:
         api_key_masked:
           type: ["string", "null"]
         config:
-          type: ["object", "null"]
+          oneOf:
+            - $ref: "#/components/schemas/LinearConfig"
+            - type: ["object", "null"]
         created_at:
           type: string
         updated_at:
@@ -828,7 +830,29 @@ components:
         webhook_secret:
           type: ["string", "null"]
         config:
-          type: ["object", "null"]
+          oneOf:
+            - $ref: "#/components/schemas/LinearConfig"
+            - type: ["object", "null"]
+
+    LinearConfig:
+      type: object
+      description: Integration-specific config for the Linear provider
+      properties:
+        linear_team_ids:
+          type: ["string", "null"]
+          description: Comma-separated team IDs allowed to trigger the agent. Empty string means allow all.
+        linear_team_names:
+          type: ["string", "null"]
+          description: Legacy comma-separated team names (backward compatibility).
+        default_repo:
+          type: ["string", "null"]
+          description: Default GitHub repo to associate with Linear events.
+        approved_state_id:
+          type: ["string", "null"]
+          description: Linear workflow state UUID to transition to when an artifact is approved.
+        approved_label_id:
+          type: ["string", "null"]
+          description: Linear label UUID to apply when an artifact is approved.
 
     Repo:
       type: object

@@ -554,9 +554,15 @@ export const ListIntegrationsResponseItem = zod.object({
   "webhook_url": zod.string().nullish(),
   "webhook_secret": zod.string().nullish(),
   "api_key_masked": zod.string().nullish(),
-  "config": zod.object({
+  "config": zod.union([zod.object({
+  "linear_team_ids": zod.string().nullish().describe('Comma-separated team IDs allowed to trigger the agent. Empty string means allow all.'),
+  "linear_team_names": zod.string().nullish().describe('Legacy comma-separated team names (backward compatibility).'),
+  "default_repo": zod.string().nullish().describe('Default GitHub repo to associate with Linear events.'),
+  "approved_state_id": zod.string().nullish().describe('Linear workflow state UUID to transition to when an artifact is approved.'),
+  "approved_label_id": zod.string().nullish().describe('Linear label UUID to apply when an artifact is approved.')
+}).describe('Integration-specific config for the Linear provider'),zod.object({
 
-}).passthrough().nullish(),
+}).passthrough().nullable()]).optional(),
   "created_at": zod.string(),
   "updated_at": zod.string()
 })
@@ -577,9 +583,15 @@ export const GetIntegrationResponse = zod.object({
   "webhook_url": zod.string().nullish(),
   "webhook_secret": zod.string().nullish(),
   "api_key_masked": zod.string().nullish(),
-  "config": zod.object({
+  "config": zod.union([zod.object({
+  "linear_team_ids": zod.string().nullish().describe('Comma-separated team IDs allowed to trigger the agent. Empty string means allow all.'),
+  "linear_team_names": zod.string().nullish().describe('Legacy comma-separated team names (backward compatibility).'),
+  "default_repo": zod.string().nullish().describe('Default GitHub repo to associate with Linear events.'),
+  "approved_state_id": zod.string().nullish().describe('Linear workflow state UUID to transition to when an artifact is approved.'),
+  "approved_label_id": zod.string().nullish().describe('Linear label UUID to apply when an artifact is approved.')
+}).describe('Integration-specific config for the Linear provider'),zod.object({
 
-}).passthrough().nullish(),
+}).passthrough().nullable()]).optional(),
   "created_at": zod.string(),
   "updated_at": zod.string()
 })
@@ -596,9 +608,15 @@ export const UpsertIntegrationBody = zod.object({
   "enabled": zod.boolean().optional(),
   "api_key": zod.string().nullish(),
   "webhook_secret": zod.string().nullish(),
-  "config": zod.object({
+  "config": zod.union([zod.object({
+  "linear_team_ids": zod.string().nullish().describe('Comma-separated team IDs allowed to trigger the agent. Empty string means allow all.'),
+  "linear_team_names": zod.string().nullish().describe('Legacy comma-separated team names (backward compatibility).'),
+  "default_repo": zod.string().nullish().describe('Default GitHub repo to associate with Linear events.'),
+  "approved_state_id": zod.string().nullish().describe('Linear workflow state UUID to transition to when an artifact is approved.'),
+  "approved_label_id": zod.string().nullish().describe('Linear label UUID to apply when an artifact is approved.')
+}).describe('Integration-specific config for the Linear provider'),zod.object({
 
-}).passthrough().nullish()
+}).passthrough().nullable()]).optional()
 })
 
 export const UpsertIntegrationResponse = zod.object({
@@ -608,9 +626,15 @@ export const UpsertIntegrationResponse = zod.object({
   "webhook_url": zod.string().nullish(),
   "webhook_secret": zod.string().nullish(),
   "api_key_masked": zod.string().nullish(),
-  "config": zod.object({
+  "config": zod.union([zod.object({
+  "linear_team_ids": zod.string().nullish().describe('Comma-separated team IDs allowed to trigger the agent. Empty string means allow all.'),
+  "linear_team_names": zod.string().nullish().describe('Legacy comma-separated team names (backward compatibility).'),
+  "default_repo": zod.string().nullish().describe('Default GitHub repo to associate with Linear events.'),
+  "approved_state_id": zod.string().nullish().describe('Linear workflow state UUID to transition to when an artifact is approved.'),
+  "approved_label_id": zod.string().nullish().describe('Linear label UUID to apply when an artifact is approved.')
+}).describe('Integration-specific config for the Linear provider'),zod.object({
 
-}).passthrough().nullish(),
+}).passthrough().nullable()]).optional(),
   "created_at": zod.string(),
   "updated_at": zod.string()
 })

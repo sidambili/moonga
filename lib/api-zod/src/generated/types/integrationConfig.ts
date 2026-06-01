@@ -5,8 +5,6 @@
  * Oncident API
  * OpenAPI spec version: 0.1.0
  */
+import type { LinearConfig } from './linearConfig';
 
-/**
- * @nullable
- */
-export type IntegrationConfig = { [key: string]: unknown } | null;
+export type IntegrationConfig = LinearConfig | { [key: string]: unknown } | null;

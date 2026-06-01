@@ -13,6 +13,5 @@ export interface IntegrationInput {
   api_key?: string | null;
   /** @nullable */
   webhook_secret?: string | null;
-  /** @nullable */
   config?: IntegrationInputConfig;
 }
