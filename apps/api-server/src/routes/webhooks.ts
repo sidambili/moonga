@@ -16,6 +16,15 @@ function verifySlackRequest(signingSecret: string, timestamp: string, rawBody: s
   }
 }
 
+function verifyLinearRequest(secret: string, rawBody: string, signature: string): boolean {
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected, "utf8"), Buffer.from(signature, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
 const GITHUB_EVENT_TYPE_MAP: Record<string, string> = {
   issues: "issues",
   pull_request: "pull_requests",
@@ -104,11 +113,17 @@ function getLinearTeamId(payload: Record<string, unknown>): string | undefined {
   return team?.id as string | undefined;
 }
 
-async function getLinearConfig(): Promise<{ linear_team_ids?: string; linear_team_names?: string; default_repo?: string }> {
+async function getLinearConfig(): Promise<{ linear_team_ids?: string; linear_team_names?: string; default_repo?: string; webhook_secret?: string }> {
   try {
     const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "linear"));
     if (row?.config) {
-      return row.config as { linear_team_ids?: string; linear_team_names?: string; default_repo?: string };
+      return {
+        ...row.config as { linear_team_ids?: string; linear_team_names?: string; default_repo?: string },
+        webhook_secret: row.webhook_secret ?? undefined,
+      };
+    }
+    if (row?.webhook_secret) {
+      return { webhook_secret: row.webhook_secret };
     }
   } catch {
     // ignore
@@ -216,6 +231,14 @@ router.post("/github", async (req, res) => {
 
 router.post("/linear", async (req, res) => {
   const linearConfig = await getLinearConfig();
+
+  if (linearConfig.webhook_secret) {
+    const signature = req.headers["x-linear-signature"] as string | undefined;
+    const rawBody = (req as unknown as Record<string, unknown> & { rawBody?: string }).rawBody ?? "";
+    if (!signature || !verifyLinearRequest(linearConfig.webhook_secret, rawBody, signature)) {
+      return res.status(400).json({ accepted: false, reason: "Invalid Linear signature" });
+    }
+  }
 
   const teamName = getLinearTeamName(req.body);
   const teamId = getLinearTeamId(req.body);
