@@ -67,13 +67,13 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div className="flex flex-wrap items-center justify-between px-4 py-3 border-b border-border gap-y-2">
         <div className="flex items-center gap-2">
           <ArtifactTypeBadge type={artifact.type} />
           <ApprovalBadge state={artifact.approval_state} />
           <span className="text-[11px] text-muted-foreground tabular-nums">#{artifact.id}</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {isDraft && !editing && (
             <>
               <Button
@@ -231,10 +231,10 @@ export default function SessionDetail() {
       </div>
 
       {/* Two-column body */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
 
         {/* Left: content */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           {/* Metadata */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="rounded-lg border border-border bg-card p-4 space-y-3">
@@ -311,7 +311,7 @@ export default function SessionDetail() {
         </div>
 
         {/* Right: agent trace — sticky on large screens */}
-        <div className="xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)] flex flex-col">
+        <div className="xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)] flex flex-col min-w-0">
           <SessionTrace sessionId={session.id} totalCost={session.total_cost} />
         </div>
       </div>

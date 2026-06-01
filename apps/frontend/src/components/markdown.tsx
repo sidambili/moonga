@@ -13,15 +13,17 @@ const components: Components = {
     const { children, className, ref, ...rest } = props;
     const match = /language-(\w+)/.exec(className || "");
     return match ? (
-      <SyntaxHighlighter
-        {...rest}
-        language={match[1]}
-        style={vscDarkPlus}
-        PreTag="div"
-        className="rounded-lg text-sm my-3"
-      >
-        {String(children).replace(/\n$/, "")}
-      </SyntaxHighlighter>
+      <div className="overflow-x-auto">
+        <SyntaxHighlighter
+          {...rest}
+          language={match[1]}
+          style={vscDarkPlus}
+          PreTag="div"
+          className="rounded-lg text-sm my-3"
+        >
+          {String(children).replace(/\n$/, "")}
+        </SyntaxHighlighter>
+      </div>
     ) : (
       <code
         {...rest}
@@ -33,6 +35,13 @@ const components: Components = {
   },
   pre({ children }) {
     return <>{children}</>;
+  },
+  table({ children }) {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full">{children}</table>
+      </div>
+    );
   },
 };
 
