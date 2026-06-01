@@ -9,5 +9,10 @@ import type { Artifact } from './artifact';
 
 export interface ArtifactList {
   items: Artifact[];
-  total: number;
+  /**
+     * ID to pass as `cursor` for the next page
+     * @nullable
+     */
+  nextCursor?: number | null;
+  hasMore: boolean;
 }

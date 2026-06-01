@@ -68,14 +68,13 @@ export const GetSourceBreakdownResponse = zod.array(GetSourceBreakdownResponseIt
  * @summary List all events
  */
 export const listEventsQueryLimitDefault = 50;
-export const listEventsQueryOffsetDefault = 0;
 
 export const ListEventsQueryParams = zod.object({
   "source": zod.coerce.string().optional(),
   "severity": zod.coerce.string().optional(),
   "status": zod.coerce.string().optional(),
   "limit": zod.coerce.number().default(listEventsQueryLimitDefault),
-  "offset": zod.coerce.number().default(listEventsQueryOffsetDefault)
+  "cursor": zod.coerce.number().optional()
 })
 
 export const ListEventsResponse = zod.object({
@@ -95,7 +94,8 @@ export const ListEventsResponse = zod.object({
   "session_id": zod.number().nullish(),
   "created_at": zod.string()
 })),
-  "total": zod.number()
+  "nextCursor": zod.number().nullish().describe('ID to pass as `cursor` for the next page'),
+  "hasMore": zod.boolean()
 })
 
 
@@ -128,12 +128,11 @@ export const GetEventResponse = zod.object({
  * @summary List all agent sessions
  */
 export const listSessionsQueryLimitDefault = 50;
-export const listSessionsQueryOffsetDefault = 0;
 
 export const ListSessionsQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "limit": zod.coerce.number().default(listSessionsQueryLimitDefault),
-  "offset": zod.coerce.number().default(listSessionsQueryOffsetDefault)
+  "cursor": zod.coerce.number().optional()
 })
 
 export const ListSessionsResponse = zod.object({
@@ -169,7 +168,8 @@ export const ListSessionsResponse = zod.object({
   "created_at": zod.string()
 }).optional()
 })),
-  "total": zod.number()
+  "nextCursor": zod.number().nullish().describe('ID to pass as `cursor` for the next page'),
+  "hasMore": zod.boolean()
 })
 
 
@@ -290,13 +290,12 @@ export const GetSessionStepsResponse = zod.array(GetSessionStepsResponseItem)
  * @summary List all artifacts
  */
 export const listArtifactsQueryLimitDefault = 50;
-export const listArtifactsQueryOffsetDefault = 0;
 
 export const ListArtifactsQueryParams = zod.object({
   "approval_state": zod.coerce.string().optional(),
   "session_id": zod.coerce.number().optional(),
   "limit": zod.coerce.number().default(listArtifactsQueryLimitDefault),
-  "offset": zod.coerce.number().default(listArtifactsQueryOffsetDefault)
+  "cursor": zod.coerce.number().optional()
 })
 
 export const ListArtifactsResponse = zod.object({
@@ -340,7 +339,8 @@ export const ListArtifactsResponse = zod.object({
 }).optional()
 }).optional()
 })),
-  "total": zod.number()
+  "nextCursor": zod.number().nullish().describe('ID to pass as `cursor` for the next page'),
+  "hasMore": zod.boolean()
 })
 
 

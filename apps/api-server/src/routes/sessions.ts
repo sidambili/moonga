@@ -1,38 +1,56 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sessionsTable, eventsTable, sessionStepsTable } from "@workspace/db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, lt } from "drizzle-orm";
 
 const router = Router();
 
 router.get("/", async (req, res) => {
   try {
-    const { status, limit = "50", offset = "0" } = req.query as Record<string, string>;
+    const { status, limit = "50", cursor } = req.query as Record<string, string>;
     const limitN = Math.min(Number(limit) || 50, 200);
-    const offsetN = Number(offset) || 0;
+    const cursorN = cursor ? Number(cursor) : undefined;
 
     const conditions = [];
     if (status) conditions.push(eq(sessionsTable.status, status));
+    if (cursorN) conditions.push(lt(sessionsTable.id, cursorN));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [rows, [{ count }]] = await Promise.all([
-      db.select({
+    const stepStats = db
+      .select({
+        session_id: sessionStepsTable.session_id,
+        step_count: sql<number>`count(*)::int`.as("step_count"),
+        total_cost: sql<number>`coalesce(sum(${sessionStepsTable.cost}), 0)`.as("total_cost"),
+      })
+      .from(sessionStepsTable)
+      .groupBy(sessionStepsTable.session_id)
+      .as("step_stats");
+
+    const rows = await db
+      .select({
         session: sessionsTable,
         event: eventsTable,
-        step_count: sql<number>`(SELECT COUNT(*)::int FROM session_steps WHERE session_steps.session_id = ${sessionsTable.id})`,
-        total_cost: sql<number>`(SELECT SUM(session_steps.cost) FROM session_steps WHERE session_steps.session_id = ${sessionsTable.id})`,
+        step_count: stepStats.step_count,
+        total_cost: stepStats.total_cost,
       })
-        .from(sessionsTable)
-        .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
-        .where(where)
-        .orderBy(desc(sessionsTable.created_at))
-        .limit(limitN)
-        .offset(offsetN),
-      db.select({ count: sql<number>`count(*)::int` }).from(sessionsTable).where(where),
-    ]);
+      .from(sessionsTable)
+      .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
+      .leftJoin(stepStats, eq(sessionsTable.id, stepStats.session_id))
+      .where(where)
+      .orderBy(desc(sessionsTable.id))
+      .limit(limitN + 1);
 
-    const items = rows.map(({ session, event, step_count, total_cost }) => ({ ...session, event, step_count, total_cost }));
-    return res.json({ items, total: count });
+    const hasMore = rows.length > limitN;
+    const pageRows = hasMore ? rows.slice(0, limitN) : rows;
+    const items = pageRows.map(({ session, event, step_count, total_cost }) => ({
+      ...session,
+      event,
+      step_count,
+      total_cost,
+    }));
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+    return res.json({ items, nextCursor, hasMore });
   } catch {
     return res.status(500).json({ error: "Failed to list sessions" });
   }
@@ -41,14 +59,27 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [row] = await db.select({
-      session: sessionsTable,
-      event: eventsTable,
-      step_count: sql<number>`(SELECT COUNT(*)::int FROM session_steps WHERE session_steps.session_id = ${sessionsTable.id})`,
-      total_cost: sql<number>`(SELECT SUM(session_steps.cost) FROM session_steps WHERE session_steps.session_id = ${sessionsTable.id})`,
-    })
+    const stepStats = db
+      .select({
+        session_id: sessionStepsTable.session_id,
+        step_count: sql<number>`count(*)::int`.as("step_count"),
+        total_cost: sql<number>`coalesce(sum(${sessionStepsTable.cost}), 0)`.as("total_cost"),
+      })
+      .from(sessionStepsTable)
+      .where(eq(sessionStepsTable.session_id, id))
+      .groupBy(sessionStepsTable.session_id)
+      .as("step_stats");
+
+    const [row] = await db
+      .select({
+        session: sessionsTable,
+        event: eventsTable,
+        step_count: stepStats.step_count,
+        total_cost: stepStats.total_cost,
+      })
       .from(sessionsTable)
       .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
+      .leftJoin(stepStats, eq(sessionsTable.id, stepStats.session_id))
       .where(eq(sessionsTable.id, id));
 
     if (!row) return res.status(404).json({ error: "Session not found" });

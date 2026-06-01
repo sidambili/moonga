@@ -1,29 +1,36 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { eventsTable, sessionsTable } from "@workspace/db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eventsTable } from "@workspace/db";
+import { eq, desc, and, lt } from "drizzle-orm";
 
 const router = Router();
 
 router.get("/", async (req, res) => {
   try {
-    const { source, severity, status, limit = "50", offset = "0" } = req.query as Record<string, string>;
+    const { source, severity, status, limit = "50", cursor } = req.query as Record<string, string>;
     const limitN = Math.min(Number(limit) || 50, 200);
-    const offsetN = Number(offset) || 0;
+    const cursorN = cursor ? Number(cursor) : undefined;
 
     const conditions = [];
     if (source) conditions.push(eq(eventsTable.source, source));
     if (severity) conditions.push(eq(eventsTable.severity, severity));
     if (status) conditions.push(eq(eventsTable.status, status));
+    if (cursorN) conditions.push(lt(eventsTable.id, cursorN));
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [items, [{ count }]] = await Promise.all([
-      db.select().from(eventsTable).where(where).orderBy(desc(eventsTable.created_at)).limit(limitN).offset(offsetN),
-      db.select({ count: sql<number>`count(*)::int` }).from(eventsTable).where(where),
-    ]);
+    const rows = await db
+      .select()
+      .from(eventsTable)
+      .where(where)
+      .orderBy(desc(eventsTable.id))
+      .limit(limitN + 1);
 
-    return res.json({ items, total: count });
+    const hasMore = rows.length > limitN;
+    const items = hasMore ? rows.slice(0, limitN) : rows;
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+    return res.json({ items, nextCursor, hasMore });
   } catch (err) {
     return res.status(500).json({ error: "Failed to list events" });
   }

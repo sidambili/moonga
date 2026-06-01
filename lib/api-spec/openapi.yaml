@@ -119,11 +119,11 @@ paths:
           schema:
             type: integer
             default: 50
-        - name: offset
+        - name: cursor
           in: query
           schema:
             type: integer
-            default: 0
+            description: ID of the last item from the previous page (for cursor pagination)
       responses:
         "200":
           description: List of events
@@ -169,11 +169,11 @@ paths:
           schema:
             type: integer
             default: 50
-        - name: offset
+        - name: cursor
           in: query
           schema:
             type: integer
-            default: 0
+            description: ID of the last item from the previous page (for cursor pagination)
       responses:
         "200":
           description: List of sessions
@@ -263,11 +263,11 @@ paths:
           schema:
             type: integer
             default: 50
-        - name: offset
+        - name: cursor
           in: query
           schema:
             type: integer
-            default: 0
+            description: ID of the last item from the previous page (for cursor pagination)
       responses:
         "200":
           description: List of artifacts
@@ -664,14 +664,17 @@ components:
 
     EventList:
       type: object
-      required: [items, total]
+      required: [items, hasMore]
       properties:
         items:
           type: array
           items:
             $ref: "#/components/schemas/Event"
-        total:
-          type: integer
+        nextCursor:
+          type: ["integer", "null"]
+          description: ID to pass as `cursor` for the next page
+        hasMore:
+          type: boolean
 
     Session:
       type: object
@@ -708,14 +711,17 @@ components:
 
     SessionList:
       type: object
-      required: [items, total]
+      required: [items, hasMore]
       properties:
         items:
           type: array
           items:
             $ref: "#/components/schemas/Session"
-        total:
-          type: integer
+        nextCursor:
+          type: ["integer", "null"]
+          description: ID to pass as `cursor` for the next page
+        hasMore:
+          type: boolean
 
     SessionStep:
       type: object
@@ -778,14 +784,17 @@ components:
 
     ArtifactList:
       type: object
-      required: [items, total]
+      required: [items, hasMore]
       properties:
         items:
           type: array
           items:
             $ref: "#/components/schemas/Artifact"
-        total:
-          type: integer
+        nextCursor:
+          type: ["integer", "null"]
+          description: ID to pass as `cursor` for the next page
+        hasMore:
+          type: boolean
 
     ArtifactEdit:
       type: object

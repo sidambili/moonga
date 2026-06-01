@@ -14,7 +14,6 @@ import {
   Pagination,
   PaginationContent,
   PaginationItem,
-  PaginationLink,
   PaginationPrevious,
   PaginationNext,
 } from "@/components/ui/pagination";
@@ -26,20 +25,23 @@ export default function ArtifactsReview() {
   const sessionIdParam = searchParams.get("session_id");
 
   const [approvalFilter, setApprovalFilter] = useState("all");
-  const [page, setPage] = useState(1);
+  const [cursors, setCursors] = useState<(number | undefined)[]>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
   const queryClient = useQueryClient();
   const approveMutation = useApproveArtifact();
   const rejectMutation = useRejectArtifact();
 
   useEffect(() => {
-    setPage(1);
+    setCursors([undefined]);
+    setPageIndex(0);
   }, [approvalFilter, sessionIdParam]);
 
+  const currentCursor = cursors[pageIndex];
   const listParams = {
     approval_state: approvalFilter === "all" ? undefined : approvalFilter,
     session_id: sessionIdParam ? Number(sessionIdParam) : undefined,
     limit: DEFAULT_PAGE_SIZE,
-    offset: (page - 1) * DEFAULT_PAGE_SIZE,
+    cursor: currentCursor,
   };
   const { data: artifactsList, isLoading } = useListArtifacts(listParams, {
     query: { queryKey: getListArtifactsQueryKey(listParams), refetchInterval: 15000 },
@@ -50,7 +52,7 @@ export default function ArtifactsReview() {
     approveMutation.mutate({ id }, {
       onSuccess: () => {
         toast({ title: "Artifact approved" });
-        queryClient.invalidateQueries({ queryKey: getListArtifactsQueryKey(listParams) });
+        queryClient.invalidateQueries({ queryKey: getListArtifactsQueryKey() });
       },
     });
   };
@@ -60,15 +62,28 @@ export default function ArtifactsReview() {
     rejectMutation.mutate({ id }, {
       onSuccess: () => {
         toast({ title: "Artifact rejected" });
-        queryClient.invalidateQueries({ queryKey: getListArtifactsQueryKey(listParams) });
+        queryClient.invalidateQueries({ queryKey: getListArtifactsQueryKey() });
       },
     });
   };
 
   const items = artifactsList?.items ?? [];
-  const total = artifactsList?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
+  const hasMore = artifactsList?.hasMore ?? false;
+  const hasPrev = pageIndex > 0;
   const draftCount = items.filter((a) => a.approval_state === "draft").length;
+
+  const goNext = () => {
+    if (!artifactsList?.nextCursor && pageIndex === cursors.length - 1) return;
+    if (artifactsList?.nextCursor && pageIndex === cursors.length - 1) {
+      setCursors((prev) => [...prev, artifactsList.nextCursor!]);
+    }
+    setPageIndex((p) => p + 1);
+  };
+
+  const goPrev = () => {
+    if (pageIndex <= 0) return;
+    setPageIndex((p) => p - 1);
+  };
 
   return (
     <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
@@ -83,9 +98,9 @@ export default function ArtifactsReview() {
                 {draftCount} pending
               </span>
             )}
-            {total > 0 && draftCount === 0 && (
+            {items.length > 0 && draftCount === 0 && (
               <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
-                {total}
+                {items.length}
               </span>
             )}
           </div>
@@ -195,31 +210,22 @@ export default function ArtifactsReview() {
           </table>
         )}
 
-        {totalPages > 1 && (
+        {(hasPrev || hasMore) && (
           <div className="border-t border-border px-4 py-3">
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    onClick={hasPrev ? goPrev : undefined}
+                    aria-disabled={!hasPrev}
+                    className={!hasPrev ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <PaginationItem key={p}>
-                    <PaginationLink
-                      isActive={p === page}
-                      onClick={() => setPage(p)}
-                      className="cursor-pointer"
-                    >
-                      {p}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
                 <PaginationItem>
                   <PaginationNext
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    onClick={hasMore ? goNext : undefined}
+                    aria-disabled={!hasMore}
+                    className={!hasMore ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
               </PaginationContent>

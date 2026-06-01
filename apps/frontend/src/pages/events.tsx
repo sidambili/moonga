@@ -9,7 +9,6 @@ import {
   Pagination,
   PaginationContent,
   PaginationItem,
-  PaginationLink,
   PaginationPrevious,
   PaginationNext,
 } from "@/components/ui/pagination";
@@ -28,26 +27,42 @@ export default function EventsFeed() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [page, setPage] = useState(1);
+  const [cursors, setCursors] = useState<(number | undefined)[]>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
 
   useEffect(() => {
-    setPage(1);
+    setCursors([undefined]);
+    setPageIndex(0);
   }, [sourceFilter, severityFilter, statusFilter]);
 
+  const currentCursor = cursors[pageIndex];
   const listParams = {
     source: sourceFilter === "all" ? undefined : sourceFilter,
     severity: severityFilter === "all" ? undefined : severityFilter,
     status: statusFilter === "all" ? undefined : statusFilter,
     limit: DEFAULT_PAGE_SIZE,
-    offset: (page - 1) * DEFAULT_PAGE_SIZE,
+    cursor: currentCursor,
   };
   const { data: eventsList, isLoading } = useListEvents(listParams, {
     query: { queryKey: getListEventsQueryKey(listParams), refetchInterval: 15000 },
   });
 
   const items = eventsList?.items ?? [];
-  const total = eventsList?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
+  const hasMore = eventsList?.hasMore ?? false;
+  const hasPrev = pageIndex > 0;
+
+  const goNext = () => {
+    if (!hasMore) return;
+    if (eventsList?.nextCursor && pageIndex === cursors.length - 1) {
+      setCursors((prev) => [...prev, eventsList.nextCursor!]);
+    }
+    setPageIndex((p) => p + 1);
+  };
+
+  const goPrev = () => {
+    if (!hasPrev) return;
+    setPageIndex((p) => p - 1);
+  };
 
   return (
     <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
@@ -57,9 +72,9 @@ export default function EventsFeed() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Events</span>
-            {total > 0 && (
+            {items.length > 0 && (
               <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
-                {total}
+                {items.length}
               </span>
             )}
           </div>
@@ -159,31 +174,22 @@ export default function EventsFeed() {
           </table>
         )}
 
-        {totalPages > 1 && (
+        {(hasPrev || hasMore) && (
           <div className="border-t border-border px-4 py-3">
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    onClick={hasPrev ? goPrev : undefined}
+                    aria-disabled={!hasPrev}
+                    className={!hasPrev ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <PaginationItem key={p}>
-                    <PaginationLink
-                      isActive={p === page}
-                      onClick={() => setPage(p)}
-                      className="cursor-pointer"
-                    >
-                      {p}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
                 <PaginationItem>
                   <PaginationNext
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    onClick={hasMore ? goNext : undefined}
+                    aria-disabled={!hasMore}
+                    className={!hasMore ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
               </PaginationContent>

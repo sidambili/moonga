@@ -9,5 +9,8 @@
 export type ListSessionsParams = {
 status?: string;
 limit?: number;
-offset?: number;
+/**
+ * ID of the last item from the previous page (for cursor pagination)
+ */
+cursor?: number;
 };

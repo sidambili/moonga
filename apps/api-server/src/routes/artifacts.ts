@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { artifactsTable, sessionsTable, eventsTable } from "@workspace/db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, lt } from "drizzle-orm";
 
 const router = Router();
 
@@ -15,22 +15,38 @@ async function hydrateArtifact(artifact: typeof artifactsTable.$inferSelect) {
 
 router.get("/", async (req, res) => {
   try {
-    const { approval_state, session_id, limit = "50", offset = "0" } = req.query as Record<string, string>;
+    const { approval_state, session_id, limit = "50", cursor } = req.query as Record<string, string>;
     const limitN = Math.min(Number(limit) || 50, 200);
-    const offsetN = Number(offset) || 0;
+    const cursorN = cursor ? Number(cursor) : undefined;
 
     const conditions = [];
     if (approval_state) conditions.push(eq(artifactsTable.approval_state, approval_state));
     if (session_id) conditions.push(eq(artifactsTable.session_id, Number(session_id)));
+    if (cursorN) conditions.push(lt(artifactsTable.id, cursorN));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [items, [{ count }]] = await Promise.all([
-      db.select().from(artifactsTable).where(where).orderBy(desc(artifactsTable.created_at)).limit(limitN).offset(offsetN),
-      db.select({ count: sql<number>`count(*)::int` }).from(artifactsTable).where(where),
-    ]);
+    const rows = await db
+      .select({
+        artifact: artifactsTable,
+        session: sessionsTable,
+        event: eventsTable,
+      })
+      .from(artifactsTable)
+      .leftJoin(sessionsTable, eq(artifactsTable.session_id, sessionsTable.id))
+      .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
+      .where(where)
+      .orderBy(desc(artifactsTable.id))
+      .limit(limitN + 1);
 
-    const hydrated = await Promise.all(items.map(hydrateArtifact));
-    return res.json({ items: hydrated, total: count });
+    const hasMore = rows.length > limitN;
+    const pageRows = hasMore ? rows.slice(0, limitN) : rows;
+    const items = pageRows.map(({ artifact, session, event }) => ({
+      ...artifact,
+      session: session ? { ...session, event } : null,
+    }));
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+    return res.json({ items, nextCursor, hasMore });
   } catch {
     return res.status(500).json({ error: "Failed to list artifacts" });
   }

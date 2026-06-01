@@ -37,7 +37,12 @@ export interface Event {
 
 export interface EventList {
   items: Event[];
-  total: number;
+  /**
+     * ID to pass as `cursor` for the next page
+     * @nullable
+     */
+  nextCursor?: number | null;
+  hasMore: boolean;
 }
 
 /**
@@ -71,7 +76,12 @@ export interface Session {
 
 export interface SessionList {
   items: Session[];
-  total: number;
+  /**
+     * ID to pass as `cursor` for the next page
+     * @nullable
+     */
+  nextCursor?: number | null;
+  hasMore: boolean;
 }
 
 export type SessionStepToolCallsItem = { [key: string]: unknown };
@@ -124,7 +134,12 @@ export interface Artifact {
 
 export interface ArtifactList {
   items: Artifact[];
-  total: number;
+  /**
+     * ID to pass as `cursor` for the next page
+     * @nullable
+     */
+  nextCursor?: number | null;
+  hasMore: boolean;
 }
 
 export interface ArtifactEdit {
@@ -273,19 +288,28 @@ source?: string;
 severity?: string;
 status?: string;
 limit?: number;
-offset?: number;
+/**
+ * ID of the last item from the previous page (for cursor pagination)
+ */
+cursor?: number;
 };
 
 export type ListSessionsParams = {
 status?: string;
 limit?: number;
-offset?: number;
+/**
+ * ID of the last item from the previous page (for cursor pagination)
+ */
+cursor?: number;
 };
 
 export type ListArtifactsParams = {
 approval_state?: string;
 session_id?: number;
 limit?: number;
-offset?: number;
+/**
+ * ID of the last item from the previous page (for cursor pagination)
+ */
+cursor?: number;
 };
 
