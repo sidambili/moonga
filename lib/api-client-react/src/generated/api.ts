@@ -1285,6 +1285,76 @@ export const useEditArtifact = <TError = ErrorType<unknown>,
       return useMutation(getEditArtifactMutationOptions(options));
     }
 
+export const getPostArtifactToLinearUrl = (id: number,) => {
+
+
+
+
+  return `/api/artifacts/${id}/post-to-linear`
+}
+
+/**
+ * @summary Post artifact content as a comment to the associated Linear issue
+ */
+export const postArtifactToLinear = async (id: number, options?: RequestInit): Promise<Artifact> => {
+
+  return customFetch<Artifact>(getPostArtifactToLinearUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostArtifactToLinearMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtifactToLinear>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postArtifactToLinear>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['postArtifactToLinear'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postArtifactToLinear>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  postArtifactToLinear(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostArtifactToLinearMutationResult = NonNullable<Awaited<ReturnType<typeof postArtifactToLinear>>>
+
+    export type PostArtifactToLinearMutationError = ErrorType<void>
+
+    /**
+ * @summary Post artifact content as a comment to the associated Linear issue
+ */
+export const usePostArtifactToLinear = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtifactToLinear>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postArtifactToLinear>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPostArtifactToLinearMutationOptions(options));
+    }
+
 export const getListIntegrationsUrl = () => {
 
 

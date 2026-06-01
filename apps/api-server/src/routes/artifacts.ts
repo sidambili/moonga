@@ -2,6 +2,8 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { artifactsTable, sessionsTable, eventsTable } from "@workspace/db";
 import { eq, desc, and, lt } from "drizzle-orm";
+import { postLinearComment } from "../lib/integrations/linear-client";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -116,6 +118,34 @@ router.patch("/:id/edit", async (req, res) => {
     return res.json(await hydrateArtifact(updated));
   } catch {
     return res.status(500).json({ error: "Failed to edit artifact" });
+  }
+});
+
+router.post("/:id/post-to-linear", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [artifact] = await db.select().from(artifactsTable).where(eq(artifactsTable.id, id));
+    if (!artifact) return res.status(404).json({ error: "Artifact not found" });
+
+    const hydrated = await hydrateArtifact(artifact);
+    const ticketId = hydrated.session?.event?.ticket_id;
+    if (!ticketId) {
+      return res.status(400).json({ error: "No Linear ticket associated with this artifact's session" });
+    }
+
+    await postLinearComment(ticketId, artifact.content);
+
+    const [updated] = await db.update(artifactsTable)
+      .set({ synced_to_linear_at: new Date() })
+      .where(eq(artifactsTable.id, id))
+      .returning();
+
+    logger.info({ artifactId: id, ticketId }, "Posted artifact to Linear");
+    return res.json(await hydrateArtifact(updated));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn({ err, artifactId: req.params.id }, "Failed to post artifact to Linear");
+    return res.status(500).json({ error: "Failed to post to Linear", message: msg });
   }
 });
 

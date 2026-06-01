@@ -2,19 +2,26 @@ import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import {
   useGetSession, useRetrySession, getGetSessionQueryKey, getListSessionsQueryKey,
-  useListArtifacts, useApproveArtifact, useRejectArtifact, useEditArtifact,
+  useListArtifacts, useApproveArtifact, useRejectArtifact, useEditArtifact, usePostArtifactToLinear,
   getListArtifactsQueryKey,
 } from "@workspace/api-client-react";
 import type { Artifact } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge, ApprovalBadge, ArtifactTypeBadge, formatEventType, formatObjective, formatSource } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 import Markdown from "@/components/markdown";
 import SessionTrace from "@/components/session-trace";
+import { SiLinear } from "react-icons/si";
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return "<1s";
@@ -48,6 +55,7 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
   const approveMutation = useApproveArtifact();
   const rejectMutation = useRejectArtifact();
   const editMutation = useEditArtifact();
+  const postToLinearMutation = usePostArtifactToLinear();
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: getListArtifactsQueryKey() });
@@ -56,22 +64,68 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
   const handleApprove = () => {
     approveMutation.mutate({ id: artifact.id }, {
       onSuccess: () => { toast({ title: "Artifact approved" }); invalidate(); },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to approve", description: message, variant: "destructive" });
+      },
     });
   };
 
   const handleReject = () => {
     rejectMutation.mutate({ id: artifact.id }, {
       onSuccess: () => { toast({ title: "Artifact rejected" }); invalidate(); },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to reject", description: message, variant: "destructive" });
+      },
     });
   };
 
   const handleSaveEdit = () => {
     editMutation.mutate({ id: artifact.id, data: { content: editContent } }, {
       onSuccess: () => { toast({ title: "Artifact updated" }); setEditing(false); invalidate(); },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to save edit", description: message, variant: "destructive" });
+      },
+    });
+  };
+
+  const handlePostToLinear = () => {
+    postToLinearMutation.mutate({ id: artifact.id }, {
+      onSuccess: () => { toast({ title: "Posted to Linear" }); invalidate(); },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to post to Linear", description: message, variant: "destructive" });
+      },
+    });
+  };
+
+  const handleApproveAndPostToLinear = () => {
+    approveMutation.mutate({ id: artifact.id }, {
+      onSuccess: () => {
+        toast({ title: "Artifact approved" });
+        postToLinearMutation.mutate({ id: artifact.id }, {
+          onSuccess: () => { toast({ title: "Posted to Linear" }); invalidate(); },
+          onError: (err: any) => {
+            const message = err?.message || String(err);
+            toast({ title: "Approved, but failed to post to Linear", description: message, variant: "destructive" });
+            invalidate();
+          },
+        });
+      },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to approve", description: message, variant: "destructive" });
+      },
     });
   };
 
   const isDraft = artifact.approval_state === "draft";
+  const isApproved = artifact.approval_state === "approved";
+  const isLinear = artifact.session?.event?.source === "linear";
+  const canPostToLinear = isApproved && isLinear && !artifact.synced_to_linear_at;
+  const hasPostedToLinear = isApproved && isLinear && !!artifact.synced_to_linear_at;
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -100,14 +154,48 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
               >
                 <XCircle className="w-3.5 h-3.5 mr-1" />Reject
               </Button>
-              <Button
-                variant="ghost" size="sm"
-                className="h-7 px-2 text-xs text-green-600 hover:text-green-700"
-                onClick={handleApprove}
-                disabled={approveMutation.isPending}
-              >
-                <CheckCircle className="w-3.5 h-3.5 mr-1" />Approve
-              </Button>
+              {isLinear ? (
+                <div className="flex items-center">
+                  <Button
+                    variant="ghost" size="sm"
+                    className="h-7 px-2 text-xs text-green-600 hover:text-green-700 rounded-r-none"
+                    onClick={handleApprove}
+                    disabled={approveMutation.isPending}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" />Approve
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost" size="sm"
+                        className="h-7 px-1 text-xs text-green-600 hover:text-green-700 rounded-l-none border-l-0"
+                        disabled={approveMutation.isPending}
+                      >
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleApprove} className="cursor-pointer">
+                        <CheckCircle className="w-3.5 h-3.5 mr-2 text-green-600" />
+                        <span>Approve</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleApproveAndPostToLinear} className="cursor-pointer">
+                        <SiLinear className="w-3.5 h-3.5 mr-2" />
+                        <span>Approve & Add to Linear</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost" size="sm"
+                  className="h-7 px-2 text-xs text-green-600 hover:text-green-700"
+                  onClick={handleApprove}
+                  disabled={approveMutation.isPending}
+                >
+                  <CheckCircle className="w-3.5 h-3.5 mr-1" />Approve
+                </Button>
+              )}
             </>
           )}
           {editing && (
@@ -124,6 +212,21 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
                 <Save className="w-3.5 h-3.5 mr-1" />Save
               </Button>
             </>
+          )}
+          {canPostToLinear && (
+            <Button
+              variant="ghost" size="sm"
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={handlePostToLinear}
+              disabled={postToLinearMutation.isPending}
+            >
+              <SiLinear className="w-3.5 h-3.5 mr-1" />Add to Linear
+            </Button>
+          )}
+          {hasPostedToLinear && (
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground">
+              <SiLinear className="w-3 h-3 mr-1" />Synced to Linear
+            </span>
           )}
           <CopyButton text={artifact.content} />
           <Link href={`/artifacts/${artifact.id}`}>

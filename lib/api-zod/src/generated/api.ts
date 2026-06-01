@@ -332,6 +332,7 @@ export const ListArtifactsResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),
@@ -393,6 +394,7 @@ export const GetArtifactResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),
@@ -451,6 +453,7 @@ export const ApproveArtifactResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),
@@ -509,6 +512,7 @@ export const RejectArtifactResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),
@@ -571,6 +575,66 @@ export const EditArtifactResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
+  "created_at": zod.string(),
+  "session": zod.object({
+  "id": zod.number(),
+  "event_id": zod.number(),
+  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
+  "model_used": zod.string().nullish(),
+  "context_snapshot": zod.object({
+
+}).passthrough().nullish(),
+  "output_summary": zod.string().nullish(),
+  "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "created_at": zod.string(),
+  "updated_at": zod.string(),
+  "event": zod.object({
+  "id": zod.number(),
+  "source": zod.string().describe('github | linear | betterstack | sentry | slack | email'),
+  "event_type": zod.string().describe('error | anomaly | ticket_created | issue_updated | deploy_failed | push | pr_opened'),
+  "severity": zod.string().describe('low | medium | high | critical'),
+  "status": zod.string().describe('new | processing | processed | ignored'),
+  "service": zod.string().nullish(),
+  "repo_id": zod.string().nullish(),
+  "ticket_id": zod.string().nullish(),
+  "title": zod.string().nullish(),
+  "payload_raw": zod.object({
+
+}).passthrough().optional(),
+  "session_id": zod.number().nullish(),
+  "created_at": zod.string()
+}).optional()
+}).optional()
+})
+
+
+/**
+ * @summary Post artifact content as a comment to the associated Linear issue
+ */
+export const PostArtifactToLinearParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostArtifactToLinearResponse = zod.object({
+  "id": zod.number(),
+  "session_id": zod.number(),
+  "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
+  "content": zod.string(),
+  "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),

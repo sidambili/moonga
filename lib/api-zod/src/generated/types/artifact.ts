@@ -15,6 +15,11 @@ export interface Artifact {
   content: string;
   /** draft | approved | rejected | edited */
   approval_state: string;
+  /**
+     * ISO timestamp when the artifact was posted as a comment to Linear
+     * @nullable
+     */
+  synced_to_linear_at?: string | null;
   created_at: string;
   session?: Session;
 }
