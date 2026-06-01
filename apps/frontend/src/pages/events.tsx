@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
@@ -6,6 +6,15 @@ import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource }
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
+import {
+  DEFAULT_PAGE_SIZE,
   SOURCE_IDS,
   SOURCE_LABELS,
   SEVERITY_LEVELS,
@@ -19,18 +28,26 @@ export default function EventsFeed() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [sourceFilter, severityFilter, statusFilter]);
 
   const listParams = {
     source: sourceFilter === "all" ? undefined : sourceFilter,
     severity: severityFilter === "all" ? undefined : severityFilter,
     status: statusFilter === "all" ? undefined : statusFilter,
-    limit: 50,
+    limit: DEFAULT_PAGE_SIZE,
+    offset: (page - 1) * DEFAULT_PAGE_SIZE,
   };
   const { data: eventsList, isLoading } = useListEvents(listParams, {
     query: { queryKey: getListEventsQueryKey(listParams), refetchInterval: 15000 },
   });
 
   const items = eventsList?.items ?? [];
+  const total = eventsList?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
 
   return (
     <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
@@ -40,9 +57,9 @@ export default function EventsFeed() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Events</span>
-            {items.length > 0 && (
+            {total > 0 && (
               <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
-                {items.length}
+                {total}
               </span>
             )}
           </div>
@@ -140,6 +157,38 @@ export default function EventsFeed() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {totalPages > 1 && (
+          <div className="border-t border-border px-4 py-3">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <PaginationItem key={p}>
+                    <PaginationLink
+                      isActive={p === page}
+                      onClick={() => setPage(p)}
+                      className="cursor-pointer"
+                    >
+                      {p}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         )}
       </div>
 
