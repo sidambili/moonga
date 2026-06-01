@@ -296,6 +296,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         prompt_token_cost: modelPrice.inputRate,
         completion_token_cost: modelPrice.outputRate,
         tool_calls_count: toolCallsCount || null,
+        step_count: result.steps.length || null,
         duration_ms: durationMs || null,
         updated_at: new Date(),
       })

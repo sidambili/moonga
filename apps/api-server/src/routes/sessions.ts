@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sessionsTable, eventsTable, sessionStepsTable } from "@workspace/db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -19,7 +20,7 @@ router.get("/", async (req, res) => {
     const stepStats = db
       .select({
         session_id: sessionStepsTable.session_id,
-        step_count: sql<number>`count(*)::int`.as("step_count"),
+        computed_step_count: sql<number>`count(*)::int`.as("computed_step_count"),
       })
       .from(sessionStepsTable)
       .groupBy(sessionStepsTable.session_id)
@@ -29,7 +30,7 @@ router.get("/", async (req, res) => {
       .select({
         session: sessionsTable,
         event: eventsTable,
-        step_count: stepStats.step_count,
+        computed_step_count: stepStats.computed_step_count,
       })
       .from(sessionsTable)
       .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
@@ -40,15 +41,16 @@ router.get("/", async (req, res) => {
 
     const hasMore = rows.length > limitN;
     const pageRows = hasMore ? rows.slice(0, limitN) : rows;
-    const items = pageRows.map(({ session, event, step_count }) => ({
+    const items = pageRows.map(({ session, event, computed_step_count }) => ({
       ...session,
       event,
-      step_count,
+      step_count: session.step_count ?? computed_step_count,
     }));
     const nextCursor = hasMore ? items[items.length - 1].id : null;
 
     return res.json({ items, nextCursor, hasMore });
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "Failed to list sessions");
     return res.status(500).json({ error: "Failed to list sessions" });
   }
 });
@@ -59,7 +61,7 @@ router.get("/:id", async (req, res) => {
     const stepStats = db
       .select({
         session_id: sessionStepsTable.session_id,
-        step_count: sql<number>`count(*)::int`.as("step_count"),
+        computed_step_count: sql<number>`count(*)::int`.as("computed_step_count"),
       })
       .from(sessionStepsTable)
       .where(eq(sessionStepsTable.session_id, id))
@@ -70,7 +72,7 @@ router.get("/:id", async (req, res) => {
       .select({
         session: sessionsTable,
         event: eventsTable,
-        step_count: stepStats.step_count,
+        computed_step_count: stepStats.computed_step_count,
       })
       .from(sessionsTable)
       .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
@@ -78,8 +80,9 @@ router.get("/:id", async (req, res) => {
       .where(eq(sessionsTable.id, id));
 
     if (!row) return res.status(404).json({ error: "Session not found" });
-    return res.json({ ...row.session, event: row.event, step_count: row.step_count });
-  } catch {
+    return res.json({ ...row.session, event: row.event, step_count: row.session.step_count ?? row.computed_step_count });
+  } catch (err) {
+    logger.error({ err }, "Failed to get session");
     return res.status(500).json({ error: "Failed to get session" });
   }
 });
@@ -109,7 +112,8 @@ router.post("/:id/retry", async (req, res) => {
 
     const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, updated.event_id));
     return res.json({ ...updated, event, step_count: 0 });
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "Failed to retry session");
     return res.status(500).json({ error: "Failed to retry session" });
   }
 });
@@ -123,7 +127,8 @@ router.get("/:id/steps", async (req, res) => {
       .where(eq(sessionStepsTable.session_id, id))
       .orderBy(sessionStepsTable.step_number);
     return res.json(steps);
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "Failed to get session steps");
     return res.status(500).json({ error: "Failed to get session steps" });
   }
 });
