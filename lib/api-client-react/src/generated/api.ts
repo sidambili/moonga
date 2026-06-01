@@ -30,6 +30,7 @@ import type {
   HealthStatus,
   Integration,
   IntegrationInput,
+  LinearTeam,
   ListArtifactsParams,
   ListEventsParams,
   ListSessionsParams,
@@ -1645,6 +1646,83 @@ export function useListIntegrationRepos<TData = Awaited<ReturnType<typeof listIn
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListIntegrationReposQueryOptions(provider,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListIntegrationTeamsUrl = (provider: string,) => {
+
+
+
+
+  return `/api/integrations/${provider}/teams`
+}
+
+/**
+ * @summary List teams for the authenticated provider user (Linear only)
+ */
+export const listIntegrationTeams = async (provider: string, options?: RequestInit): Promise<LinearTeam[]> => {
+
+  return customFetch<LinearTeam[]>(getListIntegrationTeamsUrl(provider),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListIntegrationTeamsQueryKey = (provider: string,) => {
+    return [
+    `/api/integrations/${provider}/teams`
+    ] as const;
+    }
+
+
+export const getListIntegrationTeamsQueryOptions = <TData = Awaited<ReturnType<typeof listIntegrationTeams>>, TError = ErrorType<void>>(provider: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIntegrationTeams>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListIntegrationTeamsQueryKey(provider);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listIntegrationTeams>>> = ({ signal }) => listIntegrationTeams(provider, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(provider), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listIntegrationTeams>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListIntegrationTeamsQueryResult = NonNullable<Awaited<ReturnType<typeof listIntegrationTeams>>>
+export type ListIntegrationTeamsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List teams for the authenticated provider user (Linear only)
+ */
+
+export function useListIntegrationTeams<TData = Awaited<ReturnType<typeof listIntegrationTeams>>, TError = ErrorType<void>>(
+ provider: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIntegrationTeams>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListIntegrationTeamsQueryOptions(provider,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

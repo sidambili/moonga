@@ -176,6 +176,11 @@ export interface Repo {
   private: boolean;
 }
 
+export interface LinearTeam {
+  id: string;
+  name: string;
+}
+
 export interface ModelSettings {
   id: number;
   /** openai | anthropic | openrouter | custom */

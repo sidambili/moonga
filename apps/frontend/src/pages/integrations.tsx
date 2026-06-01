@@ -3,13 +3,16 @@ import {
   useListIntegrations,
   useUpsertIntegration,
   useListIntegrationRepos,
+  useListIntegrationTeams,
   getListIntegrationsQueryKey,
+  getListIntegrationTeamsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
@@ -19,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, Check, GitBranch, ChevronsUpDown, ChevronRight } from "lucide-react";
+import { Copy, Check, GitBranch, ChevronsUpDown, ChevronRight, X } from "lucide-react";
 import { SourceIcon } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
 
@@ -136,8 +139,13 @@ function IntegrationConfig({
       releases:      et.releases      ?? true,
     };
   });
-  const [linearTeamNames,    setLinearTeamNames]    = useState<string>(
-    (current?.config as { linear_team_names?: string } | null)?.linear_team_names ?? ""
+  const legacyTeamNames = (current?.config as { linear_team_names?: string } | null)?.linear_team_names ?? "";
+  const hasLegacyTeamNames = !!legacyTeamNames;
+  const [linearTeamIds, setLinearTeamIds] = useState<string[]>(
+    ((current?.config as { linear_team_ids?: string } | null)?.linear_team_ids ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
   );
   const [linearDefaultRepo, setLinearDefaultRepo] = useState<string>(
     (current?.config as { default_repo?: string } | null)?.default_repo ?? ""
@@ -145,6 +153,10 @@ function IntegrationConfig({
 
   const { data: repos, isLoading: reposLoading } = useListIntegrationRepos(
     provider.id === "github" && current?.api_key_masked ? provider.id : ""
+  );
+
+  const { data: linearTeams, isLoading: linearTeamsLoading } = useListIntegrationTeams(
+    provider.id === "linear" && current?.api_key_masked ? "linear" : ""
   );
 
   const handleSave = () => {
@@ -159,7 +171,7 @@ function IntegrationConfig({
             provider.id === "github"
               ? { selected_repo: selectedRepo || undefined, event_types: eventTypes }
               : provider.id === "linear"
-              ? { linear_team_names: linearTeamNames || undefined, default_repo: linearDefaultRepo || undefined }
+              ? { linear_team_ids: linearTeamIds.join(","), default_repo: linearDefaultRepo || undefined }
               : undefined,
         },
       },
@@ -326,14 +338,81 @@ function IntegrationConfig({
               <div className="pt-5 border-t border-border space-y-4">
                 <p className="text-xs font-medium">Configuration</p>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">Engineering Team Names</Label>
-                  <Input
-                    placeholder="e.g. Engineering, Platform, SRE"
-                    value={linearTeamNames}
-                    onChange={(e) => setLinearTeamNames(e.target.value)}
-                    className="bg-muted/40 border-border text-sm"
-                  />
-                  <p className="text-[11px] text-muted-foreground">Comma-separated. Only these teams trigger the agent.</p>
+                  <Label className="text-xs font-medium text-muted-foreground">Engineering Teams</Label>
+                  {hasLegacyTeamNames && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                      Legacy team filter active. Re-save to upgrade.
+                    </p>
+                  )}
+                  {linearTeamIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {linearTeamIds.map((id) => {
+                        const team = linearTeams?.find((t) => t.id === id);
+                        return (
+                          <Badge key={id} variant="secondary" className="text-[11px] gap-1 pr-1.5">
+                            {team?.name ?? id}
+                            <button
+                              type="button"
+                              onClick={() => setLinearTeamIds((prev) => prev.filter((x) => x !== id))}
+                              className="rounded-full hover:bg-muted p-0.5"
+                              aria-label={`Remove ${team?.name ?? id}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between bg-muted/40 border-border text-sm h-9 font-normal"
+                        disabled={linearTeamsLoading}
+                      >
+                        <span className="truncate">
+                          {linearTeamsLoading ? "Loading teams…" : "Select teams…"}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search teams…" className="h-9" />
+                        <CommandList>
+                          <CommandEmpty>No team found.</CommandEmpty>
+                          <CommandGroup>
+                            {linearTeams?.map((team) => (
+                              <CommandItem
+                                key={team.id}
+                                value={team.id}
+                                onSelect={() => {
+                                  setLinearTeamIds((prev) =>
+                                    prev.includes(team.id) ? prev.filter((x) => x !== team.id) : [...prev, team.id]
+                                  );
+                                }}
+                                className="text-sm"
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${linearTeamIds.includes(team.id) ? "opacity-100" : "opacity-0"}`}
+                                />
+                                {team.name}
+                                <span className="ml-auto text-[11px] text-muted-foreground">{team.id}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {!current?.api_key_masked && (
+                    <p className="text-[11px] text-muted-foreground">Add an API key above to load your teams.</p>
+                  )}
+                  {current?.api_key_masked && linearTeamIds.length === 0 && !hasLegacyTeamNames && (
+                    <p className="text-[11px] text-muted-foreground">All teams will trigger the agent.</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Default Repository</Label>

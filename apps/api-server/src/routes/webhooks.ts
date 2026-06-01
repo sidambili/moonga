@@ -98,11 +98,17 @@ function getLinearTeamName(payload: Record<string, unknown>): string | undefined
   return team?.name as string | undefined;
 }
 
-async function getLinearConfig(): Promise<{ linear_team_names?: string; default_repo?: string }> {
+function getLinearTeamId(payload: Record<string, unknown>): string | undefined {
+  const data = payload.data as Record<string, unknown> | undefined;
+  const team = data?.team as Record<string, unknown> | undefined;
+  return team?.id as string | undefined;
+}
+
+async function getLinearConfig(): Promise<{ linear_team_ids?: string; linear_team_names?: string; default_repo?: string }> {
   try {
     const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "linear"));
     if (row?.config) {
-      return row.config as { linear_team_names?: string; default_repo?: string };
+      return row.config as { linear_team_ids?: string; linear_team_names?: string; default_repo?: string };
     }
   } catch {
     // ignore
@@ -110,34 +116,45 @@ async function getLinearConfig(): Promise<{ linear_team_names?: string; default_
   return {};
 }
 
-async function isEngineeringTeam(teamName: string | undefined): Promise<{ allowed: boolean; reason?: string }> {
-  const config = await getLinearConfig();
-  const configValue = config.linear_team_names?.trim();
+async function isEngineeringTeam(
+  teamName: string | undefined,
+  teamId: string | undefined,
+  prefetchedConfig?: { linear_team_ids?: string; linear_team_names?: string; default_repo?: string }
+): Promise<{ allowed: boolean; reason?: string }> {
+  const config = prefetchedConfig ?? await getLinearConfig();
 
-  // If no team names are configured, accept all teams
-  if (!configValue) {
+  // If linear_team_ids is configured, use it. Empty string means "allow all".
+  if (config.linear_team_ids !== undefined) {
+    const teamIdsConfig = config.linear_team_ids.trim();
+    if (!teamIdsConfig) {
+      return { allowed: true };
+    }
+    if (!teamId) {
+      return { allowed: false, reason: "No team ID present in webhook payload" };
+    }
+    const allowedIds = teamIdsConfig.split(",").map((s) => s.trim());
+    if (allowedIds.includes(teamId)) {
+      return { allowed: true };
+    }
+    return { allowed: false, reason: `Team ID '${teamId}' is not in the allowed teams list` };
+  }
+
+  // Fall back to legacy team names
+  const teamNamesConfig = config.linear_team_names?.trim();
+  if (!teamNamesConfig) {
     return { allowed: true };
   }
 
-  // If we have a config but no team name in the payload, reject
   if (!teamName) {
     return { allowed: false, reason: "No team name present in webhook payload" };
   }
 
-  const allowed = configValue
-    .split(",")
-    .map((s) => s.trim().toLowerCase());
-
+  const allowed = teamNamesConfig.split(",").map((s) => s.trim().toLowerCase());
   if (allowed.includes(teamName.toLowerCase())) {
     return { allowed: true };
   }
 
   return { allowed: false, reason: `Team '${teamName}' is not in the allowed teams list` };
-}
-
-async function getLinearRepoId(): Promise<string | undefined> {
-  const config = await getLinearConfig();
-  return config.default_repo || undefined;
 }
 
 function shouldProcessLinearEvent(payload: Record<string, unknown>): { process: boolean; reason?: string } {
@@ -198,8 +215,11 @@ router.post("/github", async (req, res) => {
 });
 
 router.post("/linear", async (req, res) => {
+  const linearConfig = await getLinearConfig();
+
   const teamName = getLinearTeamName(req.body);
-  const teamCheck = await isEngineeringTeam(teamName);
+  const teamId = getLinearTeamId(req.body);
+  const teamCheck = await isEngineeringTeam(teamName, teamId, linearConfig);
   if (!teamCheck.allowed) {
     return res.status(202).json({ accepted: false, reason: teamCheck.reason });
   }
@@ -209,7 +229,8 @@ router.post("/linear", async (req, res) => {
     return res.status(202).json({ accepted: false, reason });
   }
 
-  const { event, session } = await ingestWebhook("linear", req.body, await getLinearRepoId());
+  const repoId = linearConfig.default_repo || undefined;
+  const { event, session } = await ingestWebhook("linear", req.body, repoId);
   return res.status(202).json({ accepted: true, event_id: event.id, message: `Session ${session.id} created` });
 });
 

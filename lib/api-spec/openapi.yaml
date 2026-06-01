@@ -460,6 +460,35 @@ paths:
         "400":
           description: No API key configured
 
+  /integrations/{provider}/teams:
+    get:
+      operationId: listIntegrationTeams
+      tags: [integrations]
+      summary: List teams for the authenticated provider user (Linear only)
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of teams
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LinearTeam"
+        "404":
+          description: Integration not found
+        "400":
+          description: Team listing is only supported for Linear
+        "500":
+          description: Failed to list teams
+        "503":
+          description: Linear is not configured or missing API key
+
   # ── Model settings ────────────────────────────────────────────────
   /model-settings:
     get:
@@ -815,6 +844,15 @@ components:
           type: string
         private:
           type: boolean
+
+    LinearTeam:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
 
     ModelSettings:
       type: object

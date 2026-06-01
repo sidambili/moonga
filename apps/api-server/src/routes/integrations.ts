@@ -3,6 +3,7 @@ import { Octokit } from "octokit";
 import { db } from "@workspace/db";
 import { integrationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { getLinearClient } from "../lib/integrations/linear-client";
 
 const router = Router();
 
@@ -101,6 +102,39 @@ router.get("/:provider/repos", async (req, res) => {
     return res.json(result);
   } catch (err) {
     return res.status(500).json({ error: "Failed to list repositories", message: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.get("/:provider/teams", async (req, res) => {
+  try {
+    const { provider } = req.params;
+    if (provider !== "linear") {
+      return res.status(400).json({ error: "Team listing is only supported for Linear" });
+    }
+
+    const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, provider));
+    if (!row) return res.status(404).json({ error: "Integration not found" });
+
+    const linear = await getLinearClient();
+    if (!linear) {
+      return res.status(503).json({ error: "Linear is not configured or missing API key" });
+    }
+
+    const teamsConn = await linear.teams();
+    const teamNodes = [];
+    let conn = teamsConn;
+    while (conn) {
+      teamNodes.push(...conn.nodes);
+      if (conn.pageInfo.hasNextPage) {
+        conn = await conn.fetchNext();
+      } else {
+        break;
+      }
+    }
+    const teams = teamNodes.map((t) => ({ id: t.id, name: t.name }));
+    return res.json(teams);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to list teams", message: err instanceof Error ? err.message : String(err) });
   }
 });
 

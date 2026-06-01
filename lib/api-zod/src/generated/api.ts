@@ -642,6 +642,20 @@ export const ListIntegrationReposResponse = zod.array(ListIntegrationReposRespon
 
 
 /**
+ * @summary List teams for the authenticated provider user (Linear only)
+ */
+export const ListIntegrationTeamsParams = zod.object({
+  "provider": zod.coerce.string()
+})
+
+export const ListIntegrationTeamsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string()
+})
+export const ListIntegrationTeamsResponse = zod.array(ListIntegrationTeamsResponseItem)
+
+
+/**
  * @summary Get model routing settings
  */
 export const GetModelSettingsResponse = zod.object({
