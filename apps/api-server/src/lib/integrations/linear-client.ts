@@ -4,6 +4,28 @@ import { integrationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../logger";
 
+export function extractLinearTicketInfo(payload: Record<string, unknown>): string {
+  const data = payload.data as Record<string, unknown> | undefined;
+  if (!data) return JSON.stringify(payload, null, 2).slice(0, 2_000);
+
+  const priorityLabel: Record<number, string> = { 0: "No priority", 1: "Urgent", 2: "High", 3: "Medium", 4: "Low" };
+  const labels = (data.labels as Array<{ name: string }> | undefined)?.map((l) => l.name).join(", ") || "None";
+  const assignee = (data.assignee as { name?: string } | undefined)?.name || "Unassigned";
+  const state = (data.state as { name?: string } | undefined)?.name || "Unknown";
+  const description = (data.description as string | undefined) || "";
+
+  const lines = [
+    `State: ${state}`,
+    `Priority: ${priorityLabel[data.priority as number] ?? "Unknown"}`,
+    `Assignee: ${assignee}`,
+    `Labels: ${labels}`,
+  ];
+  if (data.url) lines.push(`URL: ${data.url}`);
+  if (description) lines.push(`\nDescription:\n${description.slice(0, 3_000)}`);
+
+  return lines.join("\n");
+}
+
 export async function getLinearClient(): Promise<LinearClient | null> {
   try {
     const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "linear"));
@@ -19,15 +41,16 @@ export async function getLinearClient(): Promise<LinearClient | null> {
 export async function postLinearComment(ticketId: string, body: string): Promise<void> {
   const linear = await getLinearClient();
   if (!linear) {
-    logger.warn({ ticketId }, "Linear integration disabled or missing API key — skipping comment");
-    return;
+    throw new Error("Linear integration disabled or missing API key");
   }
 
   try {
     await linear.createComment({ issueId: ticketId, body });
     logger.info({ ticketId }, "Posted comment to Linear issue");
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     logger.warn({ err, ticketId }, "Failed to post Linear comment");
+    throw new Error(`Linear comment failed: ${msg}`);
   }
 }
 

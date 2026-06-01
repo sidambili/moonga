@@ -211,20 +211,34 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
   const [open, setOpen] = useState(false);
   const label = getToolLabel(item.name, item.args);
   const hasDetail = item.args != null || item.result != null;
+  const toolResult = item.result?.tool_result;
+  const failed =
+    typeof toolResult === "object" &&
+    toolResult !== null &&
+    (toolResult as Record<string, unknown>).success === false;
 
   if (!hasDetail) {
     return (
       <div className="flex items-center gap-2 py-1.5 pl-9 pr-4">
-        <span className="text-[12px] text-muted-foreground/60">{label}</span>
+        <span className={`text-[12px] ${failed ? "text-destructive" : "text-muted-foreground/60"}`}>{label}</span>
+        {failed && (
+          <span className="text-[9px] uppercase tracking-wider bg-destructive/10 text-destructive font-medium px-1.5 py-0.5 rounded">
+            failed
+          </span>
+        )}
       </div>
     );
   }
 
   const resultText =
-    item.result?.tool_result != null
-      ? typeof item.result.tool_result === "string"
-        ? item.result.tool_result
-        : JSON.stringify(item.result.tool_result, null, 2)
+    toolResult != null
+      ? typeof toolResult === "string"
+        ? toolResult
+        : typeof toolResult === "object" &&
+          toolResult !== null &&
+          typeof (toolResult as Record<string, unknown>).error === "string"
+        ? (toolResult as Record<string, string>).error
+        : JSON.stringify(toolResult, null, 2)
       : (item.result?.content ?? "");
 
   return (
@@ -238,7 +252,12 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
         ) : (
           <ChevronRight className="w-3 h-3 text-muted-foreground/35 flex-shrink-0" />
         )}
-        <span className="text-[12px] text-muted-foreground/70">{label}</span>
+        <span className={`text-[12px] ${failed ? "text-destructive" : "text-muted-foreground/70"}`}>{label}</span>
+        {failed && (
+          <span className="text-[9px] uppercase tracking-wider bg-destructive/10 text-destructive font-medium px-1.5 py-0.5 rounded ml-1">
+            failed
+          </span>
+        )}
       </button>
       {open && (
         <div className="px-4 pb-2 pl-14 space-y-1.5">
