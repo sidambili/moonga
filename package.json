@@ -3,14 +3,18 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
+    "dev:api": "pnpm --filter @workspace/api-server run dev",
+    "dev:web": "pnpm --filter @workspace/frontend run dev",
     "dev": "pnpm --parallel --filter @workspace/api-server --filter @workspace/frontend run dev",
+    "db:push": "pnpm --filter @workspace/db run push",
     "build": "pnpm -r --if-present run build",
-    "typecheck": "tsc --build && pnpm -r --filter ./apps/** --if-present run typecheck"
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter ./apps/** --if-present run typecheck",
+    "check": "pnpm run typecheck && pnpm run build"
   },
   "private": true,
   "packageManager": "pnpm@11.5.0",
   "devDependencies": {
-    "@esbuild/darwin-arm64": "0.27.3",
     "drizzle-kit": "^0.31.10",
     "prettier": "^3.8.3",
     "typescript": "~5.9.3"

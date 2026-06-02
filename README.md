@@ -15,7 +15,7 @@ An operations intelligence platform that acts as a control plane for GitHub, Lin
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
+- pnpm workspaces, Node.js 22 LTS, TypeScript 5.9
 - Frontend: React + Vite + Tailwind CSS (dark terminal aesthetic)
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
@@ -25,7 +25,7 @@ An operations intelligence platform that acts as a control plane for GitHub, Lin
 
 ## Prerequisites
 
-- Node.js 24+
+- Node.js 22+
 - pnpm
 - PostgreSQL 16+
 - `DATABASE_URL` environment variable set
@@ -37,13 +37,10 @@ An operations intelligence platform that acts as a control plane for GitHub, Lin
 pnpm install
 
 # Push the database schema (dev only)
-pnpm --filter @workspace/db run push
+pnpm db:push
 
-# Start the API server (port 5000)
-pnpm --filter @workspace/api-server run dev
-
-# Start the frontend (in another terminal)
-pnpm --filter @workspace/frontend run dev
+# Start the API server and frontend
+pnpm dev
 ```
 
 ## Webhook endpoints

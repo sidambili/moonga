@@ -18,6 +18,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   resolve: {
+    conditions: ["workspace"],
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
       "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
