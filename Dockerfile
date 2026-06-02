@@ -19,6 +19,7 @@ COPY apps/frontend/package.json apps/frontend/
 COPY lib/db/package.json lib/db/
 COPY lib/api-zod/package.json lib/api-zod/
 COPY lib/api-client-react/package.json lib/api-client-react/
+COPY lib/constants/package.json lib/constants/
 COPY tsconfig.base.json tsconfig.json ./
 
 # Install dependencies (respects lockfile, downloads correct platform binaries inside container)
@@ -56,6 +57,7 @@ COPY --from=builder --chown=appuser:appgroup /app/apps/frontend/package.json app
 COPY --from=builder --chown=appuser:appgroup /app/lib/db/package.json lib/db/
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/package.json lib/api-zod/
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/package.json lib/api-client-react/
+COPY --from=builder --chown=appuser:appgroup /app/lib/constants/package.json lib/constants/
 COPY --from=builder --chown=appuser:appgroup /app/tsconfig.base.json /app/tsconfig.json ./
 COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 
@@ -63,9 +65,10 @@ COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:appgroup /app/apps/api-server/dist ./apps/api-server/dist
 COPY --from=builder --chown=appuser:appgroup /app/apps/frontend/dist/public ./public
 
-# Copy lib package source files (these packages export ./src/index.ts directly — no dist/)
-COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/src ./lib/api-zod/src
-COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/src ./lib/api-client-react/src
+# Copy built library packages for runtime package exports.
+COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/dist ./lib/api-zod/dist
+COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/dist ./lib/api-client-react/dist
+COPY --from=builder --chown=appuser:appgroup /app/lib/constants/dist ./lib/constants/dist
 
 # Drizzle migrations require the original TS source files (and migration metadata)
 # so drizzle-kit push runs against source rather than compiled output.
