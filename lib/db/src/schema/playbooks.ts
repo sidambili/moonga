@@ -1,6 +1,7 @@
 import { pgTable, serial, text, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { organization } from "./organizations";
 
 export const objectiveEnum = pgEnum("objective", ["diagnose", "plan"]);
 export const triggerSourceEnum = pgEnum("trigger_source", ["linear", "github", "sentry"]);
@@ -8,6 +9,8 @@ export const playbookSourceEnum = pgEnum("playbook_source", ["system", "user"]);
 
 export const playbooksTable = pgTable("playbooks", {
   id: serial("id").primaryKey(),
+  // NULL = global/system default shared across orgs; non-null = org-owned.
+  organization_id: text("organization_id").references(() => organization.id, { onDelete: "cascade" }),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   objective: objectiveEnum("objective").notNull(),

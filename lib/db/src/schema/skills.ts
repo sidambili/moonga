@@ -1,9 +1,12 @@
 import { pgTable, serial, text, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { organization } from "./organizations";
 
 export const skillsTable = pgTable("skills", {
   id: serial("id").primaryKey(),
+  // NULL = global/system default shared across orgs; non-null = org-owned.
+  organization_id: text("organization_id").references(() => organization.id, { onDelete: "cascade" }),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   content: text("content").notNull(),

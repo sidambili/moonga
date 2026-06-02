@@ -1,9 +1,11 @@
 import { pgTable, serial, text, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { organization } from "./organizations";
 
 export const modelSettingsTable = pgTable("model_settings", {
   id: serial("id").primaryKey(),
+  organization_id: text("organization_id").references(() => organization.id, { onDelete: "cascade" }),
   provider: text("provider").notNull().default("openai"),
   triage_model: text("triage_model").notNull().default("gpt-4o-mini"),
   plan_model: text("plan_model").notNull().default("gpt-4o"),

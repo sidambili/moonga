@@ -2,6 +2,7 @@ import { pgTable, serial, text, integer, timestamp, jsonb, real } from "drizzle-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { playbooksTable } from "./playbooks";
+import { projectsTable } from "./projects";
 
 export const sessionsTable = pgTable("sessions", {
   id: serial("id").primaryKey(),
@@ -25,6 +26,7 @@ export const sessionsTable = pgTable("sessions", {
   step_count: integer("step_count"),
   duration_ms: integer("duration_ms"),
   playbook_id: integer("playbook_id").references(() => playbooksTable.id, { onDelete: "set null" }),
+  project_id: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   created_at: timestamp("created_at").notNull().defaultNow(),
   updated_at: timestamp("updated_at").notNull().defaultNow(),
 });
