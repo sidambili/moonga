@@ -8,8 +8,8 @@ import type { Playbook, Skill } from "@workspace/db";
 const SYSTEM_PLAYBOOKS: Array<{
   slug: string;
   name: string;
-  objective: string;
-  trigger_source: string | null;
+  objective: "diagnose" | "plan";
+  trigger_source: "linear" | "github" | "sentry" | null;
   instructions: string;
 }> = [
   {
@@ -124,16 +124,9 @@ Do not speculate beyond what the code and error evidence support.`,
 // ── Seed ─────────────────────────────────────────────────────────────────────
 
 export async function seedSystemPlaybooks(): Promise<void> {
-  for (const p of SYSTEM_PLAYBOOKS) {
-    const existing = await db
-      .select({ id: playbooksTable.id })
-      .from(playbooksTable)
-      .where(eq(playbooksTable.slug, p.slug))
-      .limit(1);
-    if (existing.length === 0) {
-      await db.insert(playbooksTable).values({ ...p, source: "system" });
-    }
-  }
+  await db.insert(playbooksTable)
+    .values(SYSTEM_PLAYBOOKS.map((p) => ({ ...p, source: "system" as const })))
+    .onConflictDoNothing({ target: playbooksTable.slug });
 }
 
 // ── Loader ────────────────────────────────────────────────────────────────────
@@ -147,10 +140,10 @@ export async function loadPlaybook(
     .from(playbooksTable)
     .where(
       and(
-        eq(playbooksTable.objective, objective),
+        eq(playbooksTable.objective, objective as "diagnose" | "plan"),
         eq(playbooksTable.is_active, true),
         or(
-          eq(playbooksTable.trigger_source, eventSource),
+          eq(playbooksTable.trigger_source, eventSource as "linear" | "github" | "sentry"),
           isNull(playbooksTable.trigger_source),
         ),
       ),
@@ -171,5 +164,9 @@ export async function loadPlaybook(
 }
 
 export async function loadActiveSkills(): Promise<Skill[]> {
-  return db.select().from(skillsTable).where(eq(skillsTable.is_active, true));
+  return db.select()
+    .from(skillsTable)
+    .where(eq(skillsTable.is_active, true))
+    .orderBy(skillsTable.created_at)
+    .limit(50);
 }

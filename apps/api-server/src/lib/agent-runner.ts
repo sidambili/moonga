@@ -150,8 +150,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   ]);
 
   const [playbook, activeSkills] = await Promise.all([
-    loadPlaybook(session.objective, event.source),
-    loadActiveSkills(),
+    loadPlaybook(session.objective, event.source).catch(() => undefined),
+    loadActiveSkills().catch(() => []),
   ]);
 
   const systemPrompt = buildSystemPrompt(

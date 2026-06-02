@@ -64,6 +64,10 @@ function PlaybookRow({ playbook, onSaved }: { playbook: Playbook; onSaved: () =>
           setDirty(false);
           onSaved();
         },
+        onError: (err: any) => {
+          const message = err?.message || String(err);
+          toast({ title: "Failed to save playbook", description: message, variant: "destructive" });
+        },
       }
     );
   }
@@ -71,7 +75,13 @@ function PlaybookRow({ playbook, onSaved }: { playbook: Playbook; onSaved: () =>
   function handleDelete() {
     deleteMutation.mutate(
       { id: playbook.id },
-      { onSuccess: () => { toast({ title: "Playbook deleted" }); onSaved(); } }
+      {
+        onSuccess: () => { toast({ title: "Playbook deleted" }); onSaved(); },
+        onError: (err: any) => {
+          const message = err?.message || String(err);
+          toast({ title: "Failed to delete playbook", description: message, variant: "destructive" });
+        },
+      }
     );
   }
 
@@ -98,7 +108,7 @@ function PlaybookRow({ playbook, onSaved }: { playbook: Playbook; onSaved: () =>
       {open && (
         <div className="px-4 pb-4 space-y-3 bg-muted/20 border-t border-border">
           <div className="flex items-center justify-between pt-3">
-            <Label className="text-xs font-medium text-muted-foreground">Instructions</Label>
+            <Label htmlFor={`instructions-${playbook.id}`} className="text-xs font-medium text-muted-foreground">Instructions</Label>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setIsActive((v) => !v); setDirty(true); }}
@@ -115,6 +125,7 @@ function PlaybookRow({ playbook, onSaved }: { playbook: Playbook; onSaved: () =>
                 <button
                   onClick={handleDelete}
                   disabled={deleteMutation.isPending}
+                  aria-label="Delete playbook"
                   className="text-[11px] px-2 py-0.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -123,6 +134,7 @@ function PlaybookRow({ playbook, onSaved }: { playbook: Playbook; onSaved: () =>
             </div>
           </div>
           <textarea
+            id={`instructions-${playbook.id}`}
             value={instructions}
             onChange={(e) => { setInstructions(e.target.value); setDirty(true); }}
             rows={18}
@@ -164,6 +176,10 @@ function SkillRow({ skill, onSaved }: { skill: Skill; onSaved: () => void }) {
           setDirty(false);
           onSaved();
         },
+        onError: (err: any) => {
+          const message = err?.message || String(err);
+          toast({ title: "Failed to save skill", description: message, variant: "destructive" });
+        },
       }
     );
   }
@@ -171,7 +187,13 @@ function SkillRow({ skill, onSaved }: { skill: Skill; onSaved: () => void }) {
   function handleDelete() {
     deleteMutation.mutate(
       { id: skill.id },
-      { onSuccess: () => { toast({ title: "Skill deleted" }); onSaved(); } }
+      {
+        onSuccess: () => { toast({ title: "Skill deleted" }); onSaved(); },
+        onError: (err: any) => {
+          const message = err?.message || String(err);
+          toast({ title: "Failed to delete skill", description: message, variant: "destructive" });
+        },
+      }
     );
   }
 
@@ -192,7 +214,7 @@ function SkillRow({ skill, onSaved }: { skill: Skill; onSaved: () => void }) {
       {open && (
         <div className="px-4 pb-4 space-y-3 bg-muted/20 border-t border-border">
           <div className="flex items-center justify-between pt-3">
-            <Label className="text-xs font-medium text-muted-foreground">Content</Label>
+            <Label htmlFor={`content-${skill.id}`} className="text-xs font-medium text-muted-foreground">Content</Label>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setIsActive((v) => !v); setDirty(true); }}
@@ -209,6 +231,7 @@ function SkillRow({ skill, onSaved }: { skill: Skill; onSaved: () => void }) {
                 <button
                   onClick={handleDelete}
                   disabled={deleteMutation.isPending}
+                  aria-label="Delete skill"
                   className="text-[11px] px-2 py-0.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -217,6 +240,7 @@ function SkillRow({ skill, onSaved }: { skill: Skill; onSaved: () => void }) {
             </div>
           </div>
           <textarea
+            id={`content-${skill.id}`}
             value={content}
             onChange={(e) => { setContent(e.target.value); setDirty(true); }}
             rows={8}
@@ -258,6 +282,10 @@ function NewPlaybookForm({ onCreated }: { onCreated: () => void }) {
           setSlug(""); setName(""); setInstructions(""); setTriggerSource("");
           onCreated();
         },
+        onError: (err: any) => {
+          const message = err?.message || String(err);
+          toast({ title: "Failed to create playbook", description: message, variant: "destructive" });
+        },
       }
     );
   }
@@ -267,17 +295,17 @@ function NewPlaybookForm({ onCreated }: { onCreated: () => void }) {
       <p className="text-xs font-medium text-muted-foreground">New playbook</p>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Name</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} className="h-7 text-xs bg-muted/40" placeholder="My custom plan" />
+          <Label htmlFor="new-playbook-name" className="text-[11px] text-muted-foreground">Name</Label>
+          <Input id="new-playbook-name" value={name} onChange={(e) => setName(e.target.value)} className="h-7 text-xs bg-muted/40" placeholder="My custom plan" />
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Slug</Label>
-          <Input value={slug} onChange={(e) => setSlug(e.target.value)} className="h-7 text-xs bg-muted/40 font-mono" placeholder="my-custom-plan" />
+          <Label htmlFor="new-playbook-slug" className="text-[11px] text-muted-foreground">Slug</Label>
+          <Input id="new-playbook-slug" value={slug} onChange={(e) => setSlug(e.target.value)} className="h-7 text-xs bg-muted/40 font-mono" placeholder="my-custom-plan" />
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Objective</Label>
+          <Label htmlFor="new-playbook-objective" className="text-[11px] text-muted-foreground">Objective</Label>
           <Select value={objective} onValueChange={setObjective}>
-            <SelectTrigger className="w-full h-7 text-xs">
+            <SelectTrigger id="new-playbook-objective" className="w-full h-7 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -287,13 +315,14 @@ function NewPlaybookForm({ onCreated }: { onCreated: () => void }) {
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Trigger source (optional)</Label>
-          <Input value={triggerSource} onChange={(e) => setTriggerSource(e.target.value)} className="h-7 text-xs bg-muted/40" placeholder="linear / github / …" />
+          <Label htmlFor="new-playbook-trigger" className="text-[11px] text-muted-foreground">Trigger source (optional)</Label>
+          <Input id="new-playbook-trigger" value={triggerSource} onChange={(e) => setTriggerSource(e.target.value)} className="h-7 text-xs bg-muted/40" placeholder="linear / github / …" />
         </div>
       </div>
       <div className="space-y-1">
-        <Label className="text-[11px] text-muted-foreground">Instructions</Label>
+        <Label htmlFor="new-playbook-instructions" className="text-[11px] text-muted-foreground">Instructions</Label>
         <textarea
+          id="new-playbook-instructions"
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
           rows={8}
@@ -333,6 +362,10 @@ function NewSkillForm({ onCreated }: { onCreated: () => void }) {
           setSlug(""); setName(""); setContent("");
           onCreated();
         },
+        onError: (err: any) => {
+          const message = err?.message || String(err);
+          toast({ title: "Failed to create skill", description: message, variant: "destructive" });
+        },
       }
     );
   }
@@ -342,17 +375,18 @@ function NewSkillForm({ onCreated }: { onCreated: () => void }) {
       <p className="text-xs font-medium text-muted-foreground">New skill</p>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Name</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} className="h-7 text-xs bg-muted/40" placeholder="Incident severity rubric" />
+          <Label htmlFor="new-skill-name" className="text-[11px] text-muted-foreground">Name</Label>
+          <Input id="new-skill-name" value={name} onChange={(e) => setName(e.target.value)} className="h-7 text-xs bg-muted/40" placeholder="Incident severity rubric" />
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Slug</Label>
-          <Input value={slug} onChange={(e) => setSlug(e.target.value)} className="h-7 text-xs bg-muted/40 font-mono" placeholder="incident-severity-rubric" />
+          <Label htmlFor="new-skill-slug" className="text-[11px] text-muted-foreground">Slug</Label>
+          <Input id="new-skill-slug" value={slug} onChange={(e) => setSlug(e.target.value)} className="h-7 text-xs bg-muted/40 font-mono" placeholder="incident-severity-rubric" />
         </div>
       </div>
       <div className="space-y-1">
-        <Label className="text-[11px] text-muted-foreground">Content</Label>
+        <Label htmlFor="new-skill-content" className="text-[11px] text-muted-foreground">Content</Label>
         <textarea
+          id="new-skill-content"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={6}
