@@ -11,4 +11,4 @@ build/
 coverage/
 .DS_Store
 *.log
-deploy/
+deploy/vps-setup.sh

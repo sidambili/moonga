@@ -56,7 +56,7 @@ COPY --from=builder --chown=appuser:appgroup /app/apps/frontend/package.json app
 COPY --from=builder --chown=appuser:appgroup /app/lib/db/package.json lib/db/
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/package.json lib/api-zod/
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/package.json lib/api-client-react/
-COPY --from=builder --chown=appuser:appgroup /app/tsconfig.base.json tsconfig.json ./
+COPY --from=builder --chown=appuser:appgroup /app/tsconfig.base.json /app/tsconfig.json ./
 COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 
 # Copy built artifacts
