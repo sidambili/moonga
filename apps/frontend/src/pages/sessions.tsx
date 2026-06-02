@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListSessions, getListSessionsQueryKey } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
 import { SourceIcon, StatusBadge, ObjectivePill, formatEventType, formatSource } from "@/components/ui-helpers";
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
-import { SESSION_STATUSES, SESSION_STATUS_LABELS } from "@workspace/constants";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
+import { DEFAULT_PAGE_SIZE, SESSION_STATUSES, SESSION_STATUS_LABELS } from "@workspace/constants";
 
 function Confidence({ score }: { score: number | null | undefined }) {
   if (score == null) return <span className="text-xs text-muted-foreground tabular-nums">—</span>;
@@ -17,16 +24,40 @@ function Confidence({ score }: { score: number | null | undefined }) {
 export default function Sessions() {
   const [, navigate] = useLocation();
   const [statusFilter, setStatusFilter] = useState("all");
+  const [cursors, setCursors] = useState<(number | undefined)[]>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
 
+  useEffect(() => {
+    setCursors([undefined]);
+    setPageIndex(0);
+  }, [statusFilter]);
+
+  const currentCursor = cursors[pageIndex];
   const listParams = {
     status: statusFilter === "all" ? undefined : statusFilter,
-    limit: 50,
+    limit: DEFAULT_PAGE_SIZE,
+    cursor: currentCursor,
   };
   const { data: sessionsList, isLoading } = useListSessions(listParams, {
     query: { queryKey: getListSessionsQueryKey(listParams), refetchInterval: 15000 },
   });
 
   const items = sessionsList?.items ?? [];
+  const hasMore = sessionsList?.hasMore ?? false;
+  const hasPrev = pageIndex > 0;
+
+  const goNext = () => {
+    if (isLoading || !hasMore) return;
+    if (sessionsList?.nextCursor && pageIndex === cursors.length - 1) {
+      setCursors((prev) => [...prev, sessionsList.nextCursor!]);
+    }
+    setPageIndex((p) => p + 1);
+  };
+
+  const goPrev = () => {
+    if (isLoading || pageIndex <= 0) return;
+    setPageIndex((p) => p - 1);
+  };
 
   return (
     <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
@@ -119,6 +150,29 @@ export default function Sessions() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {(hasPrev || hasMore) && (
+          <div className="border-t border-border px-4 py-3">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={hasPrev && !isLoading ? goPrev : undefined}
+                    aria-disabled={!hasPrev || isLoading}
+                    className={!hasPrev || isLoading ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={hasMore && !isLoading ? goNext : undefined}
+                    aria-disabled={!hasMore || isLoading}
+                    className={!hasMore || isLoading ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         )}
       </div>
 

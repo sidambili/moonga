@@ -36,11 +36,17 @@ import type {
   ListSessionsParams,
   ModelSettings,
   ModelSettingsInput,
+  Playbook,
+  PlaybookCreate,
+  PlaybookEdit,
   Repo,
   Session,
   SessionList,
   SessionStep,
   SeverityCount,
+  Skill,
+  SkillCreate,
+  SkillEdit,
   SourceCount,
   WebhookAck,
   WebhookPayload
@@ -1285,6 +1291,76 @@ export const useEditArtifact = <TError = ErrorType<unknown>,
       return useMutation(getEditArtifactMutationOptions(options));
     }
 
+export const getPostArtifactToLinearUrl = (id: number,) => {
+
+
+
+
+  return `/api/artifacts/${id}/post-to-linear`
+}
+
+/**
+ * @summary Post artifact content as a comment to the associated Linear issue
+ */
+export const postArtifactToLinear = async (id: number, options?: RequestInit): Promise<Artifact> => {
+
+  return customFetch<Artifact>(getPostArtifactToLinearUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostArtifactToLinearMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtifactToLinear>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postArtifactToLinear>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['postArtifactToLinear'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postArtifactToLinear>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  postArtifactToLinear(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostArtifactToLinearMutationResult = NonNullable<Awaited<ReturnType<typeof postArtifactToLinear>>>
+
+    export type PostArtifactToLinearMutationError = ErrorType<void>
+
+    /**
+ * @summary Post artifact content as a comment to the associated Linear issue
+ */
+export const usePostArtifactToLinear = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtifactToLinear>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postArtifactToLinear>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPostArtifactToLinearMutationOptions(options));
+    }
+
 export const getListIntegrationsUrl = () => {
 
 
@@ -1881,6 +1957,586 @@ export const useUpdateModelSettings = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateModelSettingsMutationOptions(options));
+    }
+
+export const getListPlaybooksUrl = () => {
+
+
+
+
+  return `/api/playbooks`
+}
+
+/**
+ * @summary List all playbooks
+ */
+export const listPlaybooks = async ( options?: RequestInit): Promise<Playbook[]> => {
+
+  return customFetch<Playbook[]>(getListPlaybooksUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPlaybooksQueryKey = () => {
+    return [
+    `/api/playbooks`
+    ] as const;
+    }
+
+
+export const getListPlaybooksQueryOptions = <TData = Awaited<ReturnType<typeof listPlaybooks>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlaybooks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPlaybooksQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPlaybooks>>> = ({ signal }) => listPlaybooks({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPlaybooks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPlaybooksQueryResult = NonNullable<Awaited<ReturnType<typeof listPlaybooks>>>
+export type ListPlaybooksQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all playbooks
+ */
+
+export function useListPlaybooks<TData = Awaited<ReturnType<typeof listPlaybooks>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlaybooks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPlaybooksQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreatePlaybookUrl = () => {
+
+
+
+
+  return `/api/playbooks`
+}
+
+/**
+ * @summary Create a user playbook
+ */
+export const createPlaybook = async (playbookCreate: PlaybookCreate, options?: RequestInit): Promise<Playbook> => {
+
+  return customFetch<Playbook>(getCreatePlaybookUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      playbookCreate,)
+  }
+);}
+
+
+
+
+export const getCreatePlaybookMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlaybook>>, TError,{data: BodyType<PlaybookCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPlaybook>>, TError,{data: BodyType<PlaybookCreate>}, TContext> => {
+
+const mutationKey = ['createPlaybook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPlaybook>>, {data: BodyType<PlaybookCreate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPlaybook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePlaybookMutationResult = NonNullable<Awaited<ReturnType<typeof createPlaybook>>>
+    export type CreatePlaybookMutationBody = BodyType<PlaybookCreate>
+    export type CreatePlaybookMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a user playbook
+ */
+export const useCreatePlaybook = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlaybook>>, TError,{data: BodyType<PlaybookCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPlaybook>>,
+        TError,
+        {data: BodyType<PlaybookCreate>},
+        TContext
+      > => {
+      return useMutation(getCreatePlaybookMutationOptions(options));
+    }
+
+export const getUpdatePlaybookUrl = (id: number,) => {
+
+
+
+
+  return `/api/playbooks/${id}`
+}
+
+/**
+ * @summary Update a playbook (system playbooks allow instructions + is_active only)
+ */
+export const updatePlaybook = async (id: number,
+    playbookEdit: PlaybookEdit, options?: RequestInit): Promise<Playbook> => {
+
+  return customFetch<Playbook>(getUpdatePlaybookUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      playbookEdit,)
+  }
+);}
+
+
+
+
+export const getUpdatePlaybookMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePlaybook>>, TError,{id: number;data: BodyType<PlaybookEdit>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePlaybook>>, TError,{id: number;data: BodyType<PlaybookEdit>}, TContext> => {
+
+const mutationKey = ['updatePlaybook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePlaybook>>, {id: number;data: BodyType<PlaybookEdit>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updatePlaybook(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePlaybookMutationResult = NonNullable<Awaited<ReturnType<typeof updatePlaybook>>>
+    export type UpdatePlaybookMutationBody = BodyType<PlaybookEdit>
+    export type UpdatePlaybookMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a playbook (system playbooks allow instructions + is_active only)
+ */
+export const useUpdatePlaybook = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePlaybook>>, TError,{id: number;data: BodyType<PlaybookEdit>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePlaybook>>,
+        TError,
+        {id: number;data: BodyType<PlaybookEdit>},
+        TContext
+      > => {
+      return useMutation(getUpdatePlaybookMutationOptions(options));
+    }
+
+export const getDeletePlaybookUrl = (id: number,) => {
+
+
+
+
+  return `/api/playbooks/${id}`
+}
+
+/**
+ * @summary Delete a user playbook (system playbooks cannot be deleted)
+ */
+export const deletePlaybook = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeletePlaybookUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeletePlaybookMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaybook>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePlaybook>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deletePlaybook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePlaybook>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deletePlaybook(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePlaybookMutationResult = NonNullable<Awaited<ReturnType<typeof deletePlaybook>>>
+
+    export type DeletePlaybookMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a user playbook (system playbooks cannot be deleted)
+ */
+export const useDeletePlaybook = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaybook>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deletePlaybook>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeletePlaybookMutationOptions(options));
+    }
+
+export const getListSkillsUrl = () => {
+
+
+
+
+  return `/api/skills`
+}
+
+/**
+ * @summary List all skills
+ */
+export const listSkills = async ( options?: RequestInit): Promise<Skill[]> => {
+
+  return customFetch<Skill[]>(getListSkillsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSkillsQueryKey = () => {
+    return [
+    `/api/skills`
+    ] as const;
+    }
+
+
+export const getListSkillsQueryOptions = <TData = Awaited<ReturnType<typeof listSkills>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSkills>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSkillsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSkills>>> = ({ signal }) => listSkills({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSkills>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSkillsQueryResult = NonNullable<Awaited<ReturnType<typeof listSkills>>>
+export type ListSkillsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all skills
+ */
+
+export function useListSkills<TData = Awaited<ReturnType<typeof listSkills>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSkills>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSkillsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateSkillUrl = () => {
+
+
+
+
+  return `/api/skills`
+}
+
+/**
+ * @summary Create a user skill
+ */
+export const createSkill = async (skillCreate: SkillCreate, options?: RequestInit): Promise<Skill> => {
+
+  return customFetch<Skill>(getCreateSkillUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      skillCreate,)
+  }
+);}
+
+
+
+
+export const getCreateSkillMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSkill>>, TError,{data: BodyType<SkillCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSkill>>, TError,{data: BodyType<SkillCreate>}, TContext> => {
+
+const mutationKey = ['createSkill'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSkill>>, {data: BodyType<SkillCreate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSkill(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSkillMutationResult = NonNullable<Awaited<ReturnType<typeof createSkill>>>
+    export type CreateSkillMutationBody = BodyType<SkillCreate>
+    export type CreateSkillMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a user skill
+ */
+export const useCreateSkill = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSkill>>, TError,{data: BodyType<SkillCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSkill>>,
+        TError,
+        {data: BodyType<SkillCreate>},
+        TContext
+      > => {
+      return useMutation(getCreateSkillMutationOptions(options));
+    }
+
+export const getUpdateSkillUrl = (id: number,) => {
+
+
+
+
+  return `/api/skills/${id}`
+}
+
+/**
+ * @summary Update a skill
+ */
+export const updateSkill = async (id: number,
+    skillEdit: SkillEdit, options?: RequestInit): Promise<Skill> => {
+
+  return customFetch<Skill>(getUpdateSkillUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      skillEdit,)
+  }
+);}
+
+
+
+
+export const getUpdateSkillMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSkill>>, TError,{id: number;data: BodyType<SkillEdit>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSkill>>, TError,{id: number;data: BodyType<SkillEdit>}, TContext> => {
+
+const mutationKey = ['updateSkill'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSkill>>, {id: number;data: BodyType<SkillEdit>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSkill(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSkillMutationResult = NonNullable<Awaited<ReturnType<typeof updateSkill>>>
+    export type UpdateSkillMutationBody = BodyType<SkillEdit>
+    export type UpdateSkillMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a skill
+ */
+export const useUpdateSkill = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSkill>>, TError,{id: number;data: BodyType<SkillEdit>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSkill>>,
+        TError,
+        {id: number;data: BodyType<SkillEdit>},
+        TContext
+      > => {
+      return useMutation(getUpdateSkillMutationOptions(options));
+    }
+
+export const getDeleteSkillUrl = (id: number,) => {
+
+
+
+
+  return `/api/skills/${id}`
+}
+
+/**
+ * @summary Delete a user skill (system skills cannot be deleted)
+ */
+export const deleteSkill = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteSkillUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSkillMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSkill>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSkill>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteSkill'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSkill>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteSkill(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSkillMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSkill>>>
+
+    export type DeleteSkillMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a user skill (system skills cannot be deleted)
+ */
+export const useDeleteSkill = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSkill>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSkill>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSkillMutationOptions(options));
     }
 
 export const getIngestGithubWebhookUrl = () => {

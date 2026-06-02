@@ -16,6 +16,7 @@ import ArtifactsReview from "@/pages/artifacts";
 import ArtifactDetail from "@/pages/artifact-detail";
 import Integrations from "@/pages/integrations";
 import ModelSettings from "@/pages/settings";
+import PlaybooksPage from "@/pages/playbooks";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 
@@ -51,6 +52,7 @@ const ArtifactsReviewRoute = () => <SafeRoute component={ArtifactsReview} />;
 const ArtifactDetailRoute = () => <SafeRoute component={ArtifactDetail} />;
 const IntegrationsRoute = () => <SafeRoute component={Integrations} />;
 const ModelSettingsRoute = () => <SafeRoute component={ModelSettings} />;
+const PlaybooksRoute = () => <SafeRoute component={PlaybooksPage} />;
 const LoginRoute = () => <PublicRoute component={Login} />;
 const SignupRoute = () => <PublicRoute component={Signup} />;
 
@@ -66,6 +68,7 @@ function AuthenticatedApp() {
         <Route path="/artifacts" component={ArtifactsReviewRoute} />
         <Route path="/artifacts/:id" component={ArtifactDetailRoute} />
         <Route path="/integrations" component={IntegrationsRoute} />
+        <Route path="/playbooks" component={PlaybooksRoute} />
         <Route path="/settings" component={ModelSettingsRoute} />
         <Route component={NotFound} />
       </Switch>

@@ -37,7 +37,12 @@ export interface Event {
 
 export interface EventList {
   items: Event[];
-  total: number;
+  /**
+     * ID to pass as `cursor` for the next page
+     * @nullable
+     */
+  nextCursor?: number | null;
+  hasMore: boolean;
 }
 
 /**
@@ -63,7 +68,29 @@ export interface Session {
   /** @nullable */
   step_count?: number | null;
   /** @nullable */
+  total_tokens?: number | null;
+  /** @nullable */
+  total_prompt_tokens?: number | null;
+  /** @nullable */
+  total_completion_tokens?: number | null;
+  /** @nullable */
   total_cost?: number | null;
+  /** @nullable */
+  prompt_token_cost?: number | null;
+  /** @nullable */
+  completion_token_cost?: number | null;
+  /** @nullable */
+  cached_tokens?: number | null;
+  /** @nullable */
+  cached_cost?: number | null;
+  /** @nullable */
+  tool_calls_count?: number | null;
+  /** @nullable */
+  duration_ms?: number | null;
+  /** @nullable */
+  playbook_id?: number | null;
+  /** @nullable */
+  playbook_name?: string | null;
   created_at: string;
   updated_at: string;
   event?: Event;
@@ -71,7 +98,12 @@ export interface Session {
 
 export interface SessionList {
   items: Session[];
-  total: number;
+  /**
+     * ID to pass as `cursor` for the next page
+     * @nullable
+     */
+  nextCursor?: number | null;
+  hasMore: boolean;
 }
 
 export type SessionStepToolCallsItem = { [key: string]: unknown };
@@ -118,17 +150,87 @@ export interface Artifact {
   content: string;
   /** draft | approved | rejected | edited */
   approval_state: string;
+  /**
+     * ISO timestamp when the artifact was posted as a comment to Linear
+     * @nullable
+     */
+  synced_to_linear_at?: string | null;
   created_at: string;
   session?: Session;
 }
 
 export interface ArtifactList {
   items: Artifact[];
-  total: number;
+  /**
+     * ID to pass as `cursor` for the next page
+     * @nullable
+     */
+  nextCursor?: number | null;
+  hasMore: boolean;
 }
 
 export interface ArtifactEdit {
   content: string;
+}
+
+export interface Playbook {
+  id: number;
+  slug: string;
+  name: string;
+  /** diagnose | plan */
+  objective: string;
+  /**
+     * linear | github | sentry | null (null = any source)
+     * @nullable
+     */
+  trigger_source?: string | null;
+  instructions: string;
+  /** system | user */
+  source: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlaybookCreate {
+  slug: string;
+  name: string;
+  objective: string;
+  /** @nullable */
+  trigger_source?: string | null;
+  instructions: string;
+}
+
+export interface PlaybookEdit {
+  name?: string;
+  instructions?: string;
+  /** @nullable */
+  trigger_source?: string | null;
+  is_active?: boolean;
+}
+
+export interface Skill {
+  id: number;
+  slug: string;
+  name: string;
+  content: string;
+  /** system | user */
+  source: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SkillCreate {
+  slug: string;
+  name: string;
+  content: string;
+}
+
+export interface SkillEdit {
+  name?: string;
+  content?: string;
+  is_active?: boolean;
 }
 
 /**
@@ -273,19 +375,28 @@ source?: string;
 severity?: string;
 status?: string;
 limit?: number;
-offset?: number;
+/**
+ * ID of the last item from the previous page (for cursor pagination)
+ */
+cursor?: number;
 };
 
 export type ListSessionsParams = {
 status?: string;
 limit?: number;
-offset?: number;
+/**
+ * ID of the last item from the previous page (for cursor pagination)
+ */
+cursor?: number;
 };
 
 export type ListArtifactsParams = {
 approval_state?: string;
 session_id?: number;
 limit?: number;
-offset?: number;
+/**
+ * ID of the last item from the previous page (for cursor pagination)
+ */
+cursor?: number;
 };
 

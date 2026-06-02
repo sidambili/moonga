@@ -8,6 +8,8 @@ import modelSettingsRouter from "./model-settings";
 import modelPricesRouter from "./model-prices";
 import dashboardRouter from "./dashboard";
 import webhooksRouter from "./webhooks";
+import playbooksRouter from "./playbooks";
+import skillsRouter from "./skills";
 import { requireAuth } from "../lib/require-auth";
 
 const router: IRouter = Router();
@@ -24,5 +26,7 @@ router.use("/integrations", requireAuth, integrationsRouter);
 router.use("/model-settings", requireAuth, modelSettingsRouter);
 router.use("/model-prices", requireAuth, modelPricesRouter);
 router.use("/dashboard", requireAuth, dashboardRouter);
+router.use("/playbooks", requireAuth, playbooksRouter);
+router.use("/skills", requireAuth, skillsRouter);
 
 export default router;

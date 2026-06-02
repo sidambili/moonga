@@ -9,5 +9,10 @@ import type { Session } from './session';
 
 export interface SessionList {
   items: Session[];
-  total: number;
+  /**
+     * ID to pass as `cursor` for the next page
+     * @nullable
+     */
+  nextCursor?: number | null;
+  hasMore: boolean;
 }

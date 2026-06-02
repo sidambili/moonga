@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useListArtifacts, useApproveArtifact, useRejectArtifact, getListArtifactsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,14 @@ import { Link } from "wouter";
 import { CheckCircle, XCircle, ChevronRight } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
+import { DEFAULT_PAGE_SIZE } from "@workspace/constants";
 
 export default function ArtifactsReview() {
   const [location, navigate] = useLocation();
@@ -17,14 +25,23 @@ export default function ArtifactsReview() {
   const sessionIdParam = searchParams.get("session_id");
 
   const [approvalFilter, setApprovalFilter] = useState("all");
+  const [cursors, setCursors] = useState<(number | undefined)[]>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
   const queryClient = useQueryClient();
   const approveMutation = useApproveArtifact();
   const rejectMutation = useRejectArtifact();
 
+  useEffect(() => {
+    setCursors([undefined]);
+    setPageIndex(0);
+  }, [approvalFilter, sessionIdParam]);
+
+  const currentCursor = cursors[pageIndex];
   const listParams = {
     approval_state: approvalFilter === "all" ? undefined : approvalFilter,
     session_id: sessionIdParam ? Number(sessionIdParam) : undefined,
-    limit: 50,
+    limit: DEFAULT_PAGE_SIZE,
+    cursor: currentCursor,
   };
   const { data: artifactsList, isLoading } = useListArtifacts(listParams, {
     query: { queryKey: getListArtifactsQueryKey(listParams), refetchInterval: 15000 },
@@ -51,7 +68,22 @@ export default function ArtifactsReview() {
   };
 
   const items = artifactsList?.items ?? [];
+  const hasMore = artifactsList?.hasMore ?? false;
+  const hasPrev = pageIndex > 0;
   const draftCount = items.filter((a) => a.approval_state === "draft").length;
+
+  const goNext = () => {
+    if (!artifactsList?.nextCursor && pageIndex === cursors.length - 1) return;
+    if (artifactsList?.nextCursor && pageIndex === cursors.length - 1) {
+      setCursors((prev) => [...prev, artifactsList.nextCursor!]);
+    }
+    setPageIndex((p) => p + 1);
+  };
+
+  const goPrev = () => {
+    if (pageIndex <= 0) return;
+    setPageIndex((p) => p - 1);
+  };
 
   return (
     <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
@@ -176,6 +208,29 @@ export default function ArtifactsReview() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {(hasPrev || hasMore) && (
+          <div className="border-t border-border px-4 py-3">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={hasPrev ? goPrev : undefined}
+                    aria-disabled={!hasPrev}
+                    className={!hasPrev ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={hasMore ? goNext : undefined}
+                    aria-disabled={!hasMore}
+                    className={!hasMore ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         )}
       </div>
 

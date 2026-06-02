@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { artifactsTable, sessionsTable, eventsTable } from "@workspace/db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, lt } from "drizzle-orm";
+import { postLinearComment } from "../lib/integrations/linear-client";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -15,22 +17,38 @@ async function hydrateArtifact(artifact: typeof artifactsTable.$inferSelect) {
 
 router.get("/", async (req, res) => {
   try {
-    const { approval_state, session_id, limit = "50", offset = "0" } = req.query as Record<string, string>;
+    const { approval_state, session_id, limit = "50", cursor } = req.query as Record<string, string>;
     const limitN = Math.min(Number(limit) || 50, 200);
-    const offsetN = Number(offset) || 0;
+    const cursorN = cursor ? Number(cursor) : undefined;
 
     const conditions = [];
     if (approval_state) conditions.push(eq(artifactsTable.approval_state, approval_state));
     if (session_id) conditions.push(eq(artifactsTable.session_id, Number(session_id)));
+    if (cursorN) conditions.push(lt(artifactsTable.id, cursorN));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [items, [{ count }]] = await Promise.all([
-      db.select().from(artifactsTable).where(where).orderBy(desc(artifactsTable.created_at)).limit(limitN).offset(offsetN),
-      db.select({ count: sql<number>`count(*)::int` }).from(artifactsTable).where(where),
-    ]);
+    const rows = await db
+      .select({
+        artifact: artifactsTable,
+        session: sessionsTable,
+        event: eventsTable,
+      })
+      .from(artifactsTable)
+      .leftJoin(sessionsTable, eq(artifactsTable.session_id, sessionsTable.id))
+      .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
+      .where(where)
+      .orderBy(desc(artifactsTable.id))
+      .limit(limitN + 1);
 
-    const hydrated = await Promise.all(items.map(hydrateArtifact));
-    return res.json({ items: hydrated, total: count });
+    const hasMore = rows.length > limitN;
+    const pageRows = hasMore ? rows.slice(0, limitN) : rows;
+    const items = pageRows.map(({ artifact, session, event }) => ({
+      ...artifact,
+      session: session ? { ...session, event } : null,
+    }));
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+    return res.json({ items, nextCursor, hasMore });
   } catch {
     return res.status(500).json({ error: "Failed to list artifacts" });
   }
@@ -100,6 +118,34 @@ router.patch("/:id/edit", async (req, res) => {
     return res.json(await hydrateArtifact(updated));
   } catch {
     return res.status(500).json({ error: "Failed to edit artifact" });
+  }
+});
+
+router.post("/:id/post-to-linear", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [artifact] = await db.select().from(artifactsTable).where(eq(artifactsTable.id, id));
+    if (!artifact) return res.status(404).json({ error: "Artifact not found" });
+
+    const hydrated = await hydrateArtifact(artifact);
+    const ticketId = hydrated.session?.event?.ticket_id;
+    if (!ticketId) {
+      return res.status(400).json({ error: "No Linear ticket associated with this artifact's session" });
+    }
+
+    await postLinearComment(ticketId, artifact.content);
+
+    const [updated] = await db.update(artifactsTable)
+      .set({ synced_to_linear_at: new Date() })
+      .where(eq(artifactsTable.id, id))
+      .returning();
+
+    logger.info({ artifactId: id, ticketId }, "Posted artifact to Linear");
+    return res.json(await hydrateArtifact(updated));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn({ err, artifactId: req.params.id }, "Failed to post artifact to Linear");
+    return res.status(500).json({ error: "Failed to post to Linear", message: msg });
   }
 });
 

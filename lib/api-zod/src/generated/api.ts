@@ -68,14 +68,13 @@ export const GetSourceBreakdownResponse = zod.array(GetSourceBreakdownResponseIt
  * @summary List all events
  */
 export const listEventsQueryLimitDefault = 50;
-export const listEventsQueryOffsetDefault = 0;
 
 export const ListEventsQueryParams = zod.object({
   "source": zod.coerce.string().optional(),
   "severity": zod.coerce.string().optional(),
   "status": zod.coerce.string().optional(),
   "limit": zod.coerce.number().default(listEventsQueryLimitDefault),
-  "offset": zod.coerce.number().default(listEventsQueryOffsetDefault)
+  "cursor": zod.coerce.number().optional()
 })
 
 export const ListEventsResponse = zod.object({
@@ -95,7 +94,8 @@ export const ListEventsResponse = zod.object({
   "session_id": zod.number().nullish(),
   "created_at": zod.string()
 })),
-  "total": zod.number()
+  "nextCursor": zod.number().nullish().describe('ID to pass as `cursor` for the next page'),
+  "hasMore": zod.boolean()
 })
 
 
@@ -128,12 +128,11 @@ export const GetEventResponse = zod.object({
  * @summary List all agent sessions
  */
 export const listSessionsQueryLimitDefault = 50;
-export const listSessionsQueryOffsetDefault = 0;
 
 export const ListSessionsQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "limit": zod.coerce.number().default(listSessionsQueryLimitDefault),
-  "offset": zod.coerce.number().default(listSessionsQueryOffsetDefault)
+  "cursor": zod.coerce.number().optional()
 })
 
 export const ListSessionsResponse = zod.object({
@@ -149,7 +148,18 @@ export const ListSessionsResponse = zod.object({
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
   "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
   "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -169,7 +179,8 @@ export const ListSessionsResponse = zod.object({
   "created_at": zod.string()
 }).optional()
 })),
-  "total": zod.number()
+  "nextCursor": zod.number().nullish().describe('ID to pass as `cursor` for the next page'),
+  "hasMore": zod.boolean()
 })
 
 
@@ -192,7 +203,18 @@ export const GetSessionResponse = zod.object({
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
   "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
   "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -233,7 +255,18 @@ export const RetrySessionResponse = zod.object({
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
   "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
   "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -290,13 +323,12 @@ export const GetSessionStepsResponse = zod.array(GetSessionStepsResponseItem)
  * @summary List all artifacts
  */
 export const listArtifactsQueryLimitDefault = 50;
-export const listArtifactsQueryOffsetDefault = 0;
 
 export const ListArtifactsQueryParams = zod.object({
   "approval_state": zod.coerce.string().optional(),
   "session_id": zod.coerce.number().optional(),
   "limit": zod.coerce.number().default(listArtifactsQueryLimitDefault),
-  "offset": zod.coerce.number().default(listArtifactsQueryOffsetDefault)
+  "cursor": zod.coerce.number().optional()
 })
 
 export const ListArtifactsResponse = zod.object({
@@ -306,6 +338,7 @@ export const ListArtifactsResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),
@@ -319,7 +352,18 @@ export const ListArtifactsResponse = zod.object({
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
   "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
   "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -340,7 +384,8 @@ export const ListArtifactsResponse = zod.object({
 }).optional()
 }).optional()
 })),
-  "total": zod.number()
+  "nextCursor": zod.number().nullish().describe('ID to pass as `cursor` for the next page'),
+  "hasMore": zod.boolean()
 })
 
 
@@ -357,6 +402,7 @@ export const GetArtifactResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),
@@ -370,7 +416,18 @@ export const GetArtifactResponse = zod.object({
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
   "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
   "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -406,6 +463,7 @@ export const ApproveArtifactResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),
@@ -419,7 +477,18 @@ export const ApproveArtifactResponse = zod.object({
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
   "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
   "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -455,6 +524,7 @@ export const RejectArtifactResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),
@@ -468,7 +538,18 @@ export const RejectArtifactResponse = zod.object({
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
   "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
   "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -508,6 +589,7 @@ export const EditArtifactResponse = zod.object({
   "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
   "content": zod.string(),
   "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
   "created_at": zod.string(),
   "session": zod.object({
   "id": zod.number(),
@@ -521,7 +603,79 @@ export const EditArtifactResponse = zod.object({
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
   "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
   "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
+  "created_at": zod.string(),
+  "updated_at": zod.string(),
+  "event": zod.object({
+  "id": zod.number(),
+  "source": zod.string().describe('github | linear | betterstack | sentry | slack | email'),
+  "event_type": zod.string().describe('error | anomaly | ticket_created | issue_updated | deploy_failed | push | pr_opened'),
+  "severity": zod.string().describe('low | medium | high | critical'),
+  "status": zod.string().describe('new | processing | processed | ignored'),
+  "service": zod.string().nullish(),
+  "repo_id": zod.string().nullish(),
+  "ticket_id": zod.string().nullish(),
+  "title": zod.string().nullish(),
+  "payload_raw": zod.object({
+
+}).passthrough().optional(),
+  "session_id": zod.number().nullish(),
+  "created_at": zod.string()
+}).optional()
+}).optional()
+})
+
+
+/**
+ * @summary Post artifact content as a comment to the associated Linear issue
+ */
+export const PostArtifactToLinearParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PostArtifactToLinearResponse = zod.object({
+  "id": zod.number(),
+  "session_id": zod.number(),
+  "type": zod.string().describe('slack_message | linear_ticket | incident_report | implementation_plan'),
+  "content": zod.string(),
+  "approval_state": zod.string().describe('draft | approved | rejected | edited'),
+  "synced_to_linear_at": zod.string().nullish().describe('ISO timestamp when the artifact was posted as a comment to Linear'),
+  "created_at": zod.string(),
+  "session": zod.object({
+  "id": zod.number(),
+  "event_id": zod.number(),
+  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
+  "model_used": zod.string().nullish(),
+  "context_snapshot": zod.object({
+
+}).passthrough().nullish(),
+  "output_summary": zod.string().nullish(),
+  "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -712,6 +866,131 @@ export const UpdateModelSettingsResponse = zod.object({
   "api_key_set": zod.boolean().optional(),
   "base_url": zod.string().nullish(),
   "updated_at": zod.string()
+})
+
+
+/**
+ * @summary List all playbooks
+ */
+export const ListPlaybooksResponseItem = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "name": zod.string(),
+  "objective": zod.string().describe('diagnose | plan'),
+  "trigger_source": zod.string().nullish().describe('linear | github | sentry | null (null = any source)'),
+  "instructions": zod.string(),
+  "source": zod.string().describe('system | user'),
+  "is_active": zod.boolean(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+export const ListPlaybooksResponse = zod.array(ListPlaybooksResponseItem)
+
+
+/**
+ * @summary Create a user playbook
+ */
+export const CreatePlaybookBody = zod.object({
+  "slug": zod.string(),
+  "name": zod.string(),
+  "objective": zod.string(),
+  "trigger_source": zod.string().nullish(),
+  "instructions": zod.string()
+})
+
+
+/**
+ * @summary Update a playbook (system playbooks allow instructions + is_active only)
+ */
+export const UpdatePlaybookParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdatePlaybookBody = zod.object({
+  "name": zod.string().optional(),
+  "instructions": zod.string().optional(),
+  "trigger_source": zod.string().nullish(),
+  "is_active": zod.boolean().optional()
+})
+
+export const UpdatePlaybookResponse = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "name": zod.string(),
+  "objective": zod.string().describe('diagnose | plan'),
+  "trigger_source": zod.string().nullish().describe('linear | github | sentry | null (null = any source)'),
+  "instructions": zod.string(),
+  "source": zod.string().describe('system | user'),
+  "is_active": zod.boolean(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+
+
+/**
+ * @summary Delete a user playbook (system playbooks cannot be deleted)
+ */
+export const DeletePlaybookParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary List all skills
+ */
+export const ListSkillsResponseItem = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "name": zod.string(),
+  "content": zod.string(),
+  "source": zod.string().describe('system | user'),
+  "is_active": zod.boolean(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+export const ListSkillsResponse = zod.array(ListSkillsResponseItem)
+
+
+/**
+ * @summary Create a user skill
+ */
+export const CreateSkillBody = zod.object({
+  "slug": zod.string(),
+  "name": zod.string(),
+  "content": zod.string()
+})
+
+
+/**
+ * @summary Update a skill
+ */
+export const UpdateSkillParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSkillBody = zod.object({
+  "name": zod.string().optional(),
+  "content": zod.string().optional(),
+  "is_active": zod.boolean().optional()
+})
+
+export const UpdateSkillResponse = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "name": zod.string(),
+  "content": zod.string(),
+  "source": zod.string().describe('system | user'),
+  "is_active": zod.boolean(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+
+
+/**
+ * @summary Delete a user skill (system skills cannot be deleted)
+ */
+export const DeleteSkillParams = zod.object({
+  "id": zod.coerce.number()
 })
 
 

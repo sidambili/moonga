@@ -9,5 +9,10 @@ import type { Event } from './event';
 
 export interface EventList {
   items: Event[];
-  total: number;
+  /**
+     * ID to pass as `cursor` for the next page
+     * @nullable
+     */
+  nextCursor?: number | null;
+  hasMore: boolean;
 }

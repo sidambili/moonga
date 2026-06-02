@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
@@ -6,6 +6,14 @@ import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource }
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+} from "@/components/ui/pagination";
+import {
+  DEFAULT_PAGE_SIZE,
   SOURCE_IDS,
   SOURCE_LABELS,
   SEVERITY_LEVELS,
@@ -19,18 +27,42 @@ export default function EventsFeed() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [cursors, setCursors] = useState<(number | undefined)[]>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
 
+  useEffect(() => {
+    setCursors([undefined]);
+    setPageIndex(0);
+  }, [sourceFilter, severityFilter, statusFilter]);
+
+  const currentCursor = cursors[pageIndex];
   const listParams = {
     source: sourceFilter === "all" ? undefined : sourceFilter,
     severity: severityFilter === "all" ? undefined : severityFilter,
     status: statusFilter === "all" ? undefined : statusFilter,
-    limit: 50,
+    limit: DEFAULT_PAGE_SIZE,
+    cursor: currentCursor,
   };
   const { data: eventsList, isLoading } = useListEvents(listParams, {
     query: { queryKey: getListEventsQueryKey(listParams), refetchInterval: 15000 },
   });
 
   const items = eventsList?.items ?? [];
+  const hasMore = eventsList?.hasMore ?? false;
+  const hasPrev = pageIndex > 0;
+
+  const goNext = () => {
+    if (!hasMore) return;
+    if (eventsList?.nextCursor && pageIndex === cursors.length - 1) {
+      setCursors((prev) => [...prev, eventsList.nextCursor!]);
+    }
+    setPageIndex((p) => p + 1);
+  };
+
+  const goPrev = () => {
+    if (!hasPrev) return;
+    setPageIndex((p) => p - 1);
+  };
 
   return (
     <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
@@ -140,6 +172,29 @@ export default function EventsFeed() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {(hasPrev || hasMore) && (
+          <div className="border-t border-border px-4 py-3">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={hasPrev ? goPrev : undefined}
+                    aria-disabled={!hasPrev}
+                    className={!hasPrev ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={hasMore ? goNext : undefined}
+                    aria-disabled={!hasMore}
+                    className={!hasMore ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         )}
       </div>
 

@@ -21,6 +21,10 @@ tags:
     description: Webhook ingest endpoints
   - name: dashboard
     description: Dashboard summary data
+  - name: playbooks
+    description: Agent playbooks (workflow instructions per objective)
+  - name: skills
+    description: Reusable knowledge snippets injected into every session
 
 paths:
   /healthz:
@@ -119,11 +123,11 @@ paths:
           schema:
             type: integer
             default: 50
-        - name: offset
+        - name: cursor
           in: query
           schema:
             type: integer
-            default: 0
+            description: ID of the last item from the previous page (for cursor pagination)
       responses:
         "200":
           description: List of events
@@ -169,11 +173,11 @@ paths:
           schema:
             type: integer
             default: 50
-        - name: offset
+        - name: cursor
           in: query
           schema:
             type: integer
-            default: 0
+            description: ID of the last item from the previous page (for cursor pagination)
       responses:
         "200":
           description: List of sessions
@@ -263,11 +267,11 @@ paths:
           schema:
             type: integer
             default: 50
-        - name: offset
+        - name: cursor
           in: query
           schema:
             type: integer
-            default: 0
+            description: ID of the last item from the previous page (for cursor pagination)
       responses:
         "200":
           description: List of artifacts
@@ -359,6 +363,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Artifact"
+
+  /artifacts/{id}/post-to-linear:
+    post:
+      operationId: postArtifactToLinear
+      tags: [artifacts]
+      summary: Post artifact content as a comment to the associated Linear issue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comment posted to Linear
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artifact"
+        "400":
+          description: No Linear ticket associated with this artifact
+        "404":
+          description: Artifact not found
 
   # ── Integrations ──────────────────────────────────────────────────
   /integrations:
@@ -521,6 +548,198 @@ paths:
               schema:
                 $ref: "#/components/schemas/ModelSettings"
 
+  # ── Playbooks ─────────────────────────────────────────────────────
+  /playbooks:
+    get:
+      operationId: listPlaybooks
+      tags: [playbooks]
+      summary: List all playbooks
+      responses:
+        "200":
+          description: Playbooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Playbook"
+    post:
+      operationId: createPlaybook
+      tags: [playbooks]
+      summary: Create a user playbook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaybookCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Playbook"
+
+  /playbooks/{id}:
+    patch:
+      operationId: updatePlaybook
+      tags: [playbooks]
+      summary: Update a playbook (system playbooks allow instructions + is_active only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaybookEdit"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Playbook"
+        "400":
+          description: Invalid request body
+        "404":
+          description: Playbook not found
+    delete:
+      operationId: deletePlaybook
+      tags: [playbooks]
+      summary: Delete a user playbook (system playbooks cannot be deleted)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: System playbooks cannot be deleted
+        "404":
+          description: Playbook not found
+
+  # ── Skills ────────────────────────────────────────────────────────
+  /skills:
+    get:
+      operationId: listSkills
+      tags: [skills]
+      summary: List all skills
+      responses:
+        "200":
+          description: Skills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Skill"
+    post:
+      operationId: createSkill
+      tags: [skills]
+      summary: Create a user skill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Skill"
+
+  /skills/{id}:
+    patch:
+      operationId: updateSkill
+      tags: [skills]
+      summary: Update a skill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillEdit"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Skill"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "404":
+          description: Skill not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: deleteSkill
+      tags: [skills]
+      summary: Delete a user skill (system skills cannot be deleted)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          description: Invalid id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: System skills cannot be deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Skill not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   # ── Webhook ingest ────────────────────────────────────────────────
   /webhooks/github:
     post:
@@ -627,6 +846,26 @@ components:
       required:
         - status
 
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        message:
+          type: ["string", "null"]
+
+    ValidationError:
+      type: object
+      required: [error, details]
+      properties:
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+
     # ── Domain entities ──────────────────────────────────────────────
 
     Event:
@@ -664,14 +903,17 @@ components:
 
     EventList:
       type: object
-      required: [items, total]
+      required: [items, hasMore]
       properties:
         items:
           type: array
           items:
             $ref: "#/components/schemas/Event"
-        total:
-          type: integer
+        nextCursor:
+          type: ["integer", "null"]
+          description: ID to pass as `cursor` for the next page
+        hasMore:
+          type: boolean
 
     Session:
       type: object
@@ -697,8 +939,30 @@ components:
           type: ["number", "null"]
         step_count:
           type: ["integer", "null"]
+        total_tokens:
+          type: ["integer", "null"]
+        total_prompt_tokens:
+          type: ["integer", "null"]
+        total_completion_tokens:
+          type: ["integer", "null"]
         total_cost:
           type: ["number", "null"]
+        prompt_token_cost:
+          type: ["number", "null"]
+        completion_token_cost:
+          type: ["number", "null"]
+        cached_tokens:
+          type: ["integer", "null"]
+        cached_cost:
+          type: ["number", "null"]
+        tool_calls_count:
+          type: ["integer", "null"]
+        duration_ms:
+          type: ["integer", "null"]
+        playbook_id:
+          type: ["integer", "null"]
+        playbook_name:
+          type: ["string", "null"]
         created_at:
           type: string
         updated_at:
@@ -708,14 +972,17 @@ components:
 
     SessionList:
       type: object
-      required: [items, total]
+      required: [items, hasMore]
       properties:
         items:
           type: array
           items:
             $ref: "#/components/schemas/Session"
-        total:
-          type: integer
+        nextCursor:
+          type: ["integer", "null"]
+          description: ID to pass as `cursor` for the next page
+        hasMore:
+          type: boolean
 
     SessionStep:
       type: object
@@ -771,6 +1038,9 @@ components:
         approval_state:
           type: string
           description: "draft | approved | rejected | edited"
+        synced_to_linear_at:
+          type: ["string", "null"]
+          description: "ISO timestamp when the artifact was posted as a comment to Linear"
         created_at:
           type: string
         session:
@@ -778,14 +1048,17 @@ components:
 
     ArtifactList:
       type: object
-      required: [items, total]
+      required: [items, hasMore]
       properties:
         items:
           type: array
           items:
             $ref: "#/components/schemas/Artifact"
-        total:
-          type: integer
+        nextCursor:
+          type: ["integer", "null"]
+          description: ID to pass as `cursor` for the next page
+        hasMore:
+          type: boolean
 
     ArtifactEdit:
       type: object
@@ -793,6 +1066,104 @@ components:
       properties:
         content:
           type: string
+
+    Playbook:
+      type: object
+      required: [id, slug, name, objective, instructions, source, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        objective:
+          type: string
+          description: "diagnose | plan"
+        trigger_source:
+          type: ["string", "null"]
+          description: "linear | github | sentry | null (null = any source)"
+        instructions:
+          type: string
+        source:
+          type: string
+          description: "system | user"
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    PlaybookCreate:
+      type: object
+      required: [slug, name, objective, instructions]
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        objective:
+          type: string
+        trigger_source:
+          type: ["string", "null"]
+        instructions:
+          type: string
+
+    PlaybookEdit:
+      type: object
+      properties:
+        name:
+          type: string
+        instructions:
+          type: string
+        trigger_source:
+          type: ["string", "null"]
+        is_active:
+          type: boolean
+
+    Skill:
+      type: object
+      required: [id, slug, name, content, source, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        content:
+          type: string
+        source:
+          type: string
+          description: "system | user"
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    SkillCreate:
+      type: object
+      required: [slug, name, content]
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        content:
+          type: string
+
+    SkillEdit:
+      type: object
+      properties:
+        name:
+          type: string
+        content:
+          type: string
+        is_active:
+          type: boolean
 
     Integration:
       type: object

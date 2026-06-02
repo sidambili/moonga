@@ -15,6 +15,17 @@ function formatTokens(n: number | null | undefined) {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k tok` : `${n} tok`;
 }
 
+function formatTokenPair(
+  prompt: number | null | undefined,
+  completion: number | null | undefined,
+) {
+  const p = prompt ?? 0;
+  const c = completion ?? 0;
+  if (p === 0 && c === 0) return null;
+  const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
+  return `${fmt(p)}↑ ${fmt(c)}↓`;
+}
+
 function formatDuration(ms: number): string {
   if (ms < 1000) return "<1s";
   const s = Math.round(ms / 1000);
@@ -38,25 +49,76 @@ type ArtifactOutput = {
   confidence?: number;
 };
 
+function extractBalancedJson(text: string): string | null {
+  let inString = false;
+  let escape = false;
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (escape) { escape = false; continue; }
+    if (char === "\\") { escape = true; continue; }
+    if (char === '"') { inString = !inString; continue; }
+    if (!inString) {
+      if (char === "{") { if (depth === 0) start = i; depth++; }
+      else if (char === "}") { depth--; if (depth === 0 && start !== -1) return text.slice(start, i + 1); }
+    }
+  }
+  return null;
+}
+
+function repairJsonStringValues(json: string): string {
+  let result = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < json.length; i++) {
+    const char = json[i];
+    if (escape) { result += char; escape = false; continue; }
+    if (char === "\\") { result += char; escape = true; continue; }
+    if (char === '"') { inString = !inString; result += char; continue; }
+    if (inString && (char === "\n" || char === "\r")) { result += "\\n"; continue; }
+    result += char;
+  }
+  return result;
+}
+
 function tryParseArtifactOutput(text: string | null | undefined): ArtifactOutput | null {
   if (!text) return null;
-  // Mirror server-side parseAgentOutput: strip fences, then find outermost { }
   const stripped = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
+
+  // Strategy 1: balanced brace extraction
+  const balanced = extractBalancedJson(stripped);
+  if (balanced) {
+    try {
+      const repaired = repairJsonStringValues(balanced);
+      const p = JSON.parse(repaired) as Record<string, unknown>;
+      if (typeof p.content === "string" && p.content.trim() && (typeof p.summary === "string" || typeof p.slack_summary === "string")) {
+        return {
+          content: p.content,
+          summary: (p.summary ?? p.slack_summary) as string,
+          confidence: typeof p.confidence === "number" ? p.confidence : undefined,
+        };
+      }
+    } catch { /* not parseable */ }
+  }
+
+  // Strategy 2: naive first { last }
   const start = stripped.indexOf("{");
   const end = stripped.lastIndexOf("}");
-  if (start === -1 || end <= start) return null;
-  try {
-    const p = JSON.parse(stripped.slice(start, end + 1)) as Record<string, unknown>;
-    if (typeof p.content === "string" && p.content.trim() && (typeof p.summary === "string" || typeof p.slack_summary === "string")) {
-      return {
-        content: p.content,
-        summary: (p.summary ?? p.slack_summary) as string,
-        confidence: typeof p.confidence === "number" ? p.confidence : undefined,
-      };
-    }
-  } catch {
-    // not parseable
+  if (start !== -1 && end > start) {
+    try {
+      const repaired = repairJsonStringValues(stripped.slice(start, end + 1));
+      const p = JSON.parse(repaired) as Record<string, unknown>;
+      if (typeof p.content === "string" && p.content.trim() && (typeof p.summary === "string" || typeof p.slack_summary === "string")) {
+        return {
+          content: p.content,
+          summary: (p.summary ?? p.slack_summary) as string,
+          confidence: typeof p.confidence === "number" ? p.confidence : undefined,
+        };
+      }
+    } catch { /* not parseable */ }
   }
+
   return null;
 }
 
@@ -211,20 +273,34 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
   const [open, setOpen] = useState(false);
   const label = getToolLabel(item.name, item.args);
   const hasDetail = item.args != null || item.result != null;
+  const toolResult = item.result?.tool_result;
+  const failed =
+    typeof toolResult === "object" &&
+    toolResult !== null &&
+    (toolResult as Record<string, unknown>).success === false;
 
   if (!hasDetail) {
     return (
       <div className="flex items-center gap-2 py-1.5 pl-9 pr-4">
-        <span className="text-[12px] text-muted-foreground/60">{label}</span>
+        <span className={`text-[12px] ${failed ? "text-destructive" : "text-muted-foreground/60"}`}>{label}</span>
+        {failed && (
+          <span className="text-[9px] uppercase tracking-wider bg-destructive/10 text-destructive font-medium px-1.5 py-0.5 rounded">
+            failed
+          </span>
+        )}
       </div>
     );
   }
 
   const resultText =
-    item.result?.tool_result != null
-      ? typeof item.result.tool_result === "string"
-        ? item.result.tool_result
-        : JSON.stringify(item.result.tool_result, null, 2)
+    toolResult != null
+      ? typeof toolResult === "string"
+        ? toolResult
+        : typeof toolResult === "object" &&
+          toolResult !== null &&
+          typeof (toolResult as Record<string, unknown>).error === "string"
+        ? (toolResult as Record<string, string>).error
+        : JSON.stringify(toolResult, null, 2)
       : (item.result?.content ?? "");
 
   return (
@@ -238,7 +314,12 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
         ) : (
           <ChevronRight className="w-3 h-3 text-muted-foreground/35 flex-shrink-0" />
         )}
-        <span className="text-[12px] text-muted-foreground/70">{label}</span>
+        <span className={`text-[12px] ${failed ? "text-destructive" : "text-muted-foreground/70"}`}>{label}</span>
+        {failed && (
+          <span className="text-[9px] uppercase tracking-wider bg-destructive/10 text-destructive font-medium px-1.5 py-0.5 rounded ml-1">
+            failed
+          </span>
+        )}
       </button>
       {open && (
         <div className="px-4 pb-2 pl-14 space-y-1.5">
@@ -260,6 +341,7 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
 
 function ThinkingRow({ step, durationMs }: { step: SessionStep; durationMs?: number }) {
   const [open, setOpen] = useState(false);
+  const tok = formatTokenPair(step.prompt_tokens, step.completion_tokens);
 
   return (
     <div>
@@ -272,12 +354,17 @@ function ThinkingRow({ step, durationMs }: { step: SessionStep; durationMs?: num
         ) : (
           <ChevronRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
         )}
-        <span className="text-[12px] text-muted-foreground/55">
+        <span className="text-[12px] text-muted-foreground/55 flex-1 min-w-0 truncate">
           Thought
           {durationMs != null && (
             <span className="text-muted-foreground/40"> for {formatDuration(durationMs)}</span>
           )}
         </span>
+        {tok && (
+          <span className="text-[10px] tabular-nums text-muted-foreground/40 ml-2 flex-shrink-0">
+            {tok}
+          </span>
+        )}
       </button>
       {open && step.content && (
         <div className="px-4 pb-2 pl-9">
@@ -301,6 +388,7 @@ function ToolGroupRow({
 }) {
   const [open, setOpen] = useState(false);
   const summary = toolGroupSummary(items);
+  const tok = formatTokenPair(call.prompt_tokens, call.completion_tokens);
 
   return (
     <div>
@@ -320,6 +408,11 @@ function ToolGroupRow({
         >
           {summary}
         </span>
+        {tok && (
+          <span className="text-[10px] tabular-nums text-muted-foreground/40 ml-2 flex-shrink-0">
+            {tok}
+          </span>
+        )}
         {isSystem && (
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground/30 font-medium ml-2 flex-shrink-0">
             system
@@ -383,6 +476,8 @@ export default function SessionTrace({ sessionId, totalCost }: SessionTraceProps
 
   const groups = steps ? buildVisualGroups(steps) : [];
   const totalTok = steps?.reduce((s, st) => s + (st.tokens_used ?? 0), 0) ?? 0;
+  const totalPrompt = steps?.reduce((s, st) => s + (st.prompt_tokens ?? 0), 0) ?? 0;
+  const totalCompletion = steps?.reduce((s, st) => s + (st.completion_tokens ?? 0), 0) ?? 0;
   const totalCostComputed = steps?.reduce((s, st) => s + (st.cost ?? 0), 0) ?? 0;
   const displayCost = formatCost(totalCostComputed || totalCost);
 
@@ -437,7 +532,7 @@ export default function SessionTrace({ sessionId, totalCost }: SessionTraceProps
         <div className="border-t border-border px-4 py-2 flex items-center justify-between flex-shrink-0">
           {totalTok > 0 && (
             <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-              {formatTokens(totalTok)}
+              {formatTokenPair(totalPrompt, totalCompletion) ?? formatTokens(totalTok)}
             </span>
           )}
           {displayCost && (
