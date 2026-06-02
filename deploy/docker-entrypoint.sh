@@ -22,7 +22,7 @@ for i in {1..30}; do
 done
 
 echo "[entrypoint] Running drizzle-kit push ..."
-npx drizzle-kit push --force --config ./lib/db/drizzle.config.ts
+pnpm --filter @workspace/db run push-force
 
 echo "[entrypoint] Starting API server ..."
 exec node --enable-source-maps ./apps/api-server/dist/index.mjs
