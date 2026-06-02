@@ -49,25 +49,76 @@ type ArtifactOutput = {
   confidence?: number;
 };
 
+function extractBalancedJson(text: string): string | null {
+  let inString = false;
+  let escape = false;
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (escape) { escape = false; continue; }
+    if (char === "\\") { escape = true; continue; }
+    if (char === '"') { inString = !inString; continue; }
+    if (!inString) {
+      if (char === "{") { if (depth === 0) start = i; depth++; }
+      else if (char === "}") { depth--; if (depth === 0 && start !== -1) return text.slice(start, i + 1); }
+    }
+  }
+  return null;
+}
+
+function repairJsonStringValues(json: string): string {
+  let result = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < json.length; i++) {
+    const char = json[i];
+    if (escape) { result += char; escape = false; continue; }
+    if (char === "\\") { result += char; escape = true; continue; }
+    if (char === '"') { inString = !inString; result += char; continue; }
+    if (inString && (char === "\n" || char === "\r")) { result += "\\n"; continue; }
+    result += char;
+  }
+  return result;
+}
+
 function tryParseArtifactOutput(text: string | null | undefined): ArtifactOutput | null {
   if (!text) return null;
-  // Mirror server-side parseAgentOutput: strip fences, then find outermost { }
   const stripped = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
+
+  // Strategy 1: balanced brace extraction
+  const balanced = extractBalancedJson(stripped);
+  if (balanced) {
+    try {
+      const repaired = repairJsonStringValues(balanced);
+      const p = JSON.parse(repaired) as Record<string, unknown>;
+      if (typeof p.content === "string" && p.content.trim() && (typeof p.summary === "string" || typeof p.slack_summary === "string")) {
+        return {
+          content: p.content,
+          summary: (p.summary ?? p.slack_summary) as string,
+          confidence: typeof p.confidence === "number" ? p.confidence : undefined,
+        };
+      }
+    } catch { /* not parseable */ }
+  }
+
+  // Strategy 2: naive first { last }
   const start = stripped.indexOf("{");
   const end = stripped.lastIndexOf("}");
-  if (start === -1 || end <= start) return null;
-  try {
-    const p = JSON.parse(stripped.slice(start, end + 1)) as Record<string, unknown>;
-    if (typeof p.content === "string" && p.content.trim() && (typeof p.summary === "string" || typeof p.slack_summary === "string")) {
-      return {
-        content: p.content,
-        summary: (p.summary ?? p.slack_summary) as string,
-        confidence: typeof p.confidence === "number" ? p.confidence : undefined,
-      };
-    }
-  } catch {
-    // not parseable
+  if (start !== -1 && end > start) {
+    try {
+      const repaired = repairJsonStringValues(stripped.slice(start, end + 1));
+      const p = JSON.parse(repaired) as Record<string, unknown>;
+      if (typeof p.content === "string" && p.content.trim() && (typeof p.summary === "string" || typeof p.slack_summary === "string")) {
+        return {
+          content: p.content,
+          summary: (p.summary ?? p.slack_summary) as string,
+          confidence: typeof p.confidence === "number" ? p.confidence : undefined,
+        };
+      }
+    } catch { /* not parseable */ }
   }
+
   return null;
 }
 

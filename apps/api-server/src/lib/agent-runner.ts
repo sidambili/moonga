@@ -1,5 +1,6 @@
 import { Octokit } from "octokit";
-import { generateText } from "ai";
+import { generateText, generateObject } from "ai";
+import { z } from "zod";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOpenAI } from "@ai-sdk/openai";
 import { db } from "@workspace/db";
@@ -236,34 +237,40 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     }
 
     let finalTextRaw = result.text;
-    let retryResult: Awaited<ReturnType<typeof generateText>> | undefined;
+    let retryUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
 
     // Fallback: some providers/models don't produce text after tool results.
-    // Retry without tools, feeding the tool results back as context.
+    // Retry without tools using structured output to guarantee valid JSON.
     if (!finalTextRaw && result.steps.some((s) => s.toolCalls && s.toolCalls.length > 0)) {
       const toolResults = result.steps.flatMap((s) => s.toolResults ?? []);
       const retryPrompt = `${userPrompt}\n\n[Tool results gathered]\n${toolResults
         .map((tr) => `Tool: ${tr.toolName}\nResult: ${JSON.stringify(tr.result).slice(0, 10_000)}`)
         .join("\n---\n")}\n\nBased on the above tool results, produce your final analysis now.`;
 
-      retryResult = await generateText({
+      const retryResult = await generateObject({
         model: modelConfig,
         system: systemPrompt,
         prompt: retryPrompt,
+        schema: z.object({
+          content: z.string().describe("Full markdown analysis"),
+          slack_summary: z.string().describe("2-3 plain-text sentences suitable for Slack"),
+          confidence: z.number().min(0).max(1),
+        }),
         maxTokens,
       });
 
-      finalTextRaw = retryResult.text;
+      finalTextRaw = JSON.stringify(retryResult.object);
+      retryUsage = retryResult.usage;
     }
 
     // Add retry usage to aggregates
-    if (retryResult?.usage) {
-      totalPromptTokens += retryResult.usage.promptTokens;
-      totalCompletionTokens += retryResult.usage.completionTokens;
-      totalTokens += retryResult.usage.totalTokens;
+    if (retryUsage) {
+      totalPromptTokens += retryUsage.promptTokens;
+      totalCompletionTokens += retryUsage.completionTokens;
+      totalTokens += retryUsage.totalTokens;
       const retryCost = await estimateCost(modelString, {
-        promptTokens: retryResult.usage.promptTokens,
-        completionTokens: retryResult.usage.completionTokens,
+        promptTokens: retryUsage.promptTokens,
+        completionTokens: retryUsage.completionTokens,
       });
       totalCost += retryCost;
     }
@@ -271,9 +278,42 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     const modelPrice = await getModelPrice(modelString);
     const durationMs = Date.now() - sessionStartTime;
 
-    const parsed = parseAgentOutput(finalTextRaw);
+    let parsed = parseAgentOutput(finalTextRaw);
 
-    if (!parsed.content) {
+    // If parsing failed but we have raw text, attempt a reformat with structured output
+    if (!parsed && finalTextRaw) {
+      logger.warn({ sessionId, rawLength: finalTextRaw.length }, "Agent output parse failed — attempting reformat");
+      try {
+        const reformat = await generateObject({
+          model: modelConfig,
+          system: "You are a JSON extraction assistant. Given raw analyst output that may contain preamble text or malformed JSON, extract the content, slack_summary, and confidence into valid JSON. Preserve all markdown content exactly.",
+          prompt: `Reformat this raw analyst output into the required JSON shape.\n\nRaw text:\n${finalTextRaw}`,
+          schema: z.object({
+            content: z.string(),
+            slack_summary: z.string(),
+            confidence: z.number().min(0).max(1),
+          }),
+          maxTokens: 4096,
+        });
+        parsed = reformat.object;
+        if (reformat.usage) {
+          totalPromptTokens += reformat.usage.promptTokens;
+          totalCompletionTokens += reformat.usage.completionTokens;
+          totalTokens += reformat.usage.totalTokens;
+          const reformatCost = await estimateCost(modelString, {
+            promptTokens: reformat.usage.promptTokens,
+            completionTokens: reformat.usage.completionTokens,
+          });
+          totalCost += reformatCost;
+        }
+        await persistStep(sessionId, stepNum, "tool", "[System] Reformat parse-failed output into structured JSON", modelString, undefined, undefined, "reformat_output");
+        stepNum++;
+      } catch (reformatErr) {
+        logger.error({ err: reformatErr, sessionId }, "Reformat attempt also failed");
+      }
+    }
+
+    if (!parsed?.content) {
       logger.warn({ sessionId, steps: result.steps.length }, "Agent produced no final text — marking failed");
       await db
         .update(sessionsTable)

@@ -21,12 +21,20 @@ export const PLAN_GUIDANCE = `Write a detailed plan (600–1000 words). Every ta
 
 // ── Output format ─────────────────────────────────────────────────────────────
 
-export const OUTPUT_FORMAT_PROMPT = `Respond with valid JSON only — no surrounding text or code fences — in exactly this shape:
+export const OUTPUT_FORMAT_PROMPT = `Respond with valid JSON only — no surrounding text, no markdown code fences, no preamble, no explanation. Start your response with the opening brace and end with the closing brace.
+
+Required shape (every field is required):
 {
-  "content": "<full markdown analysis>",
+  "content": "<full markdown analysis — escape all double quotes inside this string with backslash>",
   "slack_summary": "<2-3 plain-text sentences, no markdown, suitable for a Slack reply>",
   "confidence": <float 0.0–1.0>
-}`
+}
+
+Critical formatting rules:
+- Do NOT output any text before { or after }.
+- Escape all " characters inside string values as \\".
+- Use \\n for line breaks inside strings, not actual line breaks.
+- Do NOT wrap the response in \`\`\`json code fences.`
 
 // ── System prompt composer ────────────────────────────────────────────────────
 
