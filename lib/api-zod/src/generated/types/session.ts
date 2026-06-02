@@ -45,6 +45,10 @@ export interface Session {
   tool_calls_count?: number | null;
   /** @nullable */
   duration_ms?: number | null;
+  /** @nullable */
+  playbook_id?: number | null;
+  /** @nullable */
+  playbook_name?: string | null;
   created_at: string;
   updated_at: string;
   event?: Event;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap, LogOut, Bell, Search, RefreshCw } from "lucide-react";
+import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap, LogOut, Bell, Search, RefreshCw, BookOpen } from "lucide-react";
 import { cn } from "@/lib/format";
 import { ModeToggle } from "@/components/mode-toggle";
 import { authClient } from "@/lib/auth-client";
@@ -11,6 +11,7 @@ const nav = [
   { label: "Sessions", href: "/sessions", icon: Cpu },
   { label: "Review", href: "/artifacts", icon: FileCheck2 },
   { label: "Integrations", href: "/integrations", icon: Webhook },
+  { label: "Playbooks", href: "/playbooks", icon: BookOpen },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

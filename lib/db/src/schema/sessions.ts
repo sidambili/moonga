@@ -23,6 +23,7 @@ export const sessionsTable = pgTable("sessions", {
   tool_calls_count: integer("tool_calls_count"),
   step_count: integer("step_count"),
   duration_ms: integer("duration_ms"),
+  playbook_id: integer("playbook_id"),
   created_at: timestamp("created_at").notNull().defaultNow(),
   updated_at: timestamp("updated_at").notNull().defaultNow(),
 });

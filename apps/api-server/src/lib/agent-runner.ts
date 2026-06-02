@@ -14,6 +14,7 @@ import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEvent
 import { createGithubTools } from "./integrations/github-ai-tools";
 import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt } from "./ai/prompts";
 import { parseAgentOutput } from "./ai/output";
+import { loadPlaybook, loadActiveSkills } from "./playbook-loader";
 
 const MAX_STEPS = 15;
 const MAX_TOOL_CALLS = 30;
@@ -148,7 +149,25 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       : Promise.resolve(""),
   ]);
 
-  const systemPrompt = buildSystemPrompt(techStack || undefined, session.objective);
+  const [playbook, activeSkills] = await Promise.all([
+    loadPlaybook(session.objective, event.source),
+    loadActiveSkills(),
+  ]);
+
+  const systemPrompt = buildSystemPrompt(
+    techStack || undefined,
+    session.objective,
+    playbook?.instructions,
+    activeSkills.map((s) => s.content),
+  );
+
+  if (playbook) {
+    await db
+      .update(sessionsTable)
+      .set({ playbook_id: playbook.id, updated_at: new Date() })
+      .where(eq(sessionsTable.id, sessionId));
+  }
+
   const fullContext = [repoInstructions, linearContext, context].filter(Boolean).join("\n\n---\n\n");
 
   const ticketInfo = event.source === "linear"

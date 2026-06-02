@@ -13,7 +13,7 @@ Tool use strategy:
 - For PRs: the diff is usually pre-fetched; only call tools if you need surrounding context.
 - Prefer search_code to locate symbols first, then get_file_contents to read the implementation.`
 
-// ── Objective-specific content guidance ──────────────────────────────────────
+// ── Fallback guidance (used only when no playbook is loaded) ─────────────────
 
 export const DIAGNOSE_GUIDANCE = `Be concise (200–300 words). Focus on root cause and the single most important action.`
 
@@ -38,17 +38,31 @@ Critical formatting rules:
 
 // ── System prompt composer ────────────────────────────────────────────────────
 
-export function buildSystemPrompt(techStack?: string, objective?: string): string {
+export function buildSystemPrompt(
+  techStack?: string,
+  objective?: string,
+  playbookInstructions?: string,
+  skillContents?: string[],
+): string {
   const stackLine = techStack
     ? `\nThis repository uses ${techStack}. Use language-idiomatic patterns in your analysis.\n`
     : "";
-  const contentGuidance = objective === "plan" ? PLAN_GUIDANCE : DIAGNOSE_GUIDANCE;
+
+  const guidance = playbookInstructions
+    ? `\n## Playbook\n${playbookInstructions}`
+    : `\n${objective === "plan" ? PLAN_GUIDANCE : DIAGNOSE_GUIDANCE}`;
+
+  const skillsSection =
+    skillContents && skillContents.length > 0
+      ? `\n\n## Additional Context\n${skillContents.join("\n\n---\n\n")}`
+      : "";
+
   return `${AGENT_ROLE_PROMPT}${stackLine}
 ${TOOL_STRATEGY_PROMPT}
+${guidance}${skillsSection}
 
 Rules:
 - Base analysis on actual source code, not assumptions. Quote real function/class names and file paths.
-- ${contentGuidance}
 - ${OUTPUT_FORMAT_PROMPT}`;
 }
 
@@ -94,14 +108,7 @@ REQUIRED steps before writing the plan:
 3. Call get_file_contents on the 2-4 most relevant files to read the actual implementation.
 4. Only then write the plan, referencing real file paths and function/class names you read.
 
-The plan MUST include:
-- Objective summary (what the ticket asks for and why)
-- Step-by-step tasks, each with: file path(s) to change, what to add/modify/remove, and why
-- Any new files or dependencies needed
-- Dependencies or blockers (e.g. DB migration, feature flag, other tickets)
-- Estimated complexity: Low / Medium / High with a 1-sentence justification
-
-If the ticket description is vague, say so in the objective summary and focus the plan on what can be inferred from the code you read.
+Follow your playbook instructions for the required sections.
 
 Respond with valid JSON only — no surrounding text or code fences:
 {

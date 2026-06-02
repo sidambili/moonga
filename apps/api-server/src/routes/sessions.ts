@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { sessionsTable, eventsTable, sessionStepsTable } from "@workspace/db";
+import { sessionsTable, eventsTable, sessionStepsTable, playbooksTable } from "@workspace/db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
@@ -31,20 +31,23 @@ router.get("/", async (req, res) => {
         session: sessionsTable,
         event: eventsTable,
         computed_step_count: stepStats.computed_step_count,
+        playbook_name: playbooksTable.name,
       })
       .from(sessionsTable)
       .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
       .leftJoin(stepStats, eq(sessionsTable.id, stepStats.session_id))
+      .leftJoin(playbooksTable, eq(sessionsTable.playbook_id, playbooksTable.id))
       .where(where)
       .orderBy(desc(sessionsTable.id))
       .limit(limitN + 1);
 
     const hasMore = rows.length > limitN;
     const pageRows = hasMore ? rows.slice(0, limitN) : rows;
-    const items = pageRows.map(({ session, event, computed_step_count }) => ({
+    const items = pageRows.map(({ session, event, computed_step_count, playbook_name }) => ({
       ...session,
       event,
       step_count: session.step_count ?? computed_step_count,
+      playbook_name: playbook_name ?? null,
     }));
     const nextCursor = hasMore ? items[items.length - 1].id : null;
 
@@ -73,14 +76,16 @@ router.get("/:id", async (req, res) => {
         session: sessionsTable,
         event: eventsTable,
         computed_step_count: stepStats.computed_step_count,
+        playbook_name: playbooksTable.name,
       })
       .from(sessionsTable)
       .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
       .leftJoin(stepStats, eq(sessionsTable.id, stepStats.session_id))
+      .leftJoin(playbooksTable, eq(sessionsTable.playbook_id, playbooksTable.id))
       .where(eq(sessionsTable.id, id));
 
     if (!row) return res.status(404).json({ error: "Session not found" });
-    return res.json({ ...row.session, event: row.event, step_count: row.session.step_count ?? row.computed_step_count });
+    return res.json({ ...row.session, event: row.event, step_count: row.session.step_count ?? row.computed_step_count, playbook_name: row.playbook_name ?? null });
   } catch (err) {
     logger.error({ err }, "Failed to get session");
     return res.status(500).json({ error: "Failed to get session" });

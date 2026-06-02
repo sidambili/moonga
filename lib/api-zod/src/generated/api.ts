@@ -158,6 +158,8 @@ export const ListSessionsResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -211,6 +213,8 @@ export const GetSessionResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -261,6 +265,8 @@ export const RetrySessionResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -356,6 +362,8 @@ export const ListArtifactsResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -418,6 +426,8 @@ export const GetArtifactResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -477,6 +487,8 @@ export const ApproveArtifactResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -536,6 +548,8 @@ export const RejectArtifactResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -599,6 +613,8 @@ export const EditArtifactResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -658,6 +674,8 @@ export const PostArtifactToLinearResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
   "updated_at": zod.string(),
   "event": zod.object({
@@ -848,6 +866,131 @@ export const UpdateModelSettingsResponse = zod.object({
   "api_key_set": zod.boolean().optional(),
   "base_url": zod.string().nullish(),
   "updated_at": zod.string()
+})
+
+
+/**
+ * @summary List all playbooks
+ */
+export const ListPlaybooksResponseItem = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "name": zod.string(),
+  "objective": zod.string().describe('diagnose | plan'),
+  "trigger_source": zod.string().nullish().describe('linear | github | sentry | null (null = any source)'),
+  "instructions": zod.string(),
+  "source": zod.string().describe('system | user'),
+  "is_active": zod.boolean(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+export const ListPlaybooksResponse = zod.array(ListPlaybooksResponseItem)
+
+
+/**
+ * @summary Create a user playbook
+ */
+export const CreatePlaybookBody = zod.object({
+  "slug": zod.string(),
+  "name": zod.string(),
+  "objective": zod.string(),
+  "trigger_source": zod.string().nullish(),
+  "instructions": zod.string()
+})
+
+
+/**
+ * @summary Update a playbook (system playbooks allow instructions + is_active only)
+ */
+export const UpdatePlaybookParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdatePlaybookBody = zod.object({
+  "name": zod.string().optional(),
+  "instructions": zod.string().optional(),
+  "trigger_source": zod.string().nullish(),
+  "is_active": zod.boolean().optional()
+})
+
+export const UpdatePlaybookResponse = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "name": zod.string(),
+  "objective": zod.string().describe('diagnose | plan'),
+  "trigger_source": zod.string().nullish().describe('linear | github | sentry | null (null = any source)'),
+  "instructions": zod.string(),
+  "source": zod.string().describe('system | user'),
+  "is_active": zod.boolean(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+
+
+/**
+ * @summary Delete a user playbook (system playbooks cannot be deleted)
+ */
+export const DeletePlaybookParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary List all skills
+ */
+export const ListSkillsResponseItem = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "name": zod.string(),
+  "content": zod.string(),
+  "source": zod.string().describe('system | user'),
+  "is_active": zod.boolean(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+export const ListSkillsResponse = zod.array(ListSkillsResponseItem)
+
+
+/**
+ * @summary Create a user skill
+ */
+export const CreateSkillBody = zod.object({
+  "slug": zod.string(),
+  "name": zod.string(),
+  "content": zod.string()
+})
+
+
+/**
+ * @summary Update a skill
+ */
+export const UpdateSkillParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSkillBody = zod.object({
+  "name": zod.string().optional(),
+  "content": zod.string().optional(),
+  "is_active": zod.boolean().optional()
+})
+
+export const UpdateSkillResponse = zod.object({
+  "id": zod.number(),
+  "slug": zod.string(),
+  "name": zod.string(),
+  "content": zod.string(),
+  "source": zod.string().describe('system | user'),
+  "is_active": zod.boolean(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+
+
+/**
+ * @summary Delete a user skill (system skills cannot be deleted)
+ */
+export const DeleteSkillParams = zod.object({
+  "id": zod.coerce.number()
 })
 
 

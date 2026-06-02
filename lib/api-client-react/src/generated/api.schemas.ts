@@ -87,6 +87,10 @@ export interface Session {
   tool_calls_count?: number | null;
   /** @nullable */
   duration_ms?: number | null;
+  /** @nullable */
+  playbook_id?: number | null;
+  /** @nullable */
+  playbook_name?: string | null;
   created_at: string;
   updated_at: string;
   event?: Event;
@@ -167,6 +171,66 @@ export interface ArtifactList {
 
 export interface ArtifactEdit {
   content: string;
+}
+
+export interface Playbook {
+  id: number;
+  slug: string;
+  name: string;
+  /** diagnose | plan */
+  objective: string;
+  /**
+     * linear | github | sentry | null (null = any source)
+     * @nullable
+     */
+  trigger_source?: string | null;
+  instructions: string;
+  /** system | user */
+  source: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlaybookCreate {
+  slug: string;
+  name: string;
+  objective: string;
+  /** @nullable */
+  trigger_source?: string | null;
+  instructions: string;
+}
+
+export interface PlaybookEdit {
+  name?: string;
+  instructions?: string;
+  /** @nullable */
+  trigger_source?: string | null;
+  is_active?: boolean;
+}
+
+export interface Skill {
+  id: number;
+  slug: string;
+  name: string;
+  content: string;
+  /** system | user */
+  source: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SkillCreate {
+  slug: string;
+  name: string;
+  content: string;
+}
+
+export interface SkillEdit {
+  name?: string;
+  content?: string;
+  is_active?: boolean;
 }
 
 /**

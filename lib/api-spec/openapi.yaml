@@ -21,6 +21,10 @@ tags:
     description: Webhook ingest endpoints
   - name: dashboard
     description: Dashboard summary data
+  - name: playbooks
+    description: Agent playbooks (workflow instructions per objective)
+  - name: skills
+    description: Reusable knowledge snippets injected into every session
 
 paths:
   /healthz:
@@ -545,6 +549,156 @@ paths:
                 $ref: "#/components/schemas/ModelSettings"
 
   # ── Webhook ingest ────────────────────────────────────────────────
+  # ── Playbooks ─────────────────────────────────────────────────────
+  /playbooks:
+    get:
+      operationId: listPlaybooks
+      tags: [playbooks]
+      summary: List all playbooks
+      responses:
+        "200":
+          description: Playbooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Playbook"
+    post:
+      operationId: createPlaybook
+      tags: [playbooks]
+      summary: Create a user playbook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaybookCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Playbook"
+
+  /playbooks/{id}:
+    patch:
+      operationId: updatePlaybook
+      tags: [playbooks]
+      summary: Update a playbook (system playbooks allow instructions + is_active only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaybookEdit"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Playbook"
+        "400":
+          description: Invalid request body
+        "404":
+          description: Playbook not found
+    delete:
+      operationId: deletePlaybook
+      tags: [playbooks]
+      summary: Delete a user playbook (system playbooks cannot be deleted)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: System playbooks cannot be deleted
+        "404":
+          description: Playbook not found
+
+  # ── Skills ────────────────────────────────────────────────────────
+  /skills:
+    get:
+      operationId: listSkills
+      tags: [skills]
+      summary: List all skills
+      responses:
+        "200":
+          description: Skills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Skill"
+    post:
+      operationId: createSkill
+      tags: [skills]
+      summary: Create a user skill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Skill"
+
+  /skills/{id}:
+    patch:
+      operationId: updateSkill
+      tags: [skills]
+      summary: Update a skill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SkillEdit"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Skill"
+    delete:
+      operationId: deleteSkill
+      tags: [skills]
+      summary: Delete a user skill (system skills cannot be deleted)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /webhooks/github:
     post:
       operationId: ingestGithubWebhook
@@ -743,6 +897,10 @@ components:
           type: ["integer", "null"]
         duration_ms:
           type: ["integer", "null"]
+        playbook_id:
+          type: ["integer", "null"]
+        playbook_name:
+          type: ["string", "null"]
         created_at:
           type: string
         updated_at:
@@ -846,6 +1004,104 @@ components:
       properties:
         content:
           type: string
+
+    Playbook:
+      type: object
+      required: [id, slug, name, objective, instructions, source, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        objective:
+          type: string
+          description: "diagnose | plan"
+        trigger_source:
+          type: ["string", "null"]
+          description: "linear | github | sentry | null (null = any source)"
+        instructions:
+          type: string
+        source:
+          type: string
+          description: "system | user"
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    PlaybookCreate:
+      type: object
+      required: [slug, name, objective, instructions]
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        objective:
+          type: string
+        trigger_source:
+          type: ["string", "null"]
+        instructions:
+          type: string
+
+    PlaybookEdit:
+      type: object
+      properties:
+        name:
+          type: string
+        instructions:
+          type: string
+        trigger_source:
+          type: ["string", "null"]
+        is_active:
+          type: boolean
+
+    Skill:
+      type: object
+      required: [id, slug, name, content, source, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        content:
+          type: string
+        source:
+          type: string
+          description: "system | user"
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    SkillCreate:
+      type: object
+      required: [slug, name, content]
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        content:
+          type: string
+
+    SkillEdit:
+      type: object
+      properties:
+        name:
+          type: string
+        content:
+          type: string
+        is_active:
+          type: boolean
 
     Integration:
       type: object
