@@ -62,7 +62,10 @@ async function buildAll() {
       "@swc/*",
       "@aws-sdk/*",
       "@azure/*",
-      "@opentelemetry/*",
+      // NOTE: @opentelemetry/* intentionally NOT externalized. better-auth (now
+      // bundled) statically imports @opentelemetry/api + @opentelemetry/semantic-
+      // conventions, which are pure-JS and aren't hoisted to a resolvable location
+      // at runtime — leaving them external causes ERR_MODULE_NOT_FOUND on startup.
       "@google-cloud/*",
       "@google/*",
       "googleapis",

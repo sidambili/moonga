@@ -144,6 +144,12 @@ overrides:
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
+  # @better-auth/kysely-adapter@1.6.12 imports DEFAULT_MIGRATION_LOCK_TABLE/
+  # DEFAULT_MIGRATION_TABLE from the bare "kysely" entry, but kysely 0.29.x moved
+  # those to the "kysely/migration" subpath — so 0.29.x breaks the esbuild bundle.
+  # Pin to 0.28.17 (within the adapter's own peer range) where they remain on the
+  # main export. better-auth is the only consumer of kysely here (optional peer).
+  kysely: "0.28.17"
 
 allowBuilds:
   esbuild: true
