@@ -8,7 +8,7 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 # Install pnpm (same major version as workspace lockfile)
-RUN npm install -g pnpm@11
+RUN npm install -g pnpm@11.5.0
 
 # Copy workspace manifest and lockfile first for layer caching
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc .dockerignore ./
@@ -44,7 +44,7 @@ RUN chown appuser:appgroup /app
 
 # Install curl for Docker healthchecks and pnpm for runtime dependency management
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-RUN npm install -g pnpm@11
+RUN npm install -g pnpm@11.5.0
 USER appuser
 
 # Copy workspace files + all node_modules from builder
