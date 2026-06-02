@@ -33,7 +33,23 @@ const allowedOrigins = process.env.BETTER_AUTH_TRUSTED_ORIGINS
   ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((o) => o.trim())
   : [];
 
+// Always trust the app's own origin, mirroring auth.ts. The frontend is served
+// from this same origin in production, so same-origin requests (e.g. login POSTs,
+// which always carry an Origin header) must be allowed even when the operator
+// hasn't listed the origin in BETTER_AUTH_TRUSTED_ORIGINS.
+if (process.env.BETTER_AUTH_URL) {
+  const baseOrigin = new URL(process.env.BETTER_AUTH_URL).origin;
+  if (!allowedOrigins.includes(baseOrigin)) {
+    allowedOrigins.push(baseOrigin);
+  }
+}
+
+// Scope CORS to the API only — static assets and the SPA fallback are served from
+// this same origin and must never be gated by the API's CORS policy. (Vite emits
+// its <script>/<link> tags with a crossorigin attribute, so the browser sends an
+// Origin header for /assets/* and a CORS rejection there would 500 the whole app.)
 app.use(
+  "/api",
   cors({
     origin(origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
