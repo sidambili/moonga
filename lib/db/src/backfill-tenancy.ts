@@ -10,6 +10,7 @@
  * Run after `pnpm --filter @workspace/db run push`:
  *   pnpm --filter @workspace/db run backfill
  */
+import "./load-env"; // must precede ./index, which throws if DATABASE_URL is unset
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, pool } from "./index";
