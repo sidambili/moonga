@@ -58,8 +58,6 @@ async function buildAll() {
       "@tensorflow/*",
       "@prisma/client",
       "@mikro-orm/*",
-      "better-auth",
-      "@better-auth/*",
       "@grpc/*",
       "@swc/*",
       "@aws-sdk/*",
