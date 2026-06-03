@@ -127,6 +127,27 @@ router.post("/:id/retry", async (req, res) => {
   }
 });
 
+router.post("/:id/rerun", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [original] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, id));
+    if (!original) return res.status(404).json({ error: "Session not found" });
+
+    const [session] = await db.insert(sessionsTable).values({
+      event_id: original.event_id,
+      objective: original.objective,
+      status: "pending",
+      model_used: null,
+    }).returning();
+
+    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, original.event_id));
+    return res.json({ ...session, event, step_count: 0 });
+  } catch (err) {
+    logger.error({ err }, "Failed to rerun session");
+    return res.status(500).json({ error: "Failed to rerun session" });
+  }
+});
+
 router.get("/:id/steps", async (req, res) => {
   try {
     const id = Number(req.params.id);

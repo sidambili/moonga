@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import {
-  useGetSession, useRetrySession, getGetSessionQueryKey, getListSessionsQueryKey,
+  useGetSession, useRetrySession, useRerunSession, getGetSessionQueryKey, getListSessionsQueryKey,
   useListArtifacts, useApproveArtifact, useRejectArtifact, useEditArtifact, usePostArtifactToLinear,
   getListArtifactsQueryKey,
 } from "@workspace/api-client-react";
@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen } from "lucide-react";
+import { ArrowLeft, RefreshCw, RotateCcw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge, ApprovalBadge, ArtifactTypeBadge, formatEventType, formatObjective, formatSource } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
@@ -256,12 +256,14 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
 export default function SessionDetail() {
   const [, params] = useRoute("/sessions/:id");
   const id = Number(params?.id);
+  const [, navigate] = useLocation();
   const { data: session, isLoading, refetch } = useGetSession(id, { query: { queryKey: getGetSessionQueryKey(id), enabled: !!id } });
   const { data: artifactsData } = useListArtifacts(
     { session_id: id },
     { query: { queryKey: [...getListArtifactsQueryKey(), id], enabled: !!id, refetchInterval: 10_000 } },
   );
   const retryMutation = useRetrySession();
+  const rerunMutation = useRerunSession();
   const queryClient = useQueryClient();
 
   const handleRetry = () => {
@@ -270,6 +272,20 @@ export default function SessionDetail() {
         toast({ title: "Session queued for retry" });
         refetch();
         queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+      },
+    });
+  };
+
+  const handleRerun = () => {
+    rerunMutation.mutate({ id }, {
+      onSuccess: (newSession) => {
+        toast({ title: `Session ${newSession.id} queued for rerun` });
+        queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+        navigate(`/sessions/${newSession.id}`);
+      },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to rerun session", description: message, variant: "destructive" });
       },
     });
   };
@@ -340,12 +356,20 @@ export default function SessionDetail() {
             )}
           </div>
         </div>
-        {(session.status === "failed" || session.status === "rejected") && (
-          <Button variant="outline" size="sm" onClick={handleRetry} disabled={retryMutation.isPending} className="rounded-lg text-sm self-start">
-            <RefreshCw className={`w-3.5 h-3.5 mr-2 ${retryMutation.isPending ? "animate-spin" : ""}`} />
-            Retry Session
-          </Button>
-        )}
+        <div className="flex items-center gap-2 self-start">
+          {(session.status === "failed" || session.status === "rejected") && (
+            <Button variant="outline" size="sm" onClick={handleRetry} disabled={retryMutation.isPending} className="rounded-lg text-sm">
+              <RefreshCw className={`w-3.5 h-3.5 mr-2 ${retryMutation.isPending ? "animate-spin" : ""}`} />
+              Retry Session
+            </Button>
+          )}
+          {session.status !== "pending" && session.status !== "running" && (
+            <Button variant="outline" size="sm" onClick={handleRerun} disabled={rerunMutation.isPending} className="rounded-lg text-sm">
+              <RotateCcw className={`w-3.5 h-3.5 mr-2 ${rerunMutation.isPending ? "animate-spin" : ""}`} />
+              Rerun Session
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Two-column body */}

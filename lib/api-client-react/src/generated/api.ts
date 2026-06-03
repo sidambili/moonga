@@ -850,6 +850,76 @@ export const useRetrySession = <TError = ErrorType<unknown>,
       return useMutation(getRetrySessionMutationOptions(options));
     }
 
+export const getRerunSessionUrl = (id: number,) => {
+
+
+
+
+  return `/api/sessions/${id}/rerun`
+}
+
+/**
+ * @summary Rerun a session with identical input
+ */
+export const rerunSession = async (id: number, options?: RequestInit): Promise<Session> => {
+
+  return customFetch<Session>(getRerunSessionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRerunSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rerunSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rerunSession>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['rerunSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rerunSession>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  rerunSession(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RerunSessionMutationResult = NonNullable<Awaited<ReturnType<typeof rerunSession>>>
+
+    export type RerunSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Rerun a session with identical input
+ */
+export const useRerunSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rerunSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rerunSession>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRerunSessionMutationOptions(options));
+    }
+
 export const getGetSessionStepsUrl = (id: number,) => {
 
 

@@ -226,6 +226,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Session"
 
+  /sessions/{id}/rerun:
+    post:
+      operationId: rerunSession
+      tags: [sessions]
+      summary: Rerun a session with identical input
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: New session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
   /sessions/{id}/steps:
     get:
       operationId: getSessionSteps
