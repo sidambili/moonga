@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { sessionsTable, eventsTable, sessionStepsTable, playbooksTable } from "@workspace/db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { tenantScope, withTenantScope } from "../lib/tenant-scope";
 
 const router = Router();
 
@@ -13,6 +14,8 @@ router.get("/", async (req, res) => {
     const cursorN = cursor ? Number(cursor) : undefined;
 
     const conditions = [];
+    const scope = tenantScope(res, sessionsTable.project_id);
+    if (scope) conditions.push(scope);
     if (status) conditions.push(eq(sessionsTable.status, status));
     if (cursorN) conditions.push(lt(sessionsTable.id, cursorN));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -82,7 +85,7 @@ router.get("/:id", async (req, res) => {
       .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
       .leftJoin(stepStats, eq(sessionsTable.id, stepStats.session_id))
       .leftJoin(playbooksTable, eq(sessionsTable.playbook_id, playbooksTable.id))
-      .where(eq(sessionsTable.id, id));
+      .where(withTenantScope(res, sessionsTable.project_id, eq(sessionsTable.id, id)));
 
     if (!row) return res.status(404).json({ error: "Session not found" });
     return res.json({ ...row.session, event: row.event, step_count: row.session.step_count ?? row.computed_step_count, playbook_name: row.playbook_name ?? null });
@@ -126,6 +129,13 @@ router.post("/:id/retry", async (req, res) => {
 router.get("/:id/steps", async (req, res) => {
   try {
     const id = Number(req.params.id);
+    // Don't expose steps for a session outside the active org.
+    const [sess] = await db
+      .select({ id: sessionsTable.id })
+      .from(sessionsTable)
+      .where(withTenantScope(res, sessionsTable.project_id, eq(sessionsTable.id, id)));
+    if (!sess) return res.status(404).json({ error: "Session not found" });
+
     const steps = await db
       .select()
       .from(sessionStepsTable)
