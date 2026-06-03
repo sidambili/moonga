@@ -6,11 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './activeProject';
 export * from './activityItem';
 export * from './artifact';
 export * from './artifactEdit';
 export * from './artifactList';
 export * from './dashboardSummary';
+export * from './error';
 export * from './event';
 export * from './eventList';
 export * from './eventPayloadRaw';
@@ -29,6 +31,10 @@ export * from './modelSettingsInput';
 export * from './playbook';
 export * from './playbookCreate';
 export * from './playbookEdit';
+export * from './project';
+export * from './projectCreate';
+export * from './projectEdit';
+export * from './projectList';
 export * from './repo';
 export * from './session';
 export * from './sessionContextSnapshot';
@@ -41,5 +47,7 @@ export * from './skill';
 export * from './skillCreate';
 export * from './skillEdit';
 export * from './sourceCount';
+export * from './validationError';
+export * from './validationErrorDetailsItem';
 export * from './webhookAck';
 export * from './webhookPayload';

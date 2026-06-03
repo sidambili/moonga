@@ -40,6 +40,17 @@ export async function getUserPrimaryOrgId(userId: string): Promise<string | null
   return m?.orgId ?? null;
 }
 
+/** The id of an org's oldest (default) project, or null if it has none. */
+export async function getOrgDefaultProjectId(orgId: string): Promise<string | null> {
+  const [p] = await db
+    .select({ id: projectsTable.id })
+    .from(projectsTable)
+    .where(eq(projectsTable.organization_id, orgId))
+    .orderBy(projectsTable.created_at)
+    .limit(1);
+  return p?.id ?? null;
+}
+
 /**
  * Provision a personal organization + default project for a freshly created user
  * and make them its owner. Idempotent: a no-op if the user already belongs to an

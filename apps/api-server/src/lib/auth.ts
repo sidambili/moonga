@@ -1,7 +1,12 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization } from "better-auth/plugins";
-import { db, provisionDefaultTenancy, getUserPrimaryOrgId } from "@workspace/db";
+import {
+  db,
+  provisionDefaultTenancy,
+  getUserPrimaryOrgId,
+  getOrgDefaultProjectId,
+} from "@workspace/db";
 import * as schema from "@workspace/db/schema";
 
 if (!process.env.BETTER_AUTH_SECRET) {
@@ -45,14 +50,25 @@ export const auth = betterAuth({
     },
     session: {
       create: {
-        // Point every new session at the user's (first-owned) org so downstream
-        // tenant scoping always has an active org to read.
+        // Point every new session at the user's (first-owned) org and that org's
+        // default project so downstream tenant scoping always has an active org +
+        // project to read.
         before: async (session) => {
           const orgId = await getUserPrimaryOrgId(session.userId);
           if (!orgId) return;
-          return { data: { ...session, activeOrganizationId: orgId } };
+          const projectId = await getOrgDefaultProjectId(orgId);
+          return {
+            data: { ...session, activeOrganizationId: orgId, activeProjectId: projectId },
+          };
         },
       },
+    },
+  },
+  // activeProjectId is our column, not better-auth's — declaring it as a session
+  // additionalField makes getSession surface it (input:false: server-set only).
+  session: {
+    additionalFields: {
+      activeProjectId: { type: "string", required: false, input: false },
     },
   },
   plugins: [organization()],

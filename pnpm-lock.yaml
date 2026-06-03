@@ -100,6 +100,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/utils':
+        specifier: workspace:*
+        version: link:../../lib/utils
       ai:
         specifier: ^4.3.12
         version: 4.3.19(react@19.1.0)(zod@3.25.76)

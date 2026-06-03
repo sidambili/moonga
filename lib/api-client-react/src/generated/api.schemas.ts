@@ -9,6 +9,19 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface Error {
+  error: string;
+  /** @nullable */
+  message?: string | null;
+}
+
+export type ValidationErrorDetailsItem = { [key: string]: unknown };
+
+export interface ValidationError {
+  error: string;
+  details: ValidationErrorDetailsItem[];
+}
+
 export type EventPayloadRaw = { [key: string]: unknown };
 
 export interface Event {
@@ -326,6 +339,33 @@ export interface ModelSettingsInput {
   api_key?: string | null;
   /** @nullable */
   base_url?: string | null;
+}
+
+export interface Project {
+  id: string;
+  organization_id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectList {
+  items: Project[];
+  /** @nullable */
+  activeProjectId: string | null;
+}
+
+export interface ProjectCreate {
+  name: string;
+}
+
+export interface ProjectEdit {
+  name: string;
+}
+
+export interface ActiveProject {
+  activeProjectId: string;
 }
 
 export interface DashboardSummary {

@@ -870,6 +870,63 @@ export const UpdateModelSettingsResponse = zod.object({
 
 
 /**
+ * @summary List projects in the active organization
+ */
+export const ListProjectsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "organization_id": zod.string(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})),
+  "activeProjectId": zod.string().nullable()
+})
+
+
+/**
+ * @summary Create a project in the active organization
+ */
+export const CreateProjectBody = zod.object({
+  "name": zod.string()
+})
+
+
+/**
+ * @summary Rename a project
+ */
+export const UpdateProjectParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateProjectBody = zod.object({
+  "name": zod.string()
+})
+
+export const UpdateProjectResponse = zod.object({
+  "id": zod.string(),
+  "organization_id": zod.string(),
+  "name": zod.string(),
+  "slug": zod.string(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+
+
+/**
+ * @summary Switch the caller's active project
+ */
+export const ActivateProjectParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ActivateProjectResponse = zod.object({
+  "activeProjectId": zod.string()
+})
+
+
+/**
  * @summary List all playbooks
  */
 export const ListPlaybooksResponseItem = zod.object({
