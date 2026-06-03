@@ -349,7 +349,7 @@ export default function SessionDetail() {
       </div>
 
       {/* Two-column body */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_480px] gap-5 items-start">
 
         {/* Left: content */}
         <div className="space-y-4 min-w-0">
@@ -468,7 +468,7 @@ export default function SessionDetail() {
 
         {/* Right: agent trace — sticky on large screens */}
         <div className="xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)] flex flex-col min-w-0">
-          <SessionTrace sessionId={session.id} totalCost={session.total_cost} />
+          <SessionTrace sessionId={session.id} totalCost={session.total_cost} durationMs={session.duration_ms} />
         </div>
       </div>
     </div>
