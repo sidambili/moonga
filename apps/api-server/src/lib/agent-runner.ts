@@ -367,6 +367,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       type: artifactType,
       content: parsed.content,
       approval_state: "draft",
+      // Inherit tenant scope from the parent session.
+      project_id: session.project_id,
     }).returning({ id: artifactsTable.id });
 
     await persistStep(sessionId, stepNum, "tool", `[System] Created artifact #${insertedArtifact?.id ?? "?"} (type=${artifactType}, approval=draft, ${parsed.content.length} chars)`, undefined, undefined, undefined, "create_artifact");

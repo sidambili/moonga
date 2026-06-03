@@ -1,6 +1,6 @@
 import { Router } from "express";
 import crypto from "crypto";
-import { db } from "@workspace/db";
+import { db, getOrgDefaultProjectId } from "@workspace/db";
 import { eventsTable, sessionsTable, integrationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { GITHUB_EVENT_TYPE_MAP } from "@workspace/constants";
@@ -183,11 +183,34 @@ function extractLinearTicketId(payload: Record<string, unknown>): string | undef
   return id || undefined;
 }
 
+/**
+ * Resolve the project a webhook's data belongs to. Webhooks are unauthenticated,
+ * so there's no active session to read — instead we route by integration: the
+ * (unique-per-provider) integration row names the owning org, and we scope to
+ * that org's default project. Returns null when no integration/org is configured;
+ * read-scoping (tenant-scope.ts) keeps NULL project_id rows visible, so an
+ * unrouted webhook still surfaces rather than vanishing.
+ */
+async function resolveWebhookProjectId(source: string): Promise<string | null> {
+  try {
+    const [row] = await db
+      .select({ orgId: integrationsTable.organization_id })
+      .from(integrationsTable)
+      .where(eq(integrationsTable.provider, source))
+      .limit(1);
+    if (!row?.orgId) return null;
+    return await getOrgDefaultProjectId(row.orgId);
+  } catch {
+    return null;
+  }
+}
+
 async function ingestWebhook(source: string, payload: Record<string, unknown>, repoId?: string) {
   const eventType = detectEventType(source, payload);
   const severity = detectSeverity(source, payload);
   const title = extractTitle(source, payload);
   const ticketId = source === "linear" ? extractLinearTicketId(payload) : undefined;
+  const projectId = await resolveWebhookProjectId(source);
 
   const [event] = await db.insert(eventsTable).values({
     source,
@@ -198,6 +221,7 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>, r
     repo_id: repoId ?? null,
     ticket_id: ticketId ?? null,
     payload_raw: payload,
+    project_id: projectId,
   }).returning();
 
   const objective = (source === "linear" || eventType === "ticket_created") ? "plan" : "diagnose";
@@ -207,6 +231,7 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>, r
     objective,
     status: "pending",
     model_used: null,
+    project_id: projectId,
   }).returning();
 
   await db.update(eventsTable).set({ session_id: session.id, status: "processing" }).where(eq(eventsTable.id, event.id)).returning();
