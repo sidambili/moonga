@@ -4,6 +4,7 @@ import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Za
 import { cn } from "@/lib/format";
 import { ModeToggle } from "@/components/mode-toggle";
 import { OrgSwitcher } from "@/components/org-switcher";
+import { ProjectSwitcher } from "@/components/project-switcher";
 import { authClient } from "@/lib/auth-client";
 
 const nav = [
@@ -172,6 +173,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </span>
             <div className="w-px h-4 bg-border mx-1" />
             <OrgSwitcher />
+            <span className="text-muted-foreground/40 text-sm">/</span>
+            <ProjectSwitcher />
           </div>
 
           {/* Right: action slots */}

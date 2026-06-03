@@ -106,9 +106,14 @@ router.get(
       .where(eq(projectsTable.organization_id, res.locals.activeOrganizationId))
       .orderBy(projectsTable.created_at);
 
+    // Only echo activeProjectId if it belongs to the active org — after an org
+    // switch the session may still point at the previous org's project.
+    const activeProjectId = (res.locals.activeProjectId as string | null) ?? null;
+    const validActiveId = rows.some((r) => r.id === activeProjectId) ? activeProjectId : null;
+
     return res.json({
       items: rows.map(toPublic),
-      activeProjectId: (res.locals.activeProjectId as string | null) ?? null,
+      activeProjectId: validActiveId,
     });
   }),
 );
