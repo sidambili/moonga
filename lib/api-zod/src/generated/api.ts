@@ -927,6 +927,41 @@ export const ActivateProjectResponse = zod.object({
 
 
 /**
+ * @summary List external-resource bindings for projects in the active org
+ */
+export const ListProjectSourcesResponseItem = zod.object({
+  "id": zod.string(),
+  "project_id": zod.string(),
+  "project_name": zod.string().nullish(),
+  "provider": zod.string().describe('linear | github | ...'),
+  "external_id": zod.string().describe('Linear team id, GitHub repo full_name, ...'),
+  "label": zod.string().nullish(),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
+})
+export const ListProjectSourcesResponse = zod.array(ListProjectSourcesResponseItem)
+
+
+/**
+ * @summary Bind an external resource (Linear team / GitHub repo) to a project
+ */
+export const CreateProjectSourceBody = zod.object({
+  "project_id": zod.string(),
+  "provider": zod.string(),
+  "external_id": zod.string(),
+  "label": zod.string().optional()
+})
+
+
+/**
+ * @summary Remove a project source binding
+ */
+export const DeleteProjectSourceParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
  * @summary List all playbooks
  */
 export const ListPlaybooksResponseItem = zod.object({

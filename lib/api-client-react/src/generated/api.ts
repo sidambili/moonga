@@ -45,6 +45,8 @@ import type {
   ProjectCreate,
   ProjectEdit,
   ProjectList,
+  ProjectSource,
+  ProjectSourceCreate,
   Repo,
   Session,
   SessionList,
@@ -2254,6 +2256,224 @@ export const useActivateProject = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getActivateProjectMutationOptions(options));
+    }
+
+export const getListProjectSourcesUrl = () => {
+
+
+
+
+  return `/api/project-sources`
+}
+
+/**
+ * @summary List external-resource bindings for projects in the active org
+ */
+export const listProjectSources = async ( options?: RequestInit): Promise<ProjectSource[]> => {
+
+  return customFetch<ProjectSource[]>(getListProjectSourcesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListProjectSourcesQueryKey = () => {
+    return [
+    `/api/project-sources`
+    ] as const;
+    }
+
+
+export const getListProjectSourcesQueryOptions = <TData = Awaited<ReturnType<typeof listProjectSources>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProjectSources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProjectSourcesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjectSources>>> = ({ signal }) => listProjectSources({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProjectSources>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListProjectSourcesQueryResult = NonNullable<Awaited<ReturnType<typeof listProjectSources>>>
+export type ListProjectSourcesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List external-resource bindings for projects in the active org
+ */
+
+export function useListProjectSources<TData = Awaited<ReturnType<typeof listProjectSources>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProjectSources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListProjectSourcesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateProjectSourceUrl = () => {
+
+
+
+
+  return `/api/project-sources`
+}
+
+/**
+ * @summary Bind an external resource (Linear team / GitHub repo) to a project
+ */
+export const createProjectSource = async (projectSourceCreate: ProjectSourceCreate, options?: RequestInit): Promise<ProjectSource> => {
+
+  return customFetch<ProjectSource>(getCreateProjectSourceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      projectSourceCreate,)
+  }
+);}
+
+
+
+
+export const getCreateProjectSourceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectSource>>, TError,{data: BodyType<ProjectSourceCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectSource>>, TError,{data: BodyType<ProjectSourceCreate>}, TContext> => {
+
+const mutationKey = ['createProjectSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectSource>>, {data: BodyType<ProjectSourceCreate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createProjectSource(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectSourceMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectSource>>>
+    export type CreateProjectSourceMutationBody = BodyType<ProjectSourceCreate>
+    export type CreateProjectSourceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Bind an external resource (Linear team / GitHub repo) to a project
+ */
+export const useCreateProjectSource = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectSource>>, TError,{data: BodyType<ProjectSourceCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectSource>>,
+        TError,
+        {data: BodyType<ProjectSourceCreate>},
+        TContext
+      > => {
+      return useMutation(getCreateProjectSourceMutationOptions(options));
+    }
+
+export const getDeleteProjectSourceUrl = (id: string,) => {
+
+
+
+
+  return `/api/project-sources/${id}`
+}
+
+/**
+ * @summary Remove a project source binding
+ */
+export const deleteProjectSource = async (id: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteProjectSourceUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteProjectSourceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProjectSource>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProjectSource>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteProjectSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProjectSource>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteProjectSource(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteProjectSourceMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProjectSource>>>
+
+    export type DeleteProjectSourceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove a project source binding
+ */
+export const useDeleteProjectSource = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProjectSource>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteProjectSource>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteProjectSourceMutationOptions(options));
     }
 
 export const getListPlaybooksUrl = () => {

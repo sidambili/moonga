@@ -35,6 +35,8 @@ export * from './project';
 export * from './projectCreate';
 export * from './projectEdit';
 export * from './projectList';
+export * from './projectSource';
+export * from './projectSourceCreate';
 export * from './repo';
 export * from './session';
 export * from './sessionContextSnapshot';

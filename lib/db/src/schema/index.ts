@@ -8,5 +8,6 @@ export * from "./session_steps";
 export * from "./auth";
 export * from "./organizations";
 export * from "./projects";
+export * from "./project-sources";
 export * from "./playbooks";
 export * from "./skills";

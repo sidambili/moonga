@@ -368,6 +368,28 @@ export interface ActiveProject {
   activeProjectId: string;
 }
 
+export interface ProjectSource {
+  id: string;
+  project_id: string;
+  /** @nullable */
+  project_name?: string | null;
+  /** linear | github | ... */
+  provider: string;
+  /** Linear team id, GitHub repo full_name, ... */
+  external_id: string;
+  /** @nullable */
+  label?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectSourceCreate {
+  project_id: string;
+  provider: string;
+  external_id: string;
+  label?: string;
+}
+
 export interface DashboardSummary {
   total_events: number;
   pending_review: number;

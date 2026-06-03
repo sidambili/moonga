@@ -5,9 +5,13 @@ import {
   useCreateProject,
   useUpdateProject,
   useActivateProject,
+  useListProjectSources,
+  useCreateProjectSource,
+  useDeleteProjectSource,
   getListProjectsQueryKey,
+  getListProjectSourcesQueryKey,
 } from "@workspace/api-client-react";
-import { Building2, FolderGit2, Users, Check, Trash2, Pencil } from "lucide-react";
+import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +60,12 @@ export function OrganizationSection() {
         canManage={canManage}
         invalidate={() =>
           queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() })
+        }
+      />
+      <ProjectSourcesPanel
+        canManage={canManage}
+        invalidate={() =>
+          queryClient.invalidateQueries({ queryKey: getListProjectSourcesQueryKey() })
         }
       />
       <MembersPanel
@@ -311,6 +321,157 @@ function ProjectsPanel({ canManage, invalidate }: { canManage: boolean; invalida
           />
           <Button className="h-8" onClick={create} disabled={createMutation.isPending || !newName.trim()}>
             Create
+          </Button>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+const SOURCE_PROVIDERS = [
+  { id: "linear", label: "Linear", placeholder: "Linear team ID" },
+  { id: "github", label: "GitHub", placeholder: "owner/repo" },
+] as const;
+
+function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; invalidate: () => void }) {
+  const { data: projectData } = useListProjects();
+  const { data: sources, isLoading } = useListProjectSources();
+  const createMutation = useCreateProjectSource();
+  const deleteMutation = useDeleteProjectSource();
+
+  const projects = projectData?.items ?? [];
+  const [projectId, setProjectId] = useState("");
+  const [provider, setProvider] = useState<string>("linear");
+  const [externalId, setExternalId] = useState("");
+  const [label, setLabel] = useState("");
+
+  // Default the project select to the first project once loaded.
+  useEffect(() => {
+    if (!projectId && projects.length > 0) setProjectId(projects[0].id);
+  }, [projects, projectId]);
+
+  const placeholder =
+    SOURCE_PROVIDERS.find((p) => p.id === provider)?.placeholder ?? "External id";
+
+  const add = () => {
+    if (!projectId || !externalId.trim()) return;
+    createMutation.mutate(
+      { data: { project_id: projectId, provider, external_id: externalId.trim(), label: label.trim() || undefined } },
+      {
+        onSuccess: () => {
+          setExternalId("");
+          setLabel("");
+          invalidate();
+          toast({ title: "Source mapped" });
+        },
+        onError: () => toast({ title: "Failed to map source", description: "That resource may already be mapped.", variant: "destructive" }),
+      },
+    );
+  };
+
+  const remove = (id: string) => {
+    deleteMutation.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: "Source removed" });
+        },
+        onError: () => toast({ title: "Failed to remove source", variant: "destructive" }),
+      },
+    );
+  };
+
+  return (
+    <Panel icon={Plug} title="Project Sources" count={sources?.length}>
+      <div className="px-4 py-2.5 border-b border-border">
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Route inbound webhooks to a project by binding the external resource that sent them — a
+          Linear team id or a GitHub <span className="font-mono">owner/repo</span>. Unmapped
+          resources fall back to the org's default project.
+        </p>
+      </div>
+      {isLoading ? (
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</div>
+      ) : (
+        <table className="w-full">
+          <tbody className="divide-y divide-border">
+            {(sources ?? []).map((s) => (
+              <tr key={s.id} className="hover:bg-muted/40 transition-colors">
+                <td className="px-4 py-2.5 max-w-0">
+                  <p className="text-sm truncate">{s.label || s.external_id}</p>
+                  {s.label && (
+                    <p className="text-[11px] text-muted-foreground truncate font-mono">{s.external_id}</p>
+                  )}
+                </td>
+                <td className="px-4 py-2.5 hidden sm:table-cell">
+                  <span className="text-xs text-muted-foreground capitalize">{s.provider}</span>
+                </td>
+                <td className="px-4 py-2.5 hidden md:table-cell">
+                  <span className="text-xs text-muted-foreground">{s.project_name}</span>
+                </td>
+                <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                  {canManage && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                      title="Remove source"
+                      onClick={() => remove(s.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {(sources?.length ?? 0) === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  No sources mapped yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+
+      {canManage && projects.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-t border-border">
+          <Select value={projectId} onValueChange={setProjectId}>
+            <SelectTrigger className="w-[140px] h-8 text-xs">
+              <SelectValue placeholder="Project" />
+            </SelectTrigger>
+            <SelectContent>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={provider} onValueChange={setProvider}>
+            <SelectTrigger className="w-[110px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SOURCE_PROVIDERS.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            value={externalId}
+            onChange={(e) => setExternalId(e.target.value)}
+            placeholder={placeholder}
+            className="h-8 text-sm bg-muted/40 border-border flex-1 min-w-[140px] font-mono"
+          />
+          <Input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Label (optional)"
+            className="h-8 text-sm bg-muted/40 border-border w-[150px]"
+          />
+          <Button className="h-8" onClick={add} disabled={createMutation.isPending || !projectId || !externalId.trim()}>
+            Map
           </Button>
         </div>
       )}
