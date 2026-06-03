@@ -7,6 +7,5 @@
     "rootDir": "src",
     "types": ["node"]
   },
-  "include": ["src"],
-  "references": [{ "path": "../utils" }]
+  "include": ["src"]
 }

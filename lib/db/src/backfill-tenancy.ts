@@ -11,7 +11,7 @@
  *   pnpm --filter @workspace/db run backfill
  */
 import "./load-env"; // must precede ./index, which throws if DATABASE_URL is unset
-import { randomUUID } from "node:crypto";
+import { newId } from "@workspace/utils";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, pool } from "./index";
 import {
@@ -40,7 +40,7 @@ async function main() {
   if (!org) {
     [org] = await db
       .insert(organization)
-      .values({ id: randomUUID(), name: "Default", slug: DEFAULT_SLUG })
+      .values({ id: newId(), name: "Default", slug: DEFAULT_SLUG })
       .returning();
     console.log(`created default organization ${org.id}`);
   }
@@ -54,7 +54,7 @@ async function main() {
   if (!project) {
     [project] = await db
       .insert(projectsTable)
-      .values({ id: randomUUID(), organization_id: org.id, name: "Default", slug: DEFAULT_SLUG })
+      .values({ id: newId(), organization_id: org.id, name: "Default", slug: DEFAULT_SLUG })
       .returning();
     console.log(`created default project ${project.id}`);
   }
@@ -69,7 +69,7 @@ async function main() {
       .limit(1);
     if (!existing) {
       await db.insert(member).values({
-        id: randomUUID(),
+        id: newId(),
         organizationId: org.id,
         userId: u.id,
         role: "owner",

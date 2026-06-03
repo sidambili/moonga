@@ -429,6 +429,9 @@ importers:
 
   lib/db:
     dependencies:
+      '@workspace/utils':
+        specifier: workspace:*
+        version: link:../utils
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.28.17)(pg@8.20.0)
@@ -454,6 +457,12 @@ importers:
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
+
+  lib/utils:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
 
 packages:
 
