@@ -349,6 +349,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     // reaches the human gate. Advisory only: a critic failure never fails the
     // session. Runs here (before the totals UPDATE) so its tokens are counted.
     let criticReview: string | null = null;
+    let criticUsage: { promptTokens: number; completionTokens: number; totalTokens: number; cost: number } | undefined;
+    let criticVerdict: string | null = null;
+    let criticFailed: string | null = null;
     try {
       const critic = await generateObject({
         model: modelConfig,
@@ -366,6 +369,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         }),
       });
       const r = critic.object;
+      criticVerdict = r.verdict;
       criticReview = [
         `Verdict: ${r.verdict} · premise ${r.premise_sound ? "sound" : "QUESTIONABLE"}`,
         r.blocking_issues.length ? `\n**Blocking:**\n${r.blocking_issues.map((b) => `- ${b.issue} — ${b.why}`).join("\n")}` : "",
@@ -374,15 +378,27 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         r.nits.length ? `\n**Nits:**\n${r.nits.map((s) => `- ${s}`).join("\n")}` : "",
       ].filter(Boolean).join("\n");
       if (critic.usage) {
-        totalPromptTokens += critic.usage.promptTokens;
-        totalCompletionTokens += critic.usage.completionTokens;
-        totalTokens += critic.usage.totalTokens;
-        totalCost += await estimateCost(modelString, {
+        const cost = await estimateCost(modelString, {
           promptTokens: critic.usage.promptTokens,
           completionTokens: critic.usage.completionTokens,
         });
+        criticUsage = {
+          promptTokens: critic.usage.promptTokens,
+          completionTokens: critic.usage.completionTokens,
+          totalTokens: critic.usage.totalTokens,
+          cost,
+        };
+        totalPromptTokens += criticUsage.promptTokens;
+        totalCompletionTokens += criticUsage.completionTokens;
+        totalTokens += criticUsage.totalTokens;
+        totalCost += cost;
       }
+      logger.info(
+        { sessionId, verdict: r.verdict, premiseSound: r.premise_sound, blocking: r.blocking_issues.length, tokens: criticUsage?.totalTokens, cost: criticUsage?.cost },
+        "Critic pass complete",
+      );
     } catch (criticErr) {
+      criticFailed = criticErr instanceof Error ? criticErr.message : String(criticErr);
       logger.warn({ err: criticErr, sessionId }, "Critic pass failed — continuing without review");
     }
 
@@ -420,7 +436,10 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     stepNum++;
 
     if (criticReview) {
-      await persistStep(sessionId, stepNum, "tool", `[System] Plan review (adversarial critic)\n\n${criticReview}`, modelString, undefined, undefined, "critic_review");
+      await persistStep(sessionId, stepNum, "tool", `[System] Plan review (adversarial critic)\n\n${criticReview}`, modelString, criticUsage, undefined, "critic_review", { verdict: criticVerdict });
+      stepNum++;
+    } else if (criticFailed) {
+      await persistStep(sessionId, stepNum, "tool", `[System] Plan review skipped — critic pass failed: ${criticFailed}`, modelString, undefined, undefined, "critic_review", { success: false, error: criticFailed });
       stepNum++;
     }
 
