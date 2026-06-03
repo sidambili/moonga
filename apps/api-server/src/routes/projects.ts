@@ -81,6 +81,24 @@ async function insertProject(orgId: string, name: string) {
   throw new Error("Failed to insert project");
 }
 
+async function updateProjectName(project: typeof projectsTable.$inferSelect, name: string) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const slug = await uniqueProjectSlug(project.organization_id, name, project.id);
+    try {
+      const [row] = await db
+        .update(projectsTable)
+        .set({ name, slug, updated_at: new Date() })
+        .where(eq(projectsTable.id, project.id))
+        .returning();
+      return row;
+    } catch (err) {
+      if (isUniqueViolation(err) && attempt === 0) continue;
+      throw err;
+    }
+  }
+  throw new Error("Failed to update project");
+}
+
 /** Load a project that belongs to the caller's active org, or null. */
 async function getOwnedProject(res: any, projectId: string) {
   const orgId = res.locals.activeOrganizationId as string | null;
@@ -155,14 +173,9 @@ router.patch(
     const existing = await getOwnedProject(res, req.params.id);
     if (!existing) return res.status(404).json({ error: "not_found" });
 
-    const slug = await uniqueProjectSlug(existing.organization_id, parsed.data.name, existing.id);
     let row: typeof projectsTable.$inferSelect;
     try {
-      [row] = await db
-        .update(projectsTable)
-        .set({ name: parsed.data.name, slug, updated_at: new Date() })
-        .where(eq(projectsTable.id, existing.id))
-        .returning();
+      row = await updateProjectName(existing, parsed.data.name);
     } catch (err) {
       if (isUniqueViolation(err)) return res.status(409).json({ error: "duplicate_slug" });
       throw err;

@@ -173,7 +173,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </span>
             <div className="w-px h-4 bg-border mx-1" />
             <OrgSwitcher />
-            <span className="text-muted-foreground/40 text-sm">/</span>
             <ProjectSwitcher />
           </div>
 

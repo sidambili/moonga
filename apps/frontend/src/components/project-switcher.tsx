@@ -44,10 +44,13 @@ export function ProjectSwitcher() {
   // Single project: nothing to switch to — render a plain label.
   if (projects.length === 1) {
     return (
-      <span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-        <FolderGit2 className="w-3.5 h-3.5" />
-        <span className="truncate max-w-40">{projects[0].name}</span>
-      </span>
+      <>
+        <span className="text-muted-foreground/40 text-sm">/</span>
+        <span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+          <FolderGit2 className="w-3.5 h-3.5" />
+          <span className="truncate max-w-40">{projects[0].name}</span>
+        </span>
+      </>
     );
   }
 
@@ -64,42 +67,45 @@ export function ProjectSwitcher() {
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        disabled={activateMutation.isPending}
-        className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-60 focus:outline-none"
-      >
-        <FolderGit2 className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="truncate max-w-40">{active?.name ?? "Select project"}</span>
-        <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Projects</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {projects.map((p) => (
-          <DropdownMenuItem
-            key={p.id}
-            onSelect={() => handleSelect(p.id)}
-            className="flex items-center justify-between gap-2 cursor-pointer"
-          >
-            <span className="truncate">{p.name}</span>
-            <Check
-              className={cn(
-                "w-3.5 h-3.5 shrink-0",
-                p.id === active?.id ? "opacity-100 text-primary" : "opacity-0"
-              )}
-            />
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={() => navigate("/settings")}
-          className="flex items-center gap-2 cursor-pointer text-muted-foreground"
+    <>
+      <span className="text-muted-foreground/40 text-sm">/</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          disabled={activateMutation.isPending}
+          className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
-          <Settings2 className="w-3.5 h-3.5" />
-          Manage projects
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <FolderGit2 className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="truncate max-w-40">{active?.name ?? "Select project"}</span>
+          <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuLabel className="text-xs text-muted-foreground">Projects</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {projects.map((p) => (
+            <DropdownMenuItem
+              key={p.id}
+              onSelect={() => handleSelect(p.id)}
+              className="flex items-center justify-between gap-2 cursor-pointer"
+            >
+              <span className="truncate">{p.name}</span>
+              <Check
+                className={cn(
+                  "w-3.5 h-3.5 shrink-0",
+                  p.id === active?.id ? "opacity-100 text-primary" : "opacity-0"
+                )}
+              />
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => navigate("/settings")}
+            className="flex items-center gap-2 cursor-pointer text-muted-foreground"
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            Manage projects
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }

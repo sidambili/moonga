@@ -638,6 +638,12 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ProjectSource"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     post:
       operationId: createProjectSource
       tags: [projects]
@@ -655,6 +661,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProjectSource"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Source already mapped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /project-sources/{id}:
     delete:
@@ -670,6 +700,18 @@ paths:
       responses:
         "204":
           description: Deleted
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Source not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   # ── Playbooks ─────────────────────────────────────────────────────
   /playbooks:

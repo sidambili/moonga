@@ -11,7 +11,7 @@ import {
   getListProjectsQueryKey,
   getListProjectSourcesQueryKey,
 } from "@workspace/api-client-react";
-import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug } from "lucide-react";
+import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -344,6 +344,7 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
   const [provider, setProvider] = useState<string>("linear");
   const [externalId, setExternalId] = useState("");
   const [label, setLabel] = useState("");
+  const [pendingSourceId, setPendingSourceId] = useState<string | null>(null);
 
   // Default the project select to the first project once loaded.
   useEffect(() => {
@@ -370,6 +371,8 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
   };
 
   const remove = (id: string) => {
+    if (pendingSourceId === id) return;
+    setPendingSourceId(id);
     deleteMutation.mutate(
       { id },
       {
@@ -378,6 +381,7 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
           toast({ title: "Source removed" });
         },
         onError: () => toast({ title: "Failed to remove source", variant: "destructive" }),
+        onSettled: () => setPendingSourceId(null),
       },
     );
   };
@@ -396,35 +400,46 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
       ) : (
         <table className="w-full">
           <tbody className="divide-y divide-border">
-            {(sources ?? []).map((s) => (
-              <tr key={s.id} className="hover:bg-muted/40 transition-colors">
-                <td className="px-4 py-2.5 max-w-0">
-                  <p className="text-sm truncate">{s.label || s.external_id}</p>
-                  {s.label && (
-                    <p className="text-[11px] text-muted-foreground truncate font-mono">{s.external_id}</p>
-                  )}
-                </td>
-                <td className="px-4 py-2.5 hidden sm:table-cell">
-                  <span className="text-xs text-muted-foreground capitalize">{s.provider}</span>
-                </td>
-                <td className="px-4 py-2.5 hidden md:table-cell">
-                  <span className="text-xs text-muted-foreground">{s.project_name}</span>
-                </td>
-                <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                  {canManage && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                      title="Remove source"
-                      onClick={() => remove(s.id)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {(sources ?? []).map((s) => {
+              const isRemoving = pendingSourceId === s.id;
+
+              return (
+                <tr key={s.id} className="hover:bg-muted/40 transition-colors">
+                  <td className="px-4 py-2.5 max-w-0">
+                    <p className="text-sm truncate">{s.label || s.external_id}</p>
+                    {s.label && (
+                      <p className="text-[11px] text-muted-foreground truncate font-mono">{s.external_id}</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 hidden sm:table-cell">
+                    <span className="text-xs text-muted-foreground capitalize">{s.provider}</span>
+                  </td>
+                  <td className="px-4 py-2.5 hidden md:table-cell">
+                    <span className="text-xs text-muted-foreground">{s.project_name}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    {canManage && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                        title={isRemoving ? "Removing source" : "Remove source"}
+                        aria-label={isRemoving ? "Removing source" : "Remove source"}
+                        aria-busy={isRemoving}
+                        onClick={() => remove(s.id)}
+                        disabled={isRemoving}
+                      >
+                        {isRemoving ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
             {(sources?.length ?? 0) === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">
