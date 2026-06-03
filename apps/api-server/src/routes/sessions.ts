@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { sessionsTable, eventsTable, sessionStepsTable, playbooksTable } from "@workspace/db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { subscribeToSession } from "../lib/session-stream";
 import { tenantScope, withTenantScope } from "../lib/tenant-scope";
 
 const router = Router();
@@ -146,6 +147,31 @@ router.get("/:id/steps", async (req, res) => {
     logger.error({ err }, "Failed to get session steps");
     return res.status(500).json({ error: "Failed to get session steps" });
   }
+});
+
+router.get("/:id/stream", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid session id" });
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  // Send a keep-alive comment immediately
+  res.write(":ok\n\n");
+
+  const unsubscribe = subscribeToSession(id, (step) => {
+    res.write(`data: ${JSON.stringify(step)}\n\n`);
+  });
+
+  req.on("close", () => {
+    unsubscribe();
+    res.end();
+  });
 });
 
 export default router;

@@ -15,6 +15,7 @@ import { createGithubTools } from "./integrations/github-ai-tools";
 import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt } from "./ai/prompts";
 import { parseAgentOutput } from "./ai/output";
 import { loadPlaybook, loadActiveSkills } from "./playbook-loader";
+import { emitStep } from "./session-stream";
 
 const MAX_STEPS = 15;
 const MAX_TOOL_CALLS = 30;
@@ -51,7 +52,7 @@ async function persistStep(
   toolName?: string,
   toolResult?: unknown,
 ) {
-  await db.insert(sessionStepsTable).values({
+  const [row] = await db.insert(sessionStepsTable).values({
     session_id: sessionId,
     step_number: stepNumber,
     role: role as "user" | "assistant" | "tool",
@@ -64,7 +65,9 @@ async function persistStep(
     prompt_tokens: usage?.promptTokens ?? null,
     completion_tokens: usage?.completionTokens ?? null,
     cost: usage?.cost ?? null,
-  });
+  }).returning();
+  if (row) emitStep(sessionId, row);
+  return row;
 }
 
 function getModelConfig(settings: NonNullable<Awaited<ReturnType<typeof getModelSettings>>>, modelString: string) {

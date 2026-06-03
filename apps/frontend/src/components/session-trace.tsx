@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useGetSessionSteps, getGetSessionStepsQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect, useRef } from "react";
 import type { SessionStep } from "@workspace/api-client-react";
 import {
   ChevronDown,
@@ -552,9 +551,57 @@ interface SessionTraceProps {
 }
 
 export default function SessionTrace({ sessionId, totalCost, durationMs }: SessionTraceProps) {
-  const { data: steps, isLoading } = useGetSessionSteps(sessionId, {
-    query: { queryKey: getGetSessionStepsQueryKey(sessionId), enabled: !!sessionId },
-  });
+  const [steps, setSteps] = useState<SessionStep[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLive, setIsLive] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setSteps([]);
+    setIsLive(false);
+
+    // 1. Load initial steps via REST
+    fetch(`/api/sessions/${sessionId}/steps`)
+      .then((r) => r.json())
+      .then((data: SessionStep[]) => {
+        setSteps(data);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
+
+    // 2. Open SSE for live updates
+    const es = new EventSource(`/api/sessions/${sessionId}/stream`);
+    es.onmessage = (e) => {
+      try {
+        const step = JSON.parse(e.data) as SessionStep;
+        setSteps((prev) => {
+          if (prev.some((s) => s.id === step.id)) return prev;
+          return [...prev, step].sort((a, b) => a.step_number - b.step_number);
+        });
+        setIsLive(true);
+      } catch {
+        // ignore malformed events
+      }
+    };
+    es.onerror = () => {
+      setIsLive(false);
+      es.close();
+    };
+
+    return () => {
+      es.close();
+    };
+  }, [sessionId]);
+
+  // Auto-scroll to bottom when new steps arrive while live
+  useEffect(() => {
+    if (isLive && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [steps, isLive]);
 
   const groups = steps ? buildVisualGroups(steps) : [];
   const totalTok = steps?.reduce((s, st) => s + (st.tokens_used ?? 0), 0) ?? 0;
@@ -568,7 +615,18 @@ export default function SessionTrace({ sessionId, totalCost, durationMs }: Sessi
     <div className="rounded-lg border border-border bg-card overflow-hidden flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
-        <span className="text-sm font-medium">Agent Trace</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Agent Trace</span>
+          {isLive && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+              </span>
+              Live
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           {steps && steps.length > 0 && (
             <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -596,7 +654,7 @@ export default function SessionTrace({ sessionId, totalCost, durationMs }: Sessi
       </div>
 
       {/* Scrollable feed */}
-      <div className="overflow-y-auto flex-1 min-h-0">
+      <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-12 text-xs text-muted-foreground">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
