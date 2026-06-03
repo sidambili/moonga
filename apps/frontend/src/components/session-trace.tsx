@@ -289,7 +289,7 @@ function ArtifactOutputRow({ step, parsed }: { step: SessionStep; parsed: Artifa
       {open && (
         <div className="pb-2 space-y-1">
           <div className="px-4 pl-11 pb-1.5">
-            <p className="text-[13px] text-foreground/65 leading-relaxed">{parsed.summary}</p>
+            <p className="text-[13px] text-muted-foreground/70 leading-relaxed">{parsed.summary}</p>
           </div>
           <div>
             <button
@@ -301,11 +301,11 @@ function ArtifactOutputRow({ step, parsed }: { step: SessionStep; parsed: Artifa
               ) : (
                 <ChevronRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
               )}
-              <span className="text-[11px] text-muted-foreground/50">Show full content</span>
+              <span className="text-[11px] text-muted-foreground/60">Show full content</span>
             </button>
             {showFull && (
               <div className="px-4 pb-2 pl-14">
-                <pre className="text-[11px] font-mono text-foreground/50 whitespace-pre-wrap overflow-auto max-h-64 rounded bg-muted/30 p-2 leading-relaxed">
+                <pre className="text-[11px] font-mono text-muted-foreground/60 whitespace-pre-wrap overflow-auto max-h-64 rounded bg-muted/30 p-2 leading-relaxed">
                   {step.content}
                 </pre>
               </div>
@@ -400,12 +400,12 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
       {open && (
         <div className="px-4 pb-2 pl-16 space-y-1.5">
           {item.args != null && (
-            <pre className="text-[11px] font-mono text-foreground/50 whitespace-pre-wrap overflow-auto max-h-32 rounded bg-muted/30 p-2 leading-relaxed">
+            <pre className="text-[11px] font-mono text-muted-foreground/60 whitespace-pre-wrap overflow-auto max-h-32 rounded bg-muted/30 p-2 leading-relaxed">
               {JSON.stringify(item.args, null, 2)}
             </pre>
           )}
           {resultText && (
-            <pre className="text-[11px] font-mono text-foreground/50 whitespace-pre-wrap overflow-auto max-h-40 rounded bg-muted/30 p-2 leading-relaxed">
+            <pre className="text-[11px] font-mono text-muted-foreground/60 whitespace-pre-wrap overflow-auto max-h-40 rounded bg-muted/30 p-2 leading-relaxed">
               {resultText}
             </pre>
           )}
@@ -427,7 +427,7 @@ function ThinkingRow({ step, durationMs }: { step: SessionStep; durationMs?: num
         className={`w-full flex items-start gap-3 px-4 py-1.5 transition-colors text-left ${hasContent ? "hover:bg-muted/10 cursor-pointer" : ""}`}
       >
         <Brain className="w-4 h-4 text-muted-foreground/40 mt-0.5 flex-shrink-0" />
-        <span className="text-[13px] text-muted-foreground/70 flex-1 min-w-0">
+        <span className="text-[13px] text-foreground/80 flex-1 min-w-0">
           Thought
           {durationMs != null && (
             <span className="text-muted-foreground/40"> for {formatDuration(durationMs)}</span>
@@ -448,8 +448,8 @@ function ThinkingRow({ step, durationMs }: { step: SessionStep; durationMs?: num
       </button>
       {open && hasContent && (
         <div className="px-4 pb-3 pl-11">
-          <div className="text-[13px] text-foreground/60 leading-relaxed">
-            <Markdown>{step.content ?? ""}</Markdown>
+          <div className="text-[13px] text-muted-foreground/70 leading-relaxed max-h-64 overflow-y-auto">
+            <Markdown className="prose-p:text-muted-foreground/70 prose-strong:text-muted-foreground/70 prose-li:text-muted-foreground/70">{step.content ?? ""}</Markdown>
           </div>
         </div>
       )}
@@ -478,7 +478,7 @@ function ToolGroupRow({
         className="w-full flex items-start gap-3 px-4 py-2 hover:bg-muted/10 transition-colors text-left"
       >
         <MainIcon className="w-4 h-4 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
-        <span className={`text-[13px] flex-1 min-w-0 truncate ${isSystem ? "text-muted-foreground/50" : "text-foreground/80"}`}>
+        <span className="text-[13px] flex-1 min-w-0 truncate text-foreground/80">
           {summary}
         </span>
         {tok && (
@@ -501,8 +501,8 @@ function ToolGroupRow({
         <div className="pb-1">
           {call.role === "assistant" && call.content && (
             <div className="px-4 pb-2 pl-11">
-              <div className="text-[12px] text-muted-foreground/50 leading-relaxed">
-                <Markdown>{call.content}</Markdown>
+              <div className="text-[12px] text-muted-foreground/60 leading-relaxed">
+                <Markdown className="prose-p:text-muted-foreground/50 prose-strong:text-muted-foreground/50 prose-li:text-muted-foreground/50">{call.content}</Markdown>
               </div>
             </div>
           )}
@@ -525,7 +525,7 @@ function UserRow({ step }: { step: SessionStep }) {
         className="w-full flex items-start gap-3 px-4 py-1.5 hover:bg-muted/10 transition-colors text-left"
       >
         <User className="w-4 h-4 text-muted-foreground/40 mt-0.5 flex-shrink-0" />
-        <span className="text-[13px] text-muted-foreground/60 flex-1 min-w-0">Instructions</span>
+        <span className="text-[13px] text-foreground/80 flex-1 min-w-0">Instructions</span>
         {open ? (
           <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/25 flex-shrink-0 mt-0.5" />
         ) : (
@@ -534,7 +534,7 @@ function UserRow({ step }: { step: SessionStep }) {
       </button>
       {open && step.content && (
         <div className="px-4 pb-2 pl-11">
-          <pre className="text-[12px] font-mono text-foreground/50 whitespace-pre-wrap overflow-auto max-h-48 rounded bg-muted/30 p-2 leading-relaxed">
+          <pre className="text-[12px] font-mono text-muted-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded bg-muted/30 p-2 leading-relaxed">
             {step.content}
           </pre>
         </div>
