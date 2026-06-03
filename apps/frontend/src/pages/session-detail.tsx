@@ -492,7 +492,7 @@ export default function SessionDetail() {
 
         {/* Right: agent trace — sticky on large screens */}
         <div className="xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)] flex flex-col min-w-0">
-          <SessionTrace sessionId={session.id} totalCost={session.total_cost} durationMs={session.duration_ms} />
+          <SessionTrace sessionId={session.id} status={session.status} totalCost={session.total_cost} durationMs={session.duration_ms} />
         </div>
       </div>
     </div>

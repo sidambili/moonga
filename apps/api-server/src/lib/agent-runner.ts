@@ -211,16 +211,6 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   try {
     const maxTokens = session.objective === "plan" ? 10_000 : 4_000;
 
-    const result = await generateText({
-      model: modelConfig,
-      system: systemPrompt,
-      prompt: userPrompt,
-      maxSteps: MAX_STEPS,
-      maxTokens,
-      tools: createGithubTools(ghClient, repo, checkToolLimit),
-    });
-
-    // Accumulate session aggregates while persisting steps
     let stepNum = 1;
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
@@ -228,35 +218,43 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     let totalCost = 0;
     let toolCallsCount = 0;
 
-    for (const step of result.steps) {
-      const stepUsage = step.usage ? {
-        promptTokens: step.usage.promptTokens,
-        completionTokens: step.usage.completionTokens,
-        totalTokens: step.usage.totalTokens,
-        cost: await estimateCost(modelString, {
+    const result = await generateText({
+      model: modelConfig,
+      system: systemPrompt,
+      prompt: userPrompt,
+      maxSteps: MAX_STEPS,
+      maxTokens,
+      tools: createGithubTools(ghClient, repo, checkToolLimit),
+      onStepFinish: async (step) => {
+        const stepUsage = step.usage ? {
           promptTokens: step.usage.promptTokens,
           completionTokens: step.usage.completionTokens,
-        }),
-      } : undefined;
+          totalTokens: step.usage.totalTokens,
+          cost: await estimateCost(modelString, {
+            promptTokens: step.usage.promptTokens,
+            completionTokens: step.usage.completionTokens,
+          }),
+        } : undefined;
 
-      if (stepUsage) {
-        totalPromptTokens += stepUsage.promptTokens;
-        totalCompletionTokens += stepUsage.completionTokens;
-        totalTokens += stepUsage.totalTokens;
-        totalCost += stepUsage.cost;
-      }
-      toolCallsCount += step.toolCalls?.length ?? 0;
+        if (stepUsage) {
+          totalPromptTokens += stepUsage.promptTokens;
+          totalCompletionTokens += stepUsage.completionTokens;
+          totalTokens += stepUsage.totalTokens;
+          totalCost += stepUsage.cost;
+        }
+        toolCallsCount += step.toolCalls?.length ?? 0;
 
-      if (step.text || (step.toolCalls && step.toolCalls.length > 0)) {
-        await persistStep(sessionId, stepNum, "assistant", step.text ?? "", modelString, stepUsage, step.toolCalls as unknown[]);
-      }
+        if (step.text || (step.toolCalls && step.toolCalls.length > 0)) {
+          await persistStep(sessionId, stepNum, "assistant", step.text ?? "", modelString, stepUsage, step.toolCalls as unknown[]);
+        }
 
-      for (const tr of step.toolResults ?? []) {
-        await persistStep(sessionId, stepNum, "tool", String(tr.result ?? "No result"), modelString, undefined, undefined, tr.toolName, tr.result);
-      }
+        for (const tr of step.toolResults ?? []) {
+          await persistStep(sessionId, stepNum, "tool", String(tr.result ?? "No result"), modelString, undefined, undefined, tr.toolName, tr.result);
+        }
 
-      stepNum++;
-    }
+        stepNum++;
+      },
+    });
 
     let finalTextRaw = result.text;
     let retryUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
