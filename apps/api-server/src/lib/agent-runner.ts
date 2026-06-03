@@ -12,7 +12,7 @@ import { gatherLinearContext, extractLinearTicketInfo } from "./integrations/lin
 import { extractSlackMessageInfo, getSlackBotToken, postSlackReply } from "./integrations/slack-client";
 import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEventContext } from "./integrations/github-context";
 import { createGithubTools } from "./integrations/github-ai-tools";
-import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt } from "./ai/prompts";
+import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt, CRITIC_SYSTEM_PROMPT, buildCriticPrompt } from "./ai/prompts";
 import { parseAgentOutput } from "./ai/output";
 import { loadPlaybook, loadActiveSkills } from "./playbook-loader";
 import { emitStep } from "./session-stream";
@@ -51,12 +51,14 @@ async function persistStep(
   toolCalls?: unknown[],
   toolName?: string,
   toolResult?: unknown,
+  reasoning?: string,
 ) {
   const [row] = await db.insert(sessionStepsTable).values({
     session_id: sessionId,
     step_number: stepNumber,
     role: role as "user" | "assistant" | "tool",
     content: content.slice(0, 50_000) || null,
+    reasoning: reasoning?.slice(0, 50_000) || null,
     tool_calls: toolCalls ?? null,
     tool_name: toolName ?? null,
     tool_result: toolResult !== undefined ? toolResult : null,
@@ -224,6 +226,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       prompt: userPrompt,
       maxSteps: MAX_STEPS,
       maxTokens,
+      temperature: 0,
       tools: createGithubTools(ghClient, repo, checkToolLimit),
       onStepFinish: async (step) => {
         const stepUsage = step.usage ? {
@@ -245,7 +248,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         toolCallsCount += step.toolCalls?.length ?? 0;
 
         if (step.text || (step.toolCalls && step.toolCalls.length > 0)) {
-          await persistStep(sessionId, stepNum, "assistant", step.text ?? "", modelString, stepUsage, step.toolCalls as unknown[]);
+          await persistStep(sessionId, stepNum, "assistant", step.text ?? "", modelString, stepUsage, step.toolCalls as unknown[], undefined, step.reasoning ?? undefined);
         }
 
         for (const tr of step.toolResults ?? []) {
@@ -342,6 +345,47 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       return;
     }
 
+    // Adversarial critic pass — a fresh, skeptical review of the plan before it
+    // reaches the human gate. Advisory only: a critic failure never fails the
+    // session. Runs here (before the totals UPDATE) so its tokens are counted.
+    let criticReview: string | null = null;
+    try {
+      const critic = await generateObject({
+        model: modelConfig,
+        system: CRITIC_SYSTEM_PROMPT,
+        prompt: buildCriticPrompt(ticketInfo, parsed.content),
+        temperature: 0,
+        maxTokens: 2_000,
+        schema: z.object({
+          verdict: z.enum(["ship", "revise", "reject"]),
+          premise_sound: z.boolean(),
+          blocking_issues: z.array(z.object({ issue: z.string(), why: z.string() })),
+          over_engineering: z.array(z.string()),
+          simplest_alternative: z.string(),
+          nits: z.array(z.string()),
+        }),
+      });
+      const r = critic.object;
+      criticReview = [
+        `Verdict: ${r.verdict} · premise ${r.premise_sound ? "sound" : "QUESTIONABLE"}`,
+        r.blocking_issues.length ? `\n**Blocking:**\n${r.blocking_issues.map((b) => `- ${b.issue} — ${b.why}`).join("\n")}` : "",
+        r.over_engineering.length ? `\n**Over-engineering:**\n${r.over_engineering.map((s) => `- ${s}`).join("\n")}` : "",
+        r.simplest_alternative ? `\n**Simplest alternative:** ${r.simplest_alternative}` : "",
+        r.nits.length ? `\n**Nits:**\n${r.nits.map((s) => `- ${s}`).join("\n")}` : "",
+      ].filter(Boolean).join("\n");
+      if (critic.usage) {
+        totalPromptTokens += critic.usage.promptTokens;
+        totalCompletionTokens += critic.usage.completionTokens;
+        totalTokens += critic.usage.totalTokens;
+        totalCost += await estimateCost(modelString, {
+          promptTokens: critic.usage.promptTokens,
+          completionTokens: critic.usage.completionTokens,
+        });
+      }
+    } catch (criticErr) {
+      logger.warn({ err: criticErr, sessionId }, "Critic pass failed — continuing without review");
+    }
+
     await db
       .update(sessionsTable)
       .set({
@@ -374,6 +418,11 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
     await persistStep(sessionId, stepNum, "tool", `[System] Created artifact #${insertedArtifact?.id ?? "?"} (type=${artifactType}, approval=draft, ${parsed.content.length} chars)`, undefined, undefined, undefined, "create_artifact");
     stepNum++;
+
+    if (criticReview) {
+      await persistStep(sessionId, stepNum, "tool", `[System] Plan review (adversarial critic)\n\n${criticReview}`, modelString, undefined, undefined, "critic_review");
+      stepNum++;
+    }
 
     await db
       .update(eventsTable)
