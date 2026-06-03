@@ -135,6 +135,8 @@ export interface SessionStep {
   /** @nullable */
   content?: string | null;
   /** @nullable */
+  reasoning?: string | null;
+  /** @nullable */
   tool_calls?: SessionStepToolCallsItem[] | null;
   /** @nullable */
   tool_call_id?: string | null;

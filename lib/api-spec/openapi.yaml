@@ -1183,6 +1183,8 @@ components:
           description: "user | assistant | tool"
         content:
           type: ["string", "null"]
+        reasoning:
+          type: ["string", "null"]
         tool_calls:
           type: ["array", "null"]
           items:

@@ -353,6 +353,7 @@ export const GetSessionStepsResponseItem = zod.object({
   "step_number": zod.number(),
   "role": zod.string().describe('user | assistant | tool'),
   "content": zod.string().nullish(),
+  "reasoning": zod.string().nullish(),
   "tool_calls": zod.array(zod.object({
 
 }).passthrough()).nullish(),

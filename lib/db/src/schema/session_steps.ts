@@ -8,6 +8,7 @@ export const sessionStepsTable = pgTable("session_steps", {
   step_number: integer("step_number").notNull(),
   role: text("role").notNull(), // "user" | "assistant" | "tool"
   content: text("content"),
+  reasoning: text("reasoning"), // model reasoning/thinking chain
   tool_calls: jsonb("tool_calls"), // array of tool call definitions
   tool_call_id: text("tool_call_id"), // which tool call this result belongs to
   tool_name: text("tool_name"),
