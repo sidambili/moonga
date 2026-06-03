@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useGetModelSettings,
   useUpdateModelSettings,
@@ -28,14 +28,15 @@ export function ModelSection() {
   const [planModel, setPlanModel]       = useState("gpt-4o");
   const [apiKey, setApiKey]             = useState("");
   const [baseUrl, setBaseUrl]           = useState("");
+  const hydrated = useRef(false);
 
   useEffect(() => {
-    if (settings) {
-      setProvider(settings.provider);
-      setTriageModel(settings.triage_model);
-      setPlanModel(settings.plan_model);
-      setBaseUrl(settings.base_url || "");
-    }
+    if (!settings || hydrated.current) return;
+    setProvider(settings.provider);
+    setTriageModel(settings.triage_model);
+    setPlanModel(settings.plan_model);
+    setBaseUrl(settings.base_url || "");
+    hydrated.current = true;
   }, [settings]);
 
   const handleSave = () => {
@@ -201,7 +202,7 @@ export function ModelSection() {
           <div className="p-4 space-y-4">
             {ROUTING_MODES.map((r) => (
               <div key={r.tag} className="flex items-start gap-3">
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-primary/10 text-primary flex-shrink-0 mt-0.5">
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-primary/10 text-primary shrink-0 mt-0.5">
                   {r.tag}
                 </span>
                 <p className="text-xs text-muted-foreground leading-relaxed">{r.desc}</p>

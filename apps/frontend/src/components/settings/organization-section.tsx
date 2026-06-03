@@ -336,6 +336,8 @@ function MembersPanel({
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
   const [busy, setBusy] = useState(false);
+  const [removeMemberPendingId, setRemoveMemberPendingId] = useState<string | null>(null);
+  const [cancelInvitePendingId, setCancelInvitePendingId] = useState<string | null>(null);
 
   const invite = async () => {
     if (!inviteEmail.trim()) return;
@@ -356,26 +358,38 @@ function MembersPanel({
   };
 
   const removeMember = async (memberId: string) => {
-    const { error } = await authClient.organization.removeMember({
-      memberIdOrEmail: memberId,
-      organizationId: orgId,
-    });
-    if (error) {
-      toast({ title: "Failed to remove member", description: error.message, variant: "destructive" });
-      return;
+    if (removeMemberPendingId === memberId) return;
+    setRemoveMemberPendingId(memberId);
+    try {
+      const { error } = await authClient.organization.removeMember({
+        memberIdOrEmail: memberId,
+        organizationId: orgId,
+      });
+      if (error) {
+        toast({ title: "Failed to remove member", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Member removed" });
+      onChanged();
+    } finally {
+      setRemoveMemberPendingId(null);
     }
-    toast({ title: "Member removed" });
-    onChanged();
   };
 
   const cancelInvite = async (invitationId: string) => {
-    const { error } = await authClient.organization.cancelInvitation({ invitationId });
-    if (error) {
-      toast({ title: "Failed to cancel invite", description: error.message, variant: "destructive" });
-      return;
+    if (cancelInvitePendingId === invitationId) return;
+    setCancelInvitePendingId(invitationId);
+    try {
+      const { error } = await authClient.organization.cancelInvitation({ invitationId });
+      if (error) {
+        toast({ title: "Failed to cancel invite", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Invitation cancelled" });
+      onChanged();
+    } finally {
+      setCancelInvitePendingId(null);
     }
-    toast({ title: "Invitation cancelled" });
-    onChanged();
   };
 
   return (
@@ -399,6 +413,7 @@ function MembersPanel({
                     className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                     title="Remove member"
                     onClick={() => removeMember(m.id)}
+                    disabled={removeMemberPendingId === m.id}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
@@ -431,6 +446,7 @@ function MembersPanel({
                         variant="ghost"
                         className="h-7 text-xs text-muted-foreground hover:text-destructive"
                         onClick={() => cancelInvite(inv.id)}
+                        disabled={cancelInvitePendingId === inv.id}
                       >
                         Cancel
                       </Button>
@@ -454,7 +470,7 @@ function MembersPanel({
             className="h-8 text-sm bg-muted/40 border-border"
           />
           <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "member" | "admin")}>
-            <SelectTrigger className="w-[110px] h-8 text-xs">
+            <SelectTrigger className="w-28 h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

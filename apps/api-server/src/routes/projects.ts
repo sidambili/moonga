@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod/v4";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db, projectsTable, session as authSession } from "@workspace/db";
 import { newId, uniqueSlug } from "@workspace/utils";
 import { logger } from "../lib/logger";
@@ -28,25 +28,57 @@ function toPublic(row: typeof projectsTable.$inferSelect) {
 }
 
 function asyncHandler(fn: (req: any, res: any) => Promise<any>) {
-  return (req: any, res: any) => {
+  return (req: any, res: any, next: any) => {
     Promise.resolve(fn(req, res)).catch((err) => {
       logger.error({ err }, "Unhandled projects route error");
-      res.status(500).json({ error: "internal_error", message: err?.message });
+      if (res.headersSent) {
+        return next(err);
+      }
+      return res.status(500).json({ error: "internal_error" });
     });
   };
 }
 
+function isUniqueViolation(err: unknown) {
+  return typeof err === "object" && err !== null && "code" in err && err.code === "23505";
+}
+
 /** A unique project slug within one organization. */
-function uniqueProjectSlug(orgId: string, name: string): Promise<string> {
+function uniqueProjectSlug(orgId: string, name: string, excludeProjectId?: string): Promise<string> {
   const exists = async (slug: string) => {
     const [row] = await db
       .select({ id: projectsTable.id })
       .from(projectsTable)
-      .where(and(eq(projectsTable.organization_id, orgId), eq(projectsTable.slug, slug)))
+      .where(
+        excludeProjectId
+          ? and(
+              eq(projectsTable.organization_id, orgId),
+              eq(projectsTable.slug, slug),
+              ne(projectsTable.id, excludeProjectId),
+            )
+          : and(eq(projectsTable.organization_id, orgId), eq(projectsTable.slug, slug)),
+      )
       .limit(1);
     return Boolean(row);
   };
   return uniqueSlug(name, exists, { fallback: "project" });
+}
+
+async function insertProject(orgId: string, name: string) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const slug = await uniqueProjectSlug(orgId, name);
+    try {
+      const [row] = await db
+        .insert(projectsTable)
+        .values({ id: newId(), organization_id: orgId, name, slug })
+        .returning();
+      return row;
+    } catch (err) {
+      if (isUniqueViolation(err) && attempt === 0) continue;
+      throw err;
+    }
+  }
+  throw new Error("Failed to insert project");
 }
 
 /** Load a project that belongs to the caller's active org, or null. */
@@ -93,11 +125,13 @@ router.post(
       return res.status(400).json({ error: "validation_error", details: parsed.error.issues });
     }
     const orgId = res.locals.activeOrganizationId as string;
-    const slug = await uniqueProjectSlug(orgId, parsed.data.name);
-    const [row] = await db
-      .insert(projectsTable)
-      .values({ id: newId(), organization_id: orgId, name: parsed.data.name, slug })
-      .returning();
+    let row: typeof projectsTable.$inferSelect;
+    try {
+      row = await insertProject(orgId, parsed.data.name);
+    } catch (err) {
+      if (isUniqueViolation(err)) return res.status(409).json({ error: "duplicate_slug" });
+      throw err;
+    }
     return res.status(201).json(toPublic(row));
   }),
 );
@@ -116,11 +150,18 @@ router.patch(
     const existing = await getOwnedProject(res, req.params.id);
     if (!existing) return res.status(404).json({ error: "not_found" });
 
-    const [row] = await db
-      .update(projectsTable)
-      .set({ name: parsed.data.name, updated_at: new Date() })
-      .where(eq(projectsTable.id, existing.id))
-      .returning();
+    const slug = await uniqueProjectSlug(existing.organization_id, parsed.data.name, existing.id);
+    let row: typeof projectsTable.$inferSelect;
+    try {
+      [row] = await db
+        .update(projectsTable)
+        .set({ name: parsed.data.name, slug, updated_at: new Date() })
+        .where(eq(projectsTable.id, existing.id))
+        .returning();
+    } catch (err) {
+      if (isUniqueViolation(err)) return res.status(409).json({ error: "duplicate_slug" });
+      throw err;
+    }
     return res.json(toPublic(row));
   }),
 );
