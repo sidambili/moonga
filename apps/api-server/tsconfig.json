@@ -16,6 +16,9 @@
       "path": "../../lib/db"
     },
     {
+      "path": "../../lib/utils"
+    },
+    {
       "path": "../../lib/api-zod"
     }
   ]

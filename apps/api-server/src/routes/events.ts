@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { eventsTable } from "@workspace/db";
 import { eq, desc, and, lt } from "drizzle-orm";
+import { tenantScope, withTenantScope } from "../lib/tenant-scope";
 
 const router = Router();
 
@@ -12,6 +13,8 @@ router.get("/", async (req, res) => {
     const cursorN = cursor ? Number(cursor) : undefined;
 
     const conditions = [];
+    const scope = tenantScope(res, eventsTable.project_id);
+    if (scope) conditions.push(scope);
     if (source) conditions.push(eq(eventsTable.source, source));
     if (severity) conditions.push(eq(eventsTable.severity, severity));
     if (status) conditions.push(eq(eventsTable.status, status));
@@ -39,7 +42,10 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, id));
+    const [event] = await db
+      .select()
+      .from(eventsTable)
+      .where(withTenantScope(res, eventsTable.project_id, eq(eventsTable.id, id)));
     if (!event) return res.status(404).json({ error: "Event not found" });
     return res.json(event);
   } catch {

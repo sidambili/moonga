@@ -22,6 +22,13 @@ export const session = pgTable("session", {
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  // Set by better-auth's organization plugin when a user switches active org.
+  activeOrganizationId: text("active_organization_id"),
+  // Active project within the active org. Mirrors activeOrganizationId but is
+  // ours, not better-auth's: stamped on session create and updated by the
+  // POST /api/projects/{id}/activate endpoint. Declared as a session
+  // additionalField in auth.ts so getSession surfaces it.
+  activeProjectId: text("active_project_id"),
 });
 
 export const account = pgTable("account", {

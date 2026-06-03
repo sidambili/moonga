@@ -1,8 +1,8 @@
 import { Router } from "express";
 import crypto from "crypto";
-import { db } from "@workspace/db";
-import { eventsTable, sessionsTable, integrationsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, getOrgDefaultProjectId } from "@workspace/db";
+import { eventsTable, sessionsTable, integrationsTable, projectSourcesTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 import { GITHUB_EVENT_TYPE_MAP } from "@workspace/constants";
 
 const router = Router();
@@ -183,11 +183,67 @@ function extractLinearTicketId(payload: Record<string, unknown>): string | undef
   return id || undefined;
 }
 
+/**
+ * The external resource id a webhook should be routed by — the key we match
+ * against project_sources. Linear routes by team id, GitHub by repo full_name.
+ * Other sources have no binding key yet, so they fall back to the org default.
+ */
+function extractSourceExternalId(source: string, payload: Record<string, unknown>): string | undefined {
+  if (source === "linear") return getLinearTeamId(payload);
+  if (source === "github") {
+    const repo = payload.repository as Record<string, unknown> | undefined;
+    return (repo?.full_name as string | undefined) || undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the project a webhook's data belongs to. Webhooks are unauthenticated,
+ * so there's no active session to read. Two-step routing:
+ *   1. project_sources binding — the external resource (Linear team / GitHub repo)
+ *      explicitly mapped to a project. This is how two repos reach two projects.
+ *   2. fallback — the source's integration names an org; use that org's default
+ *      project. Keeps unmapped resources flowing into a sensible bucket.
+ * Returns null when nothing resolves; read-scoping (tenant-scope.ts) keeps NULL
+ * project_id rows visible, so an unrouted webhook still surfaces.
+ */
+async function resolveWebhookProjectId(
+  source: string,
+  payload: Record<string, unknown>,
+): Promise<string | null> {
+  const externalId = extractSourceExternalId(source, payload);
+  if (externalId) {
+    try {
+      const [binding] = await db
+        .select({ projectId: projectSourcesTable.project_id })
+        .from(projectSourcesTable)
+        .where(and(eq(projectSourcesTable.provider, source), eq(projectSourcesTable.external_id, externalId)))
+        .limit(1);
+      if (binding?.projectId) return binding.projectId;
+    } catch {
+      // fall through to the org-default fallback
+    }
+  }
+
+  try {
+    const [row] = await db
+      .select({ orgId: integrationsTable.organization_id })
+      .from(integrationsTable)
+      .where(eq(integrationsTable.provider, source))
+      .limit(1);
+    if (!row?.orgId) return null;
+    return await getOrgDefaultProjectId(row.orgId);
+  } catch {
+    return null;
+  }
+}
+
 async function ingestWebhook(source: string, payload: Record<string, unknown>, repoId?: string) {
   const eventType = detectEventType(source, payload);
   const severity = detectSeverity(source, payload);
   const title = extractTitle(source, payload);
   const ticketId = source === "linear" ? extractLinearTicketId(payload) : undefined;
+  const projectId = await resolveWebhookProjectId(source, payload);
 
   const [event] = await db.insert(eventsTable).values({
     source,
@@ -198,6 +254,7 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>, r
     repo_id: repoId ?? null,
     ticket_id: ticketId ?? null,
     payload_raw: payload,
+    project_id: projectId,
   }).returning();
 
   const objective = (source === "linear" || eventType === "ticket_created") ? "plan" : "diagnose";
@@ -207,6 +264,7 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>, r
     objective,
     status: "pending",
     model_used: null,
+    project_id: projectId,
   }).returning();
 
   await db.update(eventsTable).set({ session_id: session.id, status: "processing" }).where(eq(eventsTable.id, event.id)).returning();

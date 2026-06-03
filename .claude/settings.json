@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter @workspace/frontend run typecheck)",
+      "Bash(pnpm --filter @workspace/api-server run typecheck)",
+      "Bash(pnpm --filter @workspace/api-spec run codegen)",
+      "Bash(pnpm --filter @workspace/db run push)"
+    ]
+  }
+}

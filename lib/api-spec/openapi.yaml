@@ -548,6 +548,171 @@ paths:
               schema:
                 $ref: "#/components/schemas/ModelSettings"
 
+  # ── Projects ──────────────────────────────────────────────────────
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List projects in the active organization
+      responses:
+        "200":
+          description: Projects + the caller's active project id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectList"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project in the active organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Rename a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectEdit"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}/activate:
+    post:
+      operationId: activateProject
+      tags: [projects]
+      summary: Switch the caller's active project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Active project switched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveProject"
+
+  # ── Project sources ───────────────────────────────────────────────
+  /project-sources:
+    get:
+      operationId: listProjectSources
+      tags: [projects]
+      summary: List external-resource bindings for projects in the active org
+      responses:
+        "200":
+          description: Project sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectSource"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createProjectSource
+      tags: [projects]
+      summary: Bind an external resource (Linear team / GitHub repo) to a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectSourceCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSource"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Source already mapped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /project-sources/{id}:
+    delete:
+      operationId: deleteProjectSource
+      tags: [projects]
+      summary: Remove a project source binding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Source not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   # ── Playbooks ─────────────────────────────────────────────────────
   /playbooks:
     get:
@@ -1282,6 +1447,93 @@ components:
           type: ["string", "null"]
         base_url:
           type: ["string", "null"]
+
+    # ── Projects ────────────────────────────────────────────────────
+
+    Project:
+      type: object
+      required: [id, organization_id, name, slug, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        organization_id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    ProjectList:
+      type: object
+      required: [items, activeProjectId]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+        activeProjectId:
+          type: ["string", "null"]
+
+    ProjectCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    ProjectEdit:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    ActiveProject:
+      type: object
+      required: [activeProjectId]
+      properties:
+        activeProjectId:
+          type: string
+
+    ProjectSource:
+      type: object
+      required: [id, project_id, provider, external_id, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        project_name:
+          type: ["string", "null"]
+        provider:
+          type: string
+          description: "linear | github | ..."
+        external_id:
+          type: string
+          description: "Linear team id, GitHub repo full_name, ..."
+        label:
+          type: ["string", "null"]
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    ProjectSourceCreate:
+      type: object
+      required: [project_id, provider, external_id]
+      properties:
+        project_id:
+          type: string
+        provider:
+          type: string
+        external_id:
+          type: string
+        label:
+          type: string
 
     # ── Dashboard ───────────────────────────────────────────────────
 

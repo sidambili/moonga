@@ -3,6 +3,8 @@ import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Radio, Cpu, FileCheck2, Webhook, Settings, X, Menu, Zap, LogOut, Bell, Search, RefreshCw, BookOpen } from "lucide-react";
 import { cn } from "@/lib/format";
 import { ModeToggle } from "@/components/mode-toggle";
+import { OrgSwitcher } from "@/components/org-switcher";
+import { ProjectSwitcher } from "@/components/project-switcher";
 import { authClient } from "@/lib/auth-client";
 
 const nav = [
@@ -169,6 +171,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="text-sm font-semibold tracking-tight">
               {nav.find((item) => isActive(item.href))?.label ?? "Oncident"}
             </span>
+            <div className="w-px h-4 bg-border mx-1" />
+            <OrgSwitcher />
+            <ProjectSwitcher />
           </div>
 
           {/* Right: action slots */}

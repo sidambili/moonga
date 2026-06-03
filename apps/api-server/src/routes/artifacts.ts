@@ -4,6 +4,7 @@ import { artifactsTable, sessionsTable, eventsTable } from "@workspace/db";
 import { eq, desc, and, lt } from "drizzle-orm";
 import { postLinearComment } from "../lib/integrations/linear-client";
 import { logger } from "../lib/logger";
+import { tenantScope, withTenantScope } from "../lib/tenant-scope";
 
 const router = Router();
 
@@ -22,6 +23,8 @@ router.get("/", async (req, res) => {
     const cursorN = cursor ? Number(cursor) : undefined;
 
     const conditions = [];
+    const scope = tenantScope(res, artifactsTable.project_id);
+    if (scope) conditions.push(scope);
     if (approval_state) conditions.push(eq(artifactsTable.approval_state, approval_state));
     if (session_id) conditions.push(eq(artifactsTable.session_id, Number(session_id)));
     if (cursorN) conditions.push(lt(artifactsTable.id, cursorN));
@@ -57,7 +60,10 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [artifact] = await db.select().from(artifactsTable).where(eq(artifactsTable.id, id));
+    const [artifact] = await db
+      .select()
+      .from(artifactsTable)
+      .where(withTenantScope(res, artifactsTable.project_id, eq(artifactsTable.id, id)));
     if (!artifact) return res.status(404).json({ error: "Artifact not found" });
     return res.json(await hydrateArtifact(artifact));
   } catch {

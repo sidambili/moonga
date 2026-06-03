@@ -1,6 +1,7 @@
 import { pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { projectsTable } from "./projects";
 
 export const eventsTable = pgTable("events", {
   id: serial("id").primaryKey(),
@@ -14,6 +15,7 @@ export const eventsTable = pgTable("events", {
   title: text("title"),
   payload_raw: jsonb("payload_raw").notNull().default({}),
   session_id: integer("session_id"),
+  project_id: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   created_at: timestamp("created_at").notNull().defaultNow(),
 });
 

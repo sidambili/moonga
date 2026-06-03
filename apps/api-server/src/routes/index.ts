@@ -10,6 +10,8 @@ import dashboardRouter from "./dashboard";
 import webhooksRouter from "./webhooks";
 import playbooksRouter from "./playbooks";
 import skillsRouter from "./skills";
+import projectsRouter from "./projects";
+import projectSourcesRouter from "./project-sources";
 import { requireAuth } from "../lib/require-auth";
 
 const router: IRouter = Router();
@@ -28,5 +30,8 @@ router.use("/model-prices", requireAuth, modelPricesRouter);
 router.use("/dashboard", requireAuth, dashboardRouter);
 router.use("/playbooks", requireAuth, playbooksRouter);
 router.use("/skills", requireAuth, skillsRouter);
+// Authz is enforced per-handler (org membership + ownership); see projects.ts.
+router.use("/projects", requireAuth, projectsRouter);
+router.use("/project-sources", requireAuth, projectSourcesRouter);
 
 export default router;

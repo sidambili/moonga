@@ -16,6 +16,7 @@
     "@workspace/api-zod": "workspace:*",
     "@workspace/constants": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/utils": "workspace:*",
     "ai": "^4.3.12",
     "@linear/sdk": "^34.0.0",
     "better-auth": "^1.6.12",
