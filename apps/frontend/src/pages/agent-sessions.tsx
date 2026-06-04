@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useListSessions, getListSessionsQueryKey } from "@workspace/api-client-react";
+import { useListAgentSessions, getListAgentSessionsQueryKey } from "@workspace/api-client-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatRelative } from "@/lib/format";
 import { SourceIcon, StatusBadge, ObjectivePill, formatEventType, formatSource } from "@/components/ui-helpers";
@@ -38,8 +38,8 @@ export default function Sessions() {
     limit: DEFAULT_PAGE_SIZE,
     cursor: currentCursor,
   };
-  const { data: sessionsList, isLoading } = useListSessions(listParams, {
-    query: { queryKey: getListSessionsQueryKey(listParams), refetchInterval: 15000 },
+  const { data: sessionsList, isLoading } = useListAgentSessions(listParams, {
+    query: { queryKey: getListAgentSessionsQueryKey(listParams), refetchInterval: 15000 },
   });
 
   const items = sessionsList?.items ?? [];
@@ -107,7 +107,7 @@ export default function Sessions() {
                 <tr
                   key={session.id}
                   className="hover:bg-muted/40 transition-colors cursor-pointer"
-                  onClick={() => navigate(`/sessions/${session.id}`)}
+                  onClick={() => navigate(`/agent-sessions/${session.id}`)}
                 >
                   <td className="px-4 py-3">
                     <ObjectivePill objective={session.objective} />

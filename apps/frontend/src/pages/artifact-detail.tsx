@@ -193,7 +193,7 @@ export default function ArtifactDetail() {
                 </div>
               </div>
             </div>
-            <Link href={`/sessions/${artifact.session_id}`}>
+            <Link href={`/agent-sessions/${artifact.session_id}`}>
               <Button variant="outline" size="sm" className="w-full rounded-lg text-xs">
                 <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
                 View Session #{artifact.session_id}

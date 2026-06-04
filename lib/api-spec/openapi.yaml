@@ -157,11 +157,11 @@ paths:
         "404":
           description: Not found
 
-  # ── Sessions ──────────────────────────────────────────────────────
-  /sessions:
+  # ── AgentSessions ──────────────────────────────────────────────────────
+  /agent-sessions:
     get:
-      operationId: listSessions
-      tags: [sessions]
+      operationId: listAgentSessions
+      tags: [agent-sessions]
       summary: List all agent sessions
       parameters:
         - name: status
@@ -184,12 +184,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SessionList"
+                $ref: "#/components/schemas/AgentSessionList"
 
-  /sessions/{id}:
+  /agent-sessions/{id}:
     get:
-      operationId: getSession
-      tags: [sessions]
+      operationId: getAgentSession
+      tags: [agent-sessions]
       summary: Get session by ID
       parameters:
         - name: id
@@ -199,18 +199,18 @@ paths:
             type: integer
       responses:
         "200":
-          description: Session
+          description: AgentSession
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Session"
+                $ref: "#/components/schemas/AgentSession"
         "404":
           description: Not found
 
-  /sessions/{id}/retry:
+  /agent-sessions/{id}/retry:
     post:
-      operationId: retrySession
-      tags: [sessions]
+      operationId: retryAgentSession
+      tags: [agent-sessions]
       summary: Retry a failed session
       parameters:
         - name: id
@@ -220,16 +220,16 @@ paths:
             type: integer
       responses:
         "200":
-          description: Session updated
+          description: AgentSession updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Session"
+                $ref: "#/components/schemas/AgentSession"
 
-  /sessions/{id}/rerun:
+  /agent-sessions/{id}/rerun:
     post:
-      operationId: rerunSession
-      tags: [sessions]
+      operationId: rerunAgentSession
+      tags: [agent-sessions]
       summary: Rerun a session with identical input
       parameters:
         - name: id
@@ -243,12 +243,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Session"
+                $ref: "#/components/schemas/AgentSession"
 
-  /sessions/{id}/steps:
+  /agent-sessions/{id}/steps:
     get:
-      operationId: getSessionSteps
-      tags: [sessions]
+      operationId: getAgentSessionSteps
+      tags: [agent-sessions]
       summary: Get reasoning steps for a session
       parameters:
         - name: id
@@ -258,13 +258,13 @@ paths:
             type: integer
       responses:
         "200":
-          description: Session steps
+          description: AgentSession steps
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/SessionStep"
+                  $ref: "#/components/schemas/AgentSessionStep"
 
   # ── Artifacts ─────────────────────────────────────────────────────
   /artifacts:
@@ -1099,7 +1099,7 @@ components:
         hasMore:
           type: boolean
 
-    Session:
+    AgentSession:
       type: object
       required: [id, event_id, objective, status, created_at, updated_at]
       properties:
@@ -1154,21 +1154,21 @@ components:
         event:
           $ref: "#/components/schemas/Event"
 
-    SessionList:
+    AgentSessionList:
       type: object
       required: [items, hasMore]
       properties:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Session"
+            $ref: "#/components/schemas/AgentSession"
         nextCursor:
           type: ["integer", "null"]
           description: ID to pass as `cursor` for the next page
         hasMore:
           type: boolean
 
-    SessionStep:
+    AgentSessionStep:
       type: object
       required: [id, session_id, step_number, role, created_at]
       properties:
@@ -1230,7 +1230,7 @@ components:
         created_at:
           type: string
         session:
-          $ref: "#/components/schemas/Session"
+          $ref: "#/components/schemas/AgentSession"
 
     ArtifactList:
       type: object

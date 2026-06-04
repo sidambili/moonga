@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import type { SessionStep } from "@workspace/api-client-react";
+import type { AgentSessionStep } from "@workspace/api-client-react";
 import {
   ChevronDown,
   ChevronRight,
@@ -62,7 +62,7 @@ type RawToolCall = { toolName?: string; function?: { name: string }; args?: unkn
 type ToolCallItem = {
   name: string;
   args?: unknown;
-  result?: SessionStep;
+  result?: AgentSessionStep;
 };
 
 type ArtifactOutput = {
@@ -143,10 +143,10 @@ function tryParseArtifactOutput(text: string | null | undefined): ArtifactOutput
 }
 
 type VisualGroup =
-  | { kind: "thinking"; step: SessionStep; durationMs?: number }
-  | { kind: "tool_group"; call: SessionStep; items: ToolCallItem[]; isSystem: boolean }
-  | { kind: "user"; step: SessionStep }
-  | { kind: "artifact_output"; step: SessionStep; parsed: ArtifactOutput };
+  | { kind: "thinking"; step: AgentSessionStep; durationMs?: number }
+  | { kind: "tool_group"; call: AgentSessionStep; items: ToolCallItem[]; isSystem: boolean }
+  | { kind: "user"; step: AgentSessionStep }
+  | { kind: "artifact_output"; step: AgentSessionStep; parsed: ArtifactOutput };
 
 function basename(path: string): string {
   return path.split("/").pop() ?? path;
@@ -169,7 +169,7 @@ function toolGroupSummary(items: ToolCallItem[]): string {
   return `${first} and ${extra} other ${extra === 1 ? "action" : "actions"}`;
 }
 
-function buildVisualGroups(steps: SessionStep[]): VisualGroup[] {
+function buildVisualGroups(steps: AgentSessionStep[]): VisualGroup[] {
   const groups: VisualGroup[] = [];
   let i = 0;
 
@@ -192,7 +192,7 @@ function buildVisualGroups(steps: SessionStep[]): VisualGroup[] {
     ) {
       const rawCalls = s.tool_calls as RawToolCall[];
       let j = i + 1;
-      const resultSteps: SessionStep[] = [];
+      const resultSteps: AgentSessionStep[] = [];
       while (j < steps.length && steps[j].role === "tool") {
         resultSteps.push(steps[j]);
         j++;
@@ -261,7 +261,7 @@ function StepIcon({ name, className }: { name: string; className?: string }) {
 
 /* ── Rows ───────────────────────────────────────────────── */
 
-function ArtifactOutputRow({ step, parsed }: { step: SessionStep; parsed: ArtifactOutput }) {
+function ArtifactOutputRow({ step, parsed }: { step: AgentSessionStep; parsed: ArtifactOutput }) {
   const [open, setOpen] = useState(false);
   const [showFull, setShowFull] = useState(false);
   const confidencePct = parsed.confidence != null ? `${Math.round(parsed.confidence * 100)}%` : null;
@@ -414,7 +414,7 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
   );
 }
 
-function ThinkingRow({ step, durationMs }: { step: SessionStep; durationMs?: number }) {
+function ThinkingRow({ step, durationMs }: { step: AgentSessionStep; durationMs?: number }) {
   const [open, setOpen] = useState(false);
   const tok = formatTokenPair(step.prompt_tokens, step.completion_tokens);
   const hasContent = !!step.content && step.content.trim().length > 0;
@@ -461,7 +461,7 @@ function ToolGroupRow({
   items,
   isSystem,
 }: {
-  call: SessionStep;
+  call: AgentSessionStep;
   items: ToolCallItem[];
   isSystem: boolean;
 }) {
@@ -514,7 +514,7 @@ function ToolGroupRow({
   );
 }
 
-function UserRow({ step }: { step: SessionStep }) {
+function UserRow({ step }: { step: AgentSessionStep }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -552,7 +552,7 @@ interface SessionTraceProps {
 }
 
 export default function SessionTrace({ sessionId, status, totalCost, durationMs }: SessionTraceProps) {
-  const [steps, setSteps] = useState<SessionStep[]>([]);
+  const [steps, setSteps] = useState<AgentSessionStep[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasReceivedEvent, setHasReceivedEvent] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -567,9 +567,9 @@ export default function SessionTrace({ sessionId, status, totalCost, durationMs 
     setHasReceivedEvent(false);
 
     // 1. Load initial steps via REST
-    fetch(`/api/sessions/${sessionId}/steps`)
+    fetch(`/api/agent-sessions/${sessionId}/steps`)
       .then((r) => r.json())
-      .then((data: SessionStep[]) => {
+      .then((data: AgentSessionStep[]) => {
         setSteps(data);
         setIsLoading(false);
       })
@@ -579,11 +579,11 @@ export default function SessionTrace({ sessionId, status, totalCost, durationMs 
 
     // 2. Open SSE for live updates only if session is running
     if (isRunning) {
-      const es = new EventSource(`/api/sessions/${sessionId}/stream`);
+      const es = new EventSource(`/api/agent-sessions/${sessionId}/stream`);
       esRef.current = es;
       es.onmessage = (e) => {
         try {
-          const step = JSON.parse(e.data) as SessionStep;
+          const step = JSON.parse(e.data) as AgentSessionStep;
           setSteps((prev) => {
             if (prev.some((s) => s.id === step.id)) return prev;
             return [...prev, step].sort((a, b) => a.step_number - b.step_number);

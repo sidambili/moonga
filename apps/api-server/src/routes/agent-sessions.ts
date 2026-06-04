@@ -115,7 +115,7 @@ router.post("/:id/retry", async (req, res) => {
         duration_ms: null,
         updated_at: new Date(),
       })
-      .where(eq(agentSessionsTable.id, id))
+      .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)))
       .returning();
     if (!updated) return res.status(404).json({ error: "Session not found" });
 
@@ -130,7 +130,10 @@ router.post("/:id/retry", async (req, res) => {
 router.post("/:id/rerun", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [original] = await db.select().from(agentSessionsTable).where(eq(agentSessionsTable.id, id));
+    const [original] = await db
+      .select()
+      .from(agentSessionsTable)
+      .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)));
     if (!original) return res.status(404).json({ error: "Session not found" });
 
     const [session] = await db.insert(agentSessionsTable).values({
@@ -138,6 +141,7 @@ router.post("/:id/rerun", async (req, res) => {
       objective: original.objective,
       status: "pending",
       model_used: null,
+      project_id: original.project_id,
     }).returning();
 
     const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, original.event_id));
@@ -170,10 +174,20 @@ router.get("/:id/steps", async (req, res) => {
   }
 });
 
-router.get("/:id/stream", (req, res) => {
+router.get("/:id/stream", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     res.status(400).json({ error: "Invalid session id" });
+    return;
+  }
+
+  // Don't stream steps for a session outside the active org.
+  const [sess] = await db
+    .select({ id: agentSessionsTable.id })
+    .from(agentSessionsTable)
+    .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)));
+  if (!sess) {
+    res.status(404).json({ error: "Session not found" });
     return;
   }
 

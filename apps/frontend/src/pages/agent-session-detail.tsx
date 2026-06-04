@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import {
-  useGetSession, useRetrySession, useRerunSession, getGetSessionQueryKey, getListSessionsQueryKey,
+  useGetAgentSession, useRetryAgentSession, useRerunAgentSession, getGetAgentSessionQueryKey, getListAgentSessionsQueryKey,
   useListArtifacts, useApproveArtifact, useRejectArtifact, useEditArtifact, usePostArtifactToLinear,
-  getListArtifactsQueryKey, getGetSessionStepsQueryOptions, getGetSessionStepsQueryKey,
+  getListArtifactsQueryKey, getGetAgentSessionStepsQueryOptions, getGetAgentSessionStepsQueryKey,
 } from "@workspace/api-client-react";
 import type { Artifact } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -55,8 +55,8 @@ const VERDICT_STYLES: Record<string, string> = {
 
 function CriticReviewCard({ sessionId }: { sessionId: number }) {
   const { data: steps } = useQuery(
-    getGetSessionStepsQueryOptions(sessionId, {
-      query: { queryKey: getGetSessionStepsQueryKey(sessionId), enabled: !!sessionId, refetchInterval: 10_000 },
+    getGetAgentSessionStepsQueryOptions(sessionId, {
+      query: { queryKey: getGetAgentSessionStepsQueryKey(sessionId), enabled: !!sessionId, refetchInterval: 10_000 },
     }),
   );
   const step = steps?.find((s) => s.tool_name === "critic_review");
@@ -305,16 +305,16 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
 }
 
 export default function SessionDetail() {
-  const [, params] = useRoute("/sessions/:id");
+  const [, params] = useRoute("/agent-sessions/:id");
   const id = Number(params?.id);
   const [, navigate] = useLocation();
-  const { data: session, isLoading, refetch } = useGetSession(id, { query: { queryKey: getGetSessionQueryKey(id), enabled: !!id } });
+  const { data: session, isLoading, refetch } = useGetAgentSession(id, { query: { queryKey: getGetAgentSessionQueryKey(id), enabled: !!id } });
   const { data: artifactsData } = useListArtifacts(
     { session_id: id },
     { query: { queryKey: [...getListArtifactsQueryKey(), id], enabled: !!id, refetchInterval: 10_000 } },
   );
-  const retryMutation = useRetrySession();
-  const rerunMutation = useRerunSession();
+  const retryMutation = useRetryAgentSession();
+  const rerunMutation = useRerunAgentSession();
   const queryClient = useQueryClient();
 
   const handleRetry = () => {
@@ -322,7 +322,7 @@ export default function SessionDetail() {
       onSuccess: () => {
         toast({ title: "Session queued for retry" });
         refetch();
-        queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListAgentSessionsQueryKey() });
       },
     });
   };
@@ -331,8 +331,8 @@ export default function SessionDetail() {
     rerunMutation.mutate({ id }, {
       onSuccess: (newSession) => {
         toast({ title: `Session ${newSession.id} queued for rerun` });
-        queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
-        navigate(`/sessions/${newSession.id}`);
+        queryClient.invalidateQueries({ queryKey: getListAgentSessionsQueryKey() });
+        navigate(`/agent-sessions/${newSession.id}`);
       },
       onError: (err: any) => {
         const message = err?.message || String(err);
@@ -352,7 +352,7 @@ export default function SessionDetail() {
   if (!session) {
     return (
       <div className="px-5 py-5 max-w-6xl mx-auto space-y-4">
-        <Link href="/sessions">
+        <Link href="/agent-sessions">
           <Button variant="ghost" size="sm" className="rounded-lg">
             <ArrowLeft className="w-4 h-4 mr-2" />Back
           </Button>
@@ -371,7 +371,7 @@ export default function SessionDetail() {
     <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/sessions">
+        <Link href="/agent-sessions">
           <Button variant="ghost" size="sm" className="rounded-lg h-8 px-2">
             <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />Sessions
           </Button>

@@ -5,10 +5,10 @@
  * Oncident API
  * OpenAPI spec version: 0.1.0
  */
-import type { SessionStepToolCallsItem } from './sessionStepToolCallsItem';
-import type { SessionStepToolResult } from './sessionStepToolResult';
+import type { AgentSessionStepToolCallsItem } from './agentSessionStepToolCallsItem';
+import type { AgentSessionStepToolResult } from './agentSessionStepToolResult';
 
-export interface SessionStep {
+export interface AgentSessionStep {
   id: number;
   session_id: number;
   step_number: number;
@@ -19,13 +19,13 @@ export interface SessionStep {
   /** @nullable */
   reasoning?: string | null;
   /** @nullable */
-  tool_calls?: SessionStepToolCallsItem[] | null;
+  tool_calls?: AgentSessionStepToolCallsItem[] | null;
   /** @nullable */
   tool_call_id?: string | null;
   /** @nullable */
   tool_name?: string | null;
   /** @nullable */
-  tool_result?: SessionStepToolResult;
+  tool_result?: AgentSessionStepToolResult;
   /** @nullable */
   model?: string | null;
   /** @nullable */

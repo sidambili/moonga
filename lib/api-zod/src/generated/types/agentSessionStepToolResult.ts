@@ -9,4 +9,4 @@
 /**
  * @nullable
  */
-export type SessionContextSnapshot = { [key: string]: unknown } | null;
+export type AgentSessionStepToolResult = { [key: string]: unknown } | null;

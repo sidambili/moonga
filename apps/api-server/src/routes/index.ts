@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import eventsRouter from "./events";
-import sessionsRouter from "./sessions";
+import agentSessionsRouter from "./agent-sessions";
 import artifactsRouter from "./artifacts";
 import integrationsRouter from "./integrations";
 import modelSettingsRouter from "./model-settings";
@@ -22,7 +22,7 @@ router.use("/webhooks", webhooksRouter);
 
 // Protected
 router.use("/events", requireAuth, eventsRouter);
-router.use("/sessions", requireAuth, sessionsRouter);
+router.use("/agent-sessions", requireAuth, agentSessionsRouter);
 router.use("/artifacts", requireAuth, artifactsRouter);
 router.use("/integrations", requireAuth, integrationsRouter);
 router.use("/model-settings", requireAuth, modelSettingsRouter);

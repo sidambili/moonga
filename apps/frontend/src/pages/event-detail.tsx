@@ -99,7 +99,7 @@ export default function EventDetail() {
         {event.session_id && (
           <div className="rounded-xl bg-card border border-primary/20 p-4 space-y-3">
             <p className="text-xs font-medium text-muted-foreground">Linked Agent Session</p>
-            <Link href={`/sessions/${event.session_id}`}>
+            <Link href={`/agent-sessions/${event.session_id}`}>
               <Button variant="outline" className="w-full rounded-lg text-sm">
                 <ExternalLink className="w-3.5 h-3.5 mr-2" />
                 View Session #{event.session_id}

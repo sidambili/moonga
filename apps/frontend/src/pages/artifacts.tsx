@@ -153,7 +153,7 @@ export default function ArtifactsReview() {
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <Link
-                      href={`/sessions/${artifact.session_id}`}
+                      href={`/agent-sessions/${artifact.session_id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="text-xs text-primary hover:underline"
                     >

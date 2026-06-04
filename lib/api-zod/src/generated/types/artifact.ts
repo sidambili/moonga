@@ -5,7 +5,7 @@
  * Oncident API
  * OpenAPI spec version: 0.1.0
  */
-import type { Session } from './session';
+import type { AgentSession } from './agentSession';
 
 export interface Artifact {
   id: number;
@@ -21,5 +21,5 @@ export interface Artifact {
      */
   synced_to_linear_at?: string | null;
   created_at: string;
-  session?: Session;
+  session?: AgentSession;
 }
