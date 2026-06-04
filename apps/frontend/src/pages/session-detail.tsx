@@ -3,10 +3,10 @@ import { useRoute, Link, useLocation } from "wouter";
 import {
   useGetSession, useRetrySession, useRerunSession, getGetSessionQueryKey, getListSessionsQueryKey,
   useListArtifacts, useApproveArtifact, useRejectArtifact, useEditArtifact, usePostArtifactToLinear,
-  getListArtifactsQueryKey,
+  getListArtifactsQueryKey, getGetSessionStepsQueryOptions, getGetSessionStepsQueryKey,
 } from "@workspace/api-client-react";
 import type { Artifact } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, RefreshCw, RotateCcw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen } from "lucide-react";
+import { ArrowLeft, RefreshCw, RotateCcw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen, ShieldAlert } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge, ApprovalBadge, ArtifactTypeBadge, formatEventType, formatObjective, formatSource } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
@@ -44,6 +44,57 @@ function CopyButton({ text }: { text: string }) {
       {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
       <span className="ml-1.5 text-xs">{copied ? "Copied" : "Copy"}</span>
     </Button>
+  );
+}
+
+const VERDICT_STYLES: Record<string, string> = {
+  ship: "bg-green-500/10 text-green-600",
+  revise: "bg-amber-500/10 text-amber-600",
+  reject: "bg-destructive/10 text-destructive",
+};
+
+function CriticReviewCard({ sessionId }: { sessionId: number }) {
+  const { data: steps } = useQuery(
+    getGetSessionStepsQueryOptions(sessionId, {
+      query: { queryKey: getGetSessionStepsQueryKey(sessionId), enabled: !!sessionId, refetchInterval: 10_000 },
+    }),
+  );
+  const step = steps?.find((s) => s.tool_name === "critic_review");
+  if (!step) return null;
+
+  const result = (step.tool_result ?? null) as { verdict?: string | null; success?: boolean; error?: string } | null;
+  const failed = result?.success === false || (step.content ?? "").includes("Plan review skipped");
+
+  const review = (step.content ?? "").replace(/^\[System\] Plan review \(adversarial critic\)\s*/, "").trim();
+  const verdict = (result?.verdict ?? review.match(/verdict:\s*(ship|revise|reject)/i)?.[1] ?? "").toLowerCase();
+
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-3.5 h-3.5 text-muted-foreground" aria-hidden />
+          <span className="text-sm font-medium">Plan Review</span>
+          {!failed && verdict && (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${VERDICT_STYLES[verdict] ?? "bg-muted text-muted-foreground"}`}>
+              {verdict}
+            </span>
+          )}
+          {step.cost != null && (
+            <span className="text-[11px] text-muted-foreground tabular-nums">${step.cost.toFixed(4)}</span>
+          )}
+        </div>
+        {!failed && review && <CopyButton text={review} />}
+      </div>
+      <div className="px-5 py-4">
+        {failed ? (
+          <p className="text-sm text-muted-foreground">
+            Plan review unavailable{result?.error ? ` — ${result.error}` : "."}
+          </p>
+        ) : (
+          <Markdown className="text-sm">{review}</Markdown>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -465,6 +516,9 @@ export default function SessionDetail() {
               <p className="text-sm text-muted-foreground leading-relaxed">{session.output_summary}</p>
             </div>
           )}
+
+          {/* Adversarial critic review of the plan */}
+          <CriticReviewCard sessionId={session.id} />
 
           {/* Inline artifacts */}
           {artifacts.length > 0 && (
