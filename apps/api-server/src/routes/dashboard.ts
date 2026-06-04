@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { eventsTable, sessionsTable, artifactsTable } from "@workspace/db";
+import { eventsTable, agentSessionsTable, artifactsTable } from "@workspace/db";
 import { sql, eq, gte, desc } from "drizzle-orm";
 
 const router = Router();
@@ -20,7 +20,7 @@ router.get("/summary", async (_req, res) => {
     ] = await Promise.all([
       db.select({ total_events: sql<number>`count(*)::int` }).from(eventsTable),
       db.select({ pending_review: sql<number>`count(*)::int` }).from(artifactsTable).where(eq(artifactsTable.approval_state, "draft")),
-      db.select({ sessions_running: sql<number>`count(*)::int` }).from(sessionsTable).where(eq(sessionsTable.status, "running")),
+      db.select({ sessions_running: sql<number>`count(*)::int` }).from(agentSessionsTable).where(eq(agentSessionsTable.status, "running")),
       db.select({ approved_today: sql<number>`count(*)::int` }).from(artifactsTable).where(sql`approval_state = 'approved' AND created_at >= ${today}`),
       db.select({ events_today: sql<number>`count(*)::int` }).from(eventsTable).where(gte(eventsTable.created_at, today)),
       db.select({ critical_open: sql<number>`count(*)::int` }).from(eventsTable).where(sql`severity = 'critical' AND status != 'processed'`),

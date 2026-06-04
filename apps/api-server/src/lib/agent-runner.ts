@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOpenAI } from "@ai-sdk/openai";
 import { db } from "@workspace/db";
-import { sessionsTable, sessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable } from "@workspace/db";
+import { agentSessionsTable, agentSessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost, getModelPrice } from "./model-prices";
@@ -53,7 +53,7 @@ async function persistStep(
   toolResult?: unknown,
   reasoning?: string,
 ) {
-  const [row] = await db.insert(sessionStepsTable).values({
+  const [row] = await db.insert(agentSessionStepsTable).values({
     session_id: sessionId,
     step_number: stepNumber,
     role: role as "user" | "assistant" | "tool",
@@ -95,21 +95,21 @@ function categorizeError(err: unknown): string {
 
 export async function runAgentSession(sessionId: number): Promise<void> {
   await db
-    .update(sessionsTable)
+    .update(agentSessionsTable)
     .set({ status: "running", updated_at: new Date() })
-    .where(eq(sessionsTable.id, sessionId));
+    .where(eq(agentSessionsTable.id, sessionId));
 
   const [row] = await db
-    .select({ session: sessionsTable, event: eventsTable })
-    .from(sessionsTable)
-    .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
-    .where(eq(sessionsTable.id, sessionId));
+    .select({ session: agentSessionsTable, event: eventsTable })
+    .from(agentSessionsTable)
+    .leftJoin(eventsTable, eq(agentSessionsTable.event_id, eventsTable.id))
+    .where(eq(agentSessionsTable.id, sessionId));
 
   if (!row?.event) {
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({ status: "failed", failure_reason: "missing_event", updated_at: new Date() })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
     logger.warn({ sessionId }, "Session has no associated event — marked failed");
     return;
   }
@@ -117,9 +117,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   const settings = await getModelSettings();
   if (!settings?.api_key) {
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({ status: "failed", failure_reason: "missing_api_key", updated_at: new Date() })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
     logger.warn({ sessionId }, "No API key in model settings — session marked failed");
     return;
   }
@@ -168,9 +168,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
   if (playbook) {
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({ playbook_id: playbook.id, updated_at: new Date() })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
   }
 
   const fullContext = [repoInstructions, linearContext, context].filter(Boolean).join("\n\n---\n\n");
@@ -339,9 +339,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     if (!parsed?.content) {
       logger.warn({ sessionId, steps: result.steps.length }, "Agent produced no final text — marking failed");
       await db
-        .update(sessionsTable)
+        .update(agentSessionsTable)
         .set({ status: "failed", failure_reason: "empty_output", model_used: modelString, updated_at: new Date() })
-        .where(eq(sessionsTable.id, sessionId));
+        .where(eq(agentSessionsTable.id, sessionId));
       return;
     }
 
@@ -399,7 +399,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     }
 
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({
         status: "needs_review",
         output_summary: parsed.slack_summary,
@@ -416,7 +416,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         duration_ms: durationMs || null,
         updated_at: new Date(),
       })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
 
     const artifactType = session.objective === "plan" ? "action_plan" : "diagnosis";
     const [insertedArtifact] = await db.insert(artifactsTable).values({
@@ -467,8 +467,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     const reason = categorizeError(err);
     logger.error({ err, sessionId, reason }, "Agent loop failed");
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({ status: "failed", failure_reason: reason, updated_at: new Date() })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
   }
 }

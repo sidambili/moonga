@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { artifactsTable, sessionsTable, eventsTable } from "@workspace/db";
+import { artifactsTable, agentSessionsTable, eventsTable } from "@workspace/db";
 import { eq, desc, and, lt } from "drizzle-orm";
 import { postLinearComment } from "../lib/integrations/linear-client";
 import { logger } from "../lib/logger";
@@ -9,10 +9,10 @@ import { tenantScope, withTenantScope } from "../lib/tenant-scope";
 const router = Router();
 
 async function hydrateArtifact(artifact: typeof artifactsTable.$inferSelect) {
-  const [row] = await db.select({ session: sessionsTable, event: eventsTable })
-    .from(sessionsTable)
-    .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
-    .where(eq(sessionsTable.id, artifact.session_id));
+  const [row] = await db.select({ session: agentSessionsTable, event: eventsTable })
+    .from(agentSessionsTable)
+    .leftJoin(eventsTable, eq(agentSessionsTable.event_id, eventsTable.id))
+    .where(eq(agentSessionsTable.id, artifact.session_id));
   return { ...artifact, session: row ? { ...row.session, event: row.event } : null };
 }
 
@@ -33,12 +33,12 @@ router.get("/", async (req, res) => {
     const rows = await db
       .select({
         artifact: artifactsTable,
-        session: sessionsTable,
+        session: agentSessionsTable,
         event: eventsTable,
       })
       .from(artifactsTable)
-      .leftJoin(sessionsTable, eq(artifactsTable.session_id, sessionsTable.id))
-      .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
+      .leftJoin(agentSessionsTable, eq(artifactsTable.session_id, agentSessionsTable.id))
+      .leftJoin(eventsTable, eq(agentSessionsTable.event_id, eventsTable.id))
       .where(where)
       .orderBy(desc(artifactsTable.id))
       .limit(limitN + 1);
@@ -80,9 +80,9 @@ router.post("/:id/approve", async (req, res) => {
       .returning();
     if (!updated) return res.status(404).json({ error: "Artifact not found" });
 
-    await db.update(sessionsTable)
+    await db.update(agentSessionsTable)
       .set({ status: "approved", updated_at: new Date() })
-      .where(eq(sessionsTable.id, updated.session_id));
+      .where(eq(agentSessionsTable.id, updated.session_id));
 
     return res.json(await hydrateArtifact(updated));
   } catch {
@@ -99,9 +99,9 @@ router.post("/:id/reject", async (req, res) => {
       .returning();
     if (!updated) return res.status(404).json({ error: "Artifact not found" });
 
-    await db.update(sessionsTable)
+    await db.update(agentSessionsTable)
       .set({ status: "rejected", updated_at: new Date() })
-      .where(eq(sessionsTable.id, updated.session_id));
+      .where(eq(agentSessionsTable.id, updated.session_id));
 
     return res.json(await hydrateArtifact(updated));
   } catch {

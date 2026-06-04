@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 import { playbooksTable } from "./playbooks";
 import { projectsTable } from "./projects";
 
-export const sessionsTable = pgTable("sessions", {
+export const agentSessionsTable = pgTable("agent_sessions", {
   id: serial("id").primaryKey(),
   event_id: integer("event_id").notNull(),
   objective: text("objective").notNull(),
@@ -31,6 +31,6 @@ export const sessionsTable = pgTable("sessions", {
   updated_at: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertSessionSchema = createInsertSchema(sessionsTable).omit({ id: true, created_at: true, updated_at: true });
-export type InsertSession = z.infer<typeof insertSessionSchema>;
-export type Session = typeof sessionsTable.$inferSelect;
+export const insertAgentSessionSchema = createInsertSchema(agentSessionsTable).omit({ id: true, created_at: true, updated_at: true });
+export type InsertAgentSession = z.infer<typeof insertAgentSessionSchema>;
+export type AgentSession = typeof agentSessionsTable.$inferSelect;

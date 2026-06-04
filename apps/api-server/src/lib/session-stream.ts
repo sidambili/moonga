@@ -1,6 +1,6 @@
-import type { SessionStep } from "@workspace/db";
+import type { AgentSessionStep } from "@workspace/db";
 
-type Listener = (step: SessionStep) => void;
+type Listener = (step: AgentSessionStep) => void;
 
 const subs = new Map<number, Set<Listener>>();
 

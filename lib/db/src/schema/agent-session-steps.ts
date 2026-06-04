@@ -2,7 +2,7 @@ import { pgTable, serial, text, integer, real, timestamp, jsonb } from "drizzle-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const sessionStepsTable = pgTable("session_steps", {
+export const agentSessionStepsTable = pgTable("agent_session_steps", {
   id: serial("id").primaryKey(),
   session_id: integer("session_id").notNull(),
   step_number: integer("step_number").notNull(),
@@ -21,6 +21,6 @@ export const sessionStepsTable = pgTable("session_steps", {
   created_at: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertSessionStepSchema = createInsertSchema(sessionStepsTable).omit({ id: true, created_at: true });
-export type InsertSessionStep = z.infer<typeof insertSessionStepSchema>;
-export type SessionStep = typeof sessionStepsTable.$inferSelect;
+export const insertAgentSessionStepSchema = createInsertSchema(agentSessionStepsTable).omit({ id: true, created_at: true });
+export type InsertAgentSessionStep = z.infer<typeof insertAgentSessionStepSchema>;
+export type AgentSessionStep = typeof agentSessionStepsTable.$inferSelect;
