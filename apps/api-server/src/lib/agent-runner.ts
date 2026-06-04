@@ -353,30 +353,21 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     let criticVerdict: string | null = null;
     let criticFailed: string | null = null;
     try {
-      const critic = await generateObject({
+      // Plain text, not structured output: a truncated markdown review is still
+      // readable, whereas truncated JSON throws NoObjectGeneratedError and loses
+      // the whole review.
+      const critic = await generateText({
         model: modelConfig,
         system: CRITIC_SYSTEM_PROMPT,
         prompt: buildCriticPrompt(ticketInfo, parsed.content),
         temperature: 0,
-        maxTokens: 2_000,
-        schema: z.object({
-          verdict: z.enum(["ship", "revise", "reject"]),
-          premise_sound: z.boolean(),
-          blocking_issues: z.array(z.object({ issue: z.string(), why: z.string() })),
-          over_engineering: z.array(z.string()),
-          simplest_alternative: z.string(),
-          nits: z.array(z.string()),
-        }),
+        // Generous budget: reasoning models spend most tokens "thinking" and only
+        // then emit the answer. Too low a cap = finishReason "length" with empty text.
+        maxTokens: 4_000,
       });
-      const r = critic.object;
-      criticVerdict = r.verdict;
-      criticReview = [
-        `Verdict: ${r.verdict} · premise ${r.premise_sound ? "sound" : "QUESTIONABLE"}`,
-        r.blocking_issues.length ? `\n**Blocking:**\n${r.blocking_issues.map((b) => `- ${b.issue} — ${b.why}`).join("\n")}` : "",
-        r.over_engineering.length ? `\n**Over-engineering:**\n${r.over_engineering.map((s) => `- ${s}`).join("\n")}` : "",
-        r.simplest_alternative ? `\n**Simplest alternative:** ${r.simplest_alternative}` : "",
-        r.nits.length ? `\n**Nits:**\n${r.nits.map((s) => `- ${s}`).join("\n")}` : "",
-      ].filter(Boolean).join("\n");
+      // Fall back to reasoning content when a reasoning model emits no final text.
+      criticReview = (critic.text.trim() || critic.reasoning?.trim() || "") || null;
+      criticVerdict = criticReview?.match(/verdict:\s*(ship|revise|reject)/i)?.[1]?.toLowerCase() ?? null;
       if (critic.usage) {
         const cost = await estimateCost(modelString, {
           promptTokens: critic.usage.promptTokens,
@@ -393,10 +384,15 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         totalTokens += criticUsage.totalTokens;
         totalCost += cost;
       }
-      logger.info(
-        { sessionId, verdict: r.verdict, premiseSound: r.premise_sound, blocking: r.blocking_issues.length, tokens: criticUsage?.totalTokens, cost: criticUsage?.cost },
-        "Critic pass complete",
-      );
+      if (criticReview) {
+        logger.info(
+          { sessionId, verdict: criticVerdict, finishReason: critic.finishReason, tokens: criticUsage?.totalTokens, cost: criticUsage?.cost },
+          "Critic pass complete",
+        );
+      } else {
+        criticFailed = `critic produced no text (finishReason=${critic.finishReason})`;
+        logger.warn({ sessionId, finishReason: critic.finishReason, tokens: criticUsage?.totalTokens }, "Critic pass produced no review");
+      }
     } catch (criticErr) {
       criticFailed = criticErr instanceof Error ? criticErr.message : String(criticErr);
       logger.warn({ err: criticErr, sessionId }, "Critic pass failed — continuing without review");

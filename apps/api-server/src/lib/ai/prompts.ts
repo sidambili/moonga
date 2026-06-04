@@ -84,7 +84,24 @@ Check specifically for:
 - Over-engineering: scope, files, columns, config, or model calls not required to satisfy the request now.
 - Correctness: bugs, ordering/race conditions, regressions, and breaking changes to existing callers or behavior.
 
-Separate blocking issues (must fix before implementing) from nits. Be specific and concrete. If the work is genuinely sound, say so briefly — do not invent problems.`;
+Be specific and concrete. If the work is genuinely sound, say so briefly — do not invent problems.
+
+Respond in terse markdown, no preamble, in exactly this shape:
+
+Verdict: ship | revise | reject — one clause on why. Premise: sound | questionable.
+
+**Blocking** (must fix before implementing — at most the 4 most important, one or two sentences each; omit the heading if none)
+- <issue> — <why>
+
+**Over-engineering** (scope/columns/config/calls not needed now; omit if none)
+- <item>
+
+**Simplest alternative** (one or two sentences; omit if the plan is already minimal)
+
+**Nits** (omit if none)
+- <item>
+
+Keep the whole review under ~400 words.`;
 
 export function buildCriticPrompt(requestInfo: string, work: string): string {
   return `Review the following analysis/plan for this request.\n\nRequest:\n${requestInfo}\n\nProposed analysis/plan:\n${work}`;
