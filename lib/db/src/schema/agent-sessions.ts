@@ -1,12 +1,13 @@
-import { pgTable, serial, text, integer, timestamp, jsonb, real } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb, real, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { eventsTable } from "./events";
 import { playbooksTable } from "./playbooks";
 import { projectsTable } from "./projects";
 
 export const agentSessionsTable = pgTable("agent_sessions", {
   id: serial("id").primaryKey(),
-  event_id: integer("event_id").notNull(),
+  event_id: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
   objective: text("objective").notNull(),
   status: text("status").notNull().default("pending"),
   model_used: text("model_used"),
@@ -29,7 +30,11 @@ export const agentSessionsTable = pgTable("agent_sessions", {
   project_id: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   created_at: timestamp("created_at").notNull().defaultNow(),
   updated_at: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("agent_sessions_event_id_idx").on(table.event_id),
+  index("agent_sessions_status_idx").on(table.status),
+  index("agent_sessions_project_id_idx").on(table.project_id),
+]);
 
 export const insertAgentSessionSchema = createInsertSchema(agentSessionsTable).omit({ id: true, created_at: true, updated_at: true });
 export type InsertAgentSession = z.infer<typeof insertAgentSessionSchema>;
