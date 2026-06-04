@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListSessionsParams = {
+export type ListAgentSessionsParams = {
 status?: string;
 limit?: number;
 /**

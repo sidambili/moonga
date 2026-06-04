@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SessionStepToolCallsItem = { [key: string]: unknown };
+export type AgentSessionStepToolCallsItem = { [key: string]: unknown };

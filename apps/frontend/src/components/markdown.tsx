@@ -6,6 +6,7 @@ import type { Components } from "react-markdown";
 
 interface MarkdownProps {
   children: string;
+  className?: string;
 }
 
 const components: Components = {
@@ -73,9 +74,9 @@ const previewComponents: Components = {
   th: ({ children }) => <span className="mr-1 font-medium">{children}</span>,
 };
 
-export default function Markdown({ children }: MarkdownProps) {
+export default function Markdown({ children, className }: MarkdownProps) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-blockquote:border-l-primary prose-blockquote:bg-muted/30 prose-blockquote:rounded-r-lg prose-table:text-xs">
+    <div className={`prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-blockquote:border-l-primary prose-blockquote:bg-muted/30 prose-blockquote:rounded-r-lg prose-table:text-xs ${className ?? ""}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {children}
       </ReactMarkdown>

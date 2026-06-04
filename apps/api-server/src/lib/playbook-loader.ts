@@ -35,26 +35,25 @@ Read at least 2-3 source files before writing the plan. Plans based only on file
 - Check git history for the affected files if context is unclear
 - Note any related configuration files, tests, or migrations
 
-## Phase 3: Plan — required sections
+## Phase 3: Plan
 
-**Objective summary** — what the ticket asks for and why, in your own words (not just a restatement)
+Be terse — structured sections over prose, no restatement of the ticket, no filler. Cite file paths and function/class/symbol names, never line numbers (they drift and are usually wrong). Omit any section that does not change the decision.
 
-**Affected files** — each file path with a 1-line description of what changes and why
+Scope discipline: recommend the smallest change that fully satisfies the ticket. Justify every extra file, DB column, config option, or model call with a concrete reason it is needed NOW — not "might be useful later." If part of the work is deferred to a follow-up, add ZERO plumbing for it: no column, no API field, no codegen for a feature you are not building yet.
 
-**Step-by-step tasks** — ordered list; each task must include:
-  - File path(s) to change
-  - What specifically to add, modify, or remove
-  - Why (the reasoning, not a restatement of what)
+Required sections:
 
-**New dependencies** — new files, packages, DB schema changes, feature flags required
+**Objective summary** — what the ticket asks for and why, in your own words. If the premise is flawed, over-scoped, or rests on a false assumption, say so here and recommend the simpler path.
 
-**Dependencies / blockers** — other tickets, upstream changes, or infrastructure requirements that must land first
+**Affected files** — each file path with a 1-line description of what changes and why.
 
-**Edge cases** — logic spread across multiple files, error handling concerns, backwards compatibility, race conditions
+**Step-by-step tasks** — ordered; each tagged \`required\` or \`optional\`, with file path(s), what to add/modify/remove, and the reasoning (not a restatement of what).
 
-**Complexity estimate** — Low / Medium / High with a 1-sentence justification
+**Risks** — at most the 3 most material: regressions, breaking changes to existing callers, race/ordering concerns. One line each.
 
-**Confidence** — roughly what percentage of the relevant code did you actually read before writing this plan?`,
+**Grounding** — what percentage of the relevant code did you actually read? This measures evidence gathered, not whether the design is right.
+
+**Design confidence** — separately, how confident are you the approach is correct (0–1)? Lower it if the premise is uncertain or you propose changing code you did not read.`,
   },
   {
     slug: "generic-plan",
@@ -74,21 +73,25 @@ Identify 2-4 key technical terms and search the codebase for each. Read 2-3 dire
 - Trace data flow through affected functions
 - Note any schema, config, or dependency changes required
 
-## Phase 3: Plan — required sections
+## Phase 3: Plan
 
-**Objective summary** — what is being asked for and why
+Be terse — structured sections over prose, no restatement of the request, no filler. Cite file paths and function/symbol names, never line numbers (they drift and are usually wrong). Omit any section that does not change the decision.
 
-**Affected files** — each file path with a 1-line description of changes
+Scope discipline: recommend the smallest change that fully satisfies the request. Justify every extra file, schema column, config option, or model call with a concrete reason it is needed NOW — not "might be useful later." If part of the work is deferred, add ZERO plumbing for it.
 
-**Step-by-step tasks** — ordered; each with file path, what changes, and why
+Required sections:
 
-**New dependencies** — packages, schema changes, new files required
+**Objective summary** — what is being asked for and why, in your own words. If the premise is flawed or over-scoped, say so and recommend the simpler path.
 
-**Edge cases** — error handling, backwards compatibility, concurrency concerns
+**Affected files** — each file path with a 1-line description of changes.
 
-**Complexity estimate** — Low / Medium / High with a 1-sentence justification
+**Step-by-step tasks** — ordered; each tagged \`required\` or \`optional\`, with file path, what changes, and why.
 
-**Confidence** — what percentage of the relevant code did you read?`,
+**Risks** — at most the 3 most material: regressions, breaking changes, concurrency/ordering. One line each.
+
+**Grounding** — what percentage of the relevant code did you actually read? (evidence, not design correctness)
+
+**Design confidence** — separately, how confident are you the approach is correct (0–1)?`,
   },
   {
     slug: "incident-diagnose",
@@ -124,9 +127,22 @@ Do not speculate beyond what the code and error evidence support.`,
 // ── Seed ─────────────────────────────────────────────────────────────────────
 
 export async function seedSystemPlaybooks(): Promise<void> {
-  await db.insert(playbooksTable)
-    .values(SYSTEM_PLAYBOOKS.map((p) => ({ ...p, source: "system" as const })))
-    .onConflictDoNothing({ target: playbooksTable.slug });
+  // Upsert: system playbooks are defined in code and are authoritative, so edits
+  // here propagate on the next boot. We update the content fields but preserve
+  // is_active so an operator who deactivated a system playbook keeps that choice.
+  for (const p of SYSTEM_PLAYBOOKS) {
+    await db.insert(playbooksTable)
+      .values({ ...p, source: "system" as const })
+      .onConflictDoUpdate({
+        target: playbooksTable.slug,
+        set: {
+          name: p.name,
+          objective: p.objective,
+          trigger_source: p.trigger_source,
+          instructions: p.instructions,
+        },
+      });
+  }
 }
 
 // ── Loader ────────────────────────────────────────────────────────────────────

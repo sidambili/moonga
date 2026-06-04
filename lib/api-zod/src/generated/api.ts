@@ -127,15 +127,15 @@ export const GetEventResponse = zod.object({
 /**
  * @summary List all agent sessions
  */
-export const listSessionsQueryLimitDefault = 50;
+export const listAgentSessionsQueryLimitDefault = 50;
 
-export const ListSessionsQueryParams = zod.object({
+export const ListAgentSessionsQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
-  "limit": zod.coerce.number().default(listSessionsQueryLimitDefault),
+  "limit": zod.coerce.number().default(listAgentSessionsQueryLimitDefault),
   "cursor": zod.coerce.number().optional()
 })
 
-export const ListSessionsResponse = zod.object({
+export const ListAgentSessionsResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
@@ -187,11 +187,11 @@ export const ListSessionsResponse = zod.object({
 /**
  * @summary Get session by ID
  */
-export const GetSessionParams = zod.object({
+export const GetAgentSessionParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const GetSessionResponse = zod.object({
+export const GetAgentSessionResponse = zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
   "objective": zod.string().describe('diagnose | plan | summarize | draft'),
@@ -239,11 +239,63 @@ export const GetSessionResponse = zod.object({
 /**
  * @summary Retry a failed session
  */
-export const RetrySessionParams = zod.object({
+export const RetryAgentSessionParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const RetrySessionResponse = zod.object({
+export const RetryAgentSessionResponse = zod.object({
+  "id": zod.number(),
+  "event_id": zod.number(),
+  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
+  "model_used": zod.string().nullish(),
+  "context_snapshot": zod.object({
+
+}).passthrough().nullish(),
+  "output_summary": zod.string().nullish(),
+  "confidence_score": zod.number().nullish(),
+  "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
+  "created_at": zod.string(),
+  "updated_at": zod.string(),
+  "event": zod.object({
+  "id": zod.number(),
+  "source": zod.string().describe('github | linear | betterstack | sentry | slack | email'),
+  "event_type": zod.string().describe('error | anomaly | ticket_created | issue_updated | deploy_failed | push | pr_opened'),
+  "severity": zod.string().describe('low | medium | high | critical'),
+  "status": zod.string().describe('new | processing | processed | ignored'),
+  "service": zod.string().nullish(),
+  "repo_id": zod.string().nullish(),
+  "ticket_id": zod.string().nullish(),
+  "title": zod.string().nullish(),
+  "payload_raw": zod.object({
+
+}).passthrough().optional(),
+  "session_id": zod.number().nullish(),
+  "created_at": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Rerun a session with identical input
+ */
+export const RerunAgentSessionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RerunAgentSessionResponse = zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
   "objective": zod.string().describe('diagnose | plan | summarize | draft'),
@@ -291,16 +343,17 @@ export const RetrySessionResponse = zod.object({
 /**
  * @summary Get reasoning steps for a session
  */
-export const GetSessionStepsParams = zod.object({
+export const GetAgentSessionStepsParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const GetSessionStepsResponseItem = zod.object({
+export const GetAgentSessionStepsResponseItem = zod.object({
   "id": zod.number(),
   "session_id": zod.number(),
   "step_number": zod.number(),
   "role": zod.string().describe('user | assistant | tool'),
   "content": zod.string().nullish(),
+  "reasoning": zod.string().nullish(),
   "tool_calls": zod.array(zod.object({
 
 }).passthrough()).nullish(),
@@ -316,7 +369,7 @@ export const GetSessionStepsResponseItem = zod.object({
   "cost": zod.number().nullish(),
   "created_at": zod.string()
 })
-export const GetSessionStepsResponse = zod.array(GetSessionStepsResponseItem)
+export const GetAgentSessionStepsResponse = zod.array(GetAgentSessionStepsResponseItem)
 
 
 /**

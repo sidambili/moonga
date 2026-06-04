@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOpenAI } from "@ai-sdk/openai";
 import { db } from "@workspace/db";
-import { sessionsTable, sessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable } from "@workspace/db";
+import { agentSessionsTable, agentSessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost, getModelPrice } from "./model-prices";
@@ -12,9 +12,10 @@ import { gatherLinearContext, extractLinearTicketInfo } from "./integrations/lin
 import { extractSlackMessageInfo, getSlackBotToken, postSlackReply } from "./integrations/slack-client";
 import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEventContext } from "./integrations/github-context";
 import { createGithubTools } from "./integrations/github-ai-tools";
-import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt } from "./ai/prompts";
+import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt, CRITIC_SYSTEM_PROMPT, buildCriticPrompt } from "./ai/prompts";
 import { parseAgentOutput } from "./ai/output";
 import { loadPlaybook, loadActiveSkills } from "./playbook-loader";
+import { emitStep } from "./session-stream";
 
 const MAX_STEPS = 15;
 const MAX_TOOL_CALLS = 30;
@@ -50,12 +51,14 @@ async function persistStep(
   toolCalls?: unknown[],
   toolName?: string,
   toolResult?: unknown,
+  reasoning?: string,
 ) {
-  await db.insert(sessionStepsTable).values({
+  const [row] = await db.insert(agentSessionStepsTable).values({
     session_id: sessionId,
     step_number: stepNumber,
     role: role as "user" | "assistant" | "tool",
     content: content.slice(0, 50_000) || null,
+    reasoning: reasoning?.slice(0, 50_000) || null,
     tool_calls: toolCalls ?? null,
     tool_name: toolName ?? null,
     tool_result: toolResult !== undefined ? toolResult : null,
@@ -64,7 +67,9 @@ async function persistStep(
     prompt_tokens: usage?.promptTokens ?? null,
     completion_tokens: usage?.completionTokens ?? null,
     cost: usage?.cost ?? null,
-  });
+  }).returning();
+  if (row) emitStep(sessionId, row);
+  return row;
 }
 
 function getModelConfig(settings: NonNullable<Awaited<ReturnType<typeof getModelSettings>>>, modelString: string) {
@@ -90,21 +95,21 @@ function categorizeError(err: unknown): string {
 
 export async function runAgentSession(sessionId: number): Promise<void> {
   await db
-    .update(sessionsTable)
+    .update(agentSessionsTable)
     .set({ status: "running", updated_at: new Date() })
-    .where(eq(sessionsTable.id, sessionId));
+    .where(eq(agentSessionsTable.id, sessionId));
 
   const [row] = await db
-    .select({ session: sessionsTable, event: eventsTable })
-    .from(sessionsTable)
-    .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
-    .where(eq(sessionsTable.id, sessionId));
+    .select({ session: agentSessionsTable, event: eventsTable })
+    .from(agentSessionsTable)
+    .leftJoin(eventsTable, eq(agentSessionsTable.event_id, eventsTable.id))
+    .where(eq(agentSessionsTable.id, sessionId));
 
   if (!row?.event) {
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({ status: "failed", failure_reason: "missing_event", updated_at: new Date() })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
     logger.warn({ sessionId }, "Session has no associated event — marked failed");
     return;
   }
@@ -112,9 +117,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   const settings = await getModelSettings();
   if (!settings?.api_key) {
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({ status: "failed", failure_reason: "missing_api_key", updated_at: new Date() })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
     logger.warn({ sessionId }, "No API key in model settings — session marked failed");
     return;
   }
@@ -163,9 +168,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
   if (playbook) {
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({ playbook_id: playbook.id, updated_at: new Date() })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
   }
 
   const fullContext = [repoInstructions, linearContext, context].filter(Boolean).join("\n\n---\n\n");
@@ -208,16 +213,6 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   try {
     const maxTokens = session.objective === "plan" ? 10_000 : 4_000;
 
-    const result = await generateText({
-      model: modelConfig,
-      system: systemPrompt,
-      prompt: userPrompt,
-      maxSteps: MAX_STEPS,
-      maxTokens,
-      tools: createGithubTools(ghClient, repo, checkToolLimit),
-    });
-
-    // Accumulate session aggregates while persisting steps
     let stepNum = 1;
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
@@ -225,35 +220,44 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     let totalCost = 0;
     let toolCallsCount = 0;
 
-    for (const step of result.steps) {
-      const stepUsage = step.usage ? {
-        promptTokens: step.usage.promptTokens,
-        completionTokens: step.usage.completionTokens,
-        totalTokens: step.usage.totalTokens,
-        cost: await estimateCost(modelString, {
+    const result = await generateText({
+      model: modelConfig,
+      system: systemPrompt,
+      prompt: userPrompt,
+      maxSteps: MAX_STEPS,
+      maxTokens,
+      temperature: 0,
+      tools: createGithubTools(ghClient, repo, checkToolLimit),
+      onStepFinish: async (step) => {
+        const stepUsage = step.usage ? {
           promptTokens: step.usage.promptTokens,
           completionTokens: step.usage.completionTokens,
-        }),
-      } : undefined;
+          totalTokens: step.usage.totalTokens,
+          cost: await estimateCost(modelString, {
+            promptTokens: step.usage.promptTokens,
+            completionTokens: step.usage.completionTokens,
+          }),
+        } : undefined;
 
-      if (stepUsage) {
-        totalPromptTokens += stepUsage.promptTokens;
-        totalCompletionTokens += stepUsage.completionTokens;
-        totalTokens += stepUsage.totalTokens;
-        totalCost += stepUsage.cost;
-      }
-      toolCallsCount += step.toolCalls?.length ?? 0;
+        if (stepUsage) {
+          totalPromptTokens += stepUsage.promptTokens;
+          totalCompletionTokens += stepUsage.completionTokens;
+          totalTokens += stepUsage.totalTokens;
+          totalCost += stepUsage.cost;
+        }
+        toolCallsCount += step.toolCalls?.length ?? 0;
 
-      if (step.text || (step.toolCalls && step.toolCalls.length > 0)) {
-        await persistStep(sessionId, stepNum, "assistant", step.text ?? "", modelString, stepUsage, step.toolCalls as unknown[]);
-      }
+        if (step.text || (step.toolCalls && step.toolCalls.length > 0)) {
+          await persistStep(sessionId, stepNum, "assistant", step.text ?? "", modelString, stepUsage, step.toolCalls as unknown[], undefined, step.reasoning ?? undefined);
+        }
 
-      for (const tr of step.toolResults ?? []) {
-        await persistStep(sessionId, stepNum, "tool", String(tr.result ?? "No result"), modelString, undefined, undefined, tr.toolName, tr.result);
-      }
+        for (const tr of step.toolResults ?? []) {
+          await persistStep(sessionId, stepNum, "tool", String(tr.result ?? "No result"), modelString, undefined, undefined, tr.toolName, tr.result);
+        }
 
-      stepNum++;
-    }
+        stepNum++;
+      },
+    });
 
     let finalTextRaw = result.text;
     let retryUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
@@ -335,14 +339,67 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     if (!parsed?.content) {
       logger.warn({ sessionId, steps: result.steps.length }, "Agent produced no final text — marking failed");
       await db
-        .update(sessionsTable)
+        .update(agentSessionsTable)
         .set({ status: "failed", failure_reason: "empty_output", model_used: modelString, updated_at: new Date() })
-        .where(eq(sessionsTable.id, sessionId));
+        .where(eq(agentSessionsTable.id, sessionId));
       return;
     }
 
+    // Adversarial critic pass — a fresh, skeptical review of the plan before it
+    // reaches the human gate. Advisory only: a critic failure never fails the
+    // session. Runs here (before the totals UPDATE) so its tokens are counted.
+    let criticReview: string | null = null;
+    let criticUsage: { promptTokens: number; completionTokens: number; totalTokens: number; cost: number } | undefined;
+    let criticVerdict: string | null = null;
+    let criticFailed: string | null = null;
+    try {
+      // Plain text, not structured output: a truncated markdown review is still
+      // readable, whereas truncated JSON throws NoObjectGeneratedError and loses
+      // the whole review.
+      const critic = await generateText({
+        model: modelConfig,
+        system: CRITIC_SYSTEM_PROMPT,
+        prompt: buildCriticPrompt(ticketInfo, parsed.content),
+        temperature: 0,
+        // Generous budget: reasoning models spend most tokens "thinking" and only
+        // then emit the answer. Too low a cap = finishReason "length" with empty text.
+        maxTokens: 4_000,
+      });
+      // Fall back to reasoning content when a reasoning model emits no final text.
+      criticReview = (critic.text.trim() || critic.reasoning?.trim() || "") || null;
+      criticVerdict = criticReview?.match(/verdict:\s*(ship|revise|reject)/i)?.[1]?.toLowerCase() ?? null;
+      if (critic.usage) {
+        const cost = await estimateCost(modelString, {
+          promptTokens: critic.usage.promptTokens,
+          completionTokens: critic.usage.completionTokens,
+        });
+        criticUsage = {
+          promptTokens: critic.usage.promptTokens,
+          completionTokens: critic.usage.completionTokens,
+          totalTokens: critic.usage.totalTokens,
+          cost,
+        };
+        totalPromptTokens += criticUsage.promptTokens;
+        totalCompletionTokens += criticUsage.completionTokens;
+        totalTokens += criticUsage.totalTokens;
+        totalCost += cost;
+      }
+      if (criticReview) {
+        logger.info(
+          { sessionId, verdict: criticVerdict, finishReason: critic.finishReason, tokens: criticUsage?.totalTokens, cost: criticUsage?.cost },
+          "Critic pass complete",
+        );
+      } else {
+        criticFailed = `critic produced no text (finishReason=${critic.finishReason})`;
+        logger.warn({ sessionId, finishReason: critic.finishReason, tokens: criticUsage?.totalTokens }, "Critic pass produced no review");
+      }
+    } catch (criticErr) {
+      criticFailed = criticErr instanceof Error ? criticErr.message : String(criticErr);
+      logger.warn({ err: criticErr, sessionId }, "Critic pass failed — continuing without review");
+    }
+
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({
         status: "needs_review",
         output_summary: parsed.slack_summary,
@@ -359,7 +416,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         duration_ms: durationMs || null,
         updated_at: new Date(),
       })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
 
     const artifactType = session.objective === "plan" ? "action_plan" : "diagnosis";
     const [insertedArtifact] = await db.insert(artifactsTable).values({
@@ -373,6 +430,14 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
     await persistStep(sessionId, stepNum, "tool", `[System] Created artifact #${insertedArtifact?.id ?? "?"} (type=${artifactType}, approval=draft, ${parsed.content.length} chars)`, undefined, undefined, undefined, "create_artifact");
     stepNum++;
+
+    if (criticReview) {
+      await persistStep(sessionId, stepNum, "tool", `[System] Plan review (adversarial critic)\n\n${criticReview}`, modelString, criticUsage, undefined, "critic_review", { verdict: criticVerdict });
+      stepNum++;
+    } else if (criticFailed) {
+      await persistStep(sessionId, stepNum, "tool", `[System] Plan review skipped — critic pass failed: ${criticFailed}`, modelString, undefined, undefined, "critic_review", { success: false, error: criticFailed });
+      stepNum++;
+    }
 
     await db
       .update(eventsTable)
@@ -402,8 +467,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     const reason = categorizeError(err);
     logger.error({ err, sessionId, reason }, "Agent loop failed");
     await db
-      .update(sessionsTable)
+      .update(agentSessionsTable)
       .set({ status: "failed", failure_reason: reason, updated_at: new Date() })
-      .where(eq(sessionsTable.id, sessionId));
+      .where(eq(agentSessionsTable.id, sessionId));
   }
 }

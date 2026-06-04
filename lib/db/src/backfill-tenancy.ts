@@ -20,7 +20,7 @@ import {
   projectsTable,
   user,
   eventsTable,
-  sessionsTable,
+  agentSessionsTable,
   artifactsTable,
   integrationsTable,
   modelSettingsTable,
@@ -80,7 +80,7 @@ async function main() {
 
   // 4. Operational data -> default project
   await db.update(eventsTable).set({ project_id: project.id }).where(isNull(eventsTable.project_id));
-  await db.update(sessionsTable).set({ project_id: project.id }).where(isNull(sessionsTable.project_id));
+  await db.update(agentSessionsTable).set({ project_id: project.id }).where(isNull(agentSessionsTable.project_id));
   await db.update(artifactsTable).set({ project_id: project.id }).where(isNull(artifactsTable.project_id));
 
   // 5. Org-level config -> default org (system playbooks/skills stay global)

@@ -61,9 +61,9 @@ export interface EventList {
 /**
  * @nullable
  */
-export type SessionContextSnapshot = { [key: string]: unknown } | null;
+export type AgentSessionContextSnapshot = { [key: string]: unknown } | null;
 
-export interface Session {
+export interface AgentSession {
   id: number;
   event_id: number;
   /** diagnose | plan | summarize | draft */
@@ -73,7 +73,7 @@ export interface Session {
   /** @nullable */
   model_used?: string | null;
   /** @nullable */
-  context_snapshot?: SessionContextSnapshot;
+  context_snapshot?: AgentSessionContextSnapshot;
   /** @nullable */
   output_summary?: string | null;
   /** @nullable */
@@ -109,8 +109,8 @@ export interface Session {
   event?: Event;
 }
 
-export interface SessionList {
-  items: Session[];
+export interface AgentSessionList {
+  items: AgentSession[];
   /**
      * ID to pass as `cursor` for the next page
      * @nullable
@@ -119,14 +119,14 @@ export interface SessionList {
   hasMore: boolean;
 }
 
-export type SessionStepToolCallsItem = { [key: string]: unknown };
+export type AgentSessionStepToolCallsItem = { [key: string]: unknown };
 
 /**
  * @nullable
  */
-export type SessionStepToolResult = { [key: string]: unknown } | null;
+export type AgentSessionStepToolResult = { [key: string]: unknown } | null;
 
-export interface SessionStep {
+export interface AgentSessionStep {
   id: number;
   session_id: number;
   step_number: number;
@@ -135,13 +135,15 @@ export interface SessionStep {
   /** @nullable */
   content?: string | null;
   /** @nullable */
-  tool_calls?: SessionStepToolCallsItem[] | null;
+  reasoning?: string | null;
+  /** @nullable */
+  tool_calls?: AgentSessionStepToolCallsItem[] | null;
   /** @nullable */
   tool_call_id?: string | null;
   /** @nullable */
   tool_name?: string | null;
   /** @nullable */
-  tool_result?: SessionStepToolResult;
+  tool_result?: AgentSessionStepToolResult;
   /** @nullable */
   model?: string | null;
   /** @nullable */
@@ -169,7 +171,7 @@ export interface Artifact {
      */
   synced_to_linear_at?: string | null;
   created_at: string;
-  session?: Session;
+  session?: AgentSession;
 }
 
 export interface ArtifactList {
@@ -443,7 +445,7 @@ limit?: number;
 cursor?: number;
 };
 
-export type ListSessionsParams = {
+export type ListAgentSessionsParams = {
 status?: string;
 limit?: number;
 /**

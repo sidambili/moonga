@@ -10,7 +10,7 @@ import { authClient } from "@/lib/auth-client";
 const nav = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Events", href: "/events", icon: Radio },
-  { label: "Sessions", href: "/sessions", icon: Cpu },
+  { label: "Sessions", href: "/agent-sessions", icon: Cpu },
   { label: "Review", href: "/artifacts", icon: FileCheck2 },
   { label: "Integrations", href: "/integrations", icon: Webhook },
   { label: "Playbooks", href: "/playbooks", icon: BookOpen },

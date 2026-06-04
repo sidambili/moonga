@@ -1,7 +1,7 @@
 import { Router } from "express";
 import crypto from "crypto";
 import { db, getOrgDefaultProjectId } from "@workspace/db";
-import { eventsTable, sessionsTable, integrationsTable, projectSourcesTable } from "@workspace/db";
+import { eventsTable, agentSessionsTable, integrationsTable, projectSourcesTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { GITHUB_EVENT_TYPE_MAP } from "@workspace/constants";
 
@@ -259,7 +259,7 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>, r
 
   const objective = (source === "linear" || eventType === "ticket_created") ? "plan" : "diagnose";
 
-  const [session] = await db.insert(sessionsTable).values({
+  const [session] = await db.insert(agentSessionsTable).values({
     event_id: event.id,
     objective,
     status: "pending",

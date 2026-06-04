@@ -1,8 +1,30 @@
-import { useState } from "react";
-import { useGetSessionSteps, getGetSessionStepsQueryKey } from "@workspace/api-client-react";
-import type { SessionStep } from "@workspace/api-client-react";
-import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import type { AgentSessionStep } from "@workspace/api-client-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Brain,
+  Search,
+  FileText,
+  FolderOpen,
+  GitCommit,
+  GitPullRequest,
+  CircleDot,
+  History,
+  Terminal,
+  User,
+  FileOutput,
+  MessageSquare,
+  Download,
+  BookOpen,
+  Wrench,
+  Sparkles,
+  Clock,
+  Coins,
+} from "lucide-react";
 import { SYSTEM_TOOL_NAMES, getToolLabel } from "@workspace/constants";
+import Markdown from "@/components/markdown";
 
 function formatCost(cost: number | null | undefined) {
   if (cost == null || cost === 0) return null;
@@ -12,7 +34,7 @@ function formatCost(cost: number | null | undefined) {
 
 function formatTokens(n: number | null | undefined) {
   if (n == null || n === 0) return null;
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k tok` : `${n} tok`;
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
 }
 
 function formatTokenPair(
@@ -40,7 +62,7 @@ type RawToolCall = { toolName?: string; function?: { name: string }; args?: unkn
 type ToolCallItem = {
   name: string;
   args?: unknown;
-  result?: SessionStep;
+  result?: AgentSessionStep;
 };
 
 type ArtifactOutput = {
@@ -86,7 +108,6 @@ function tryParseArtifactOutput(text: string | null | undefined): ArtifactOutput
   if (!text) return null;
   const stripped = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
 
-  // Strategy 1: balanced brace extraction
   const balanced = extractBalancedJson(stripped);
   if (balanced) {
     try {
@@ -102,7 +123,6 @@ function tryParseArtifactOutput(text: string | null | undefined): ArtifactOutput
     } catch { /* not parseable */ }
   }
 
-  // Strategy 2: naive first { last }
   const start = stripped.indexOf("{");
   const end = stripped.lastIndexOf("}");
   if (start !== -1 && end > start) {
@@ -123,10 +143,10 @@ function tryParseArtifactOutput(text: string | null | undefined): ArtifactOutput
 }
 
 type VisualGroup =
-  | { kind: "thinking"; step: SessionStep; durationMs?: number }
-  | { kind: "tool_group"; call: SessionStep; items: ToolCallItem[]; isSystem: boolean }
-  | { kind: "user"; step: SessionStep }
-  | { kind: "artifact_output"; step: SessionStep; parsed: ArtifactOutput };
+  | { kind: "thinking"; step: AgentSessionStep; durationMs?: number }
+  | { kind: "tool_group"; call: AgentSessionStep; items: ToolCallItem[]; isSystem: boolean }
+  | { kind: "user"; step: AgentSessionStep }
+  | { kind: "artifact_output"; step: AgentSessionStep; parsed: ArtifactOutput };
 
 function basename(path: string): string {
   return path.split("/").pop() ?? path;
@@ -149,7 +169,7 @@ function toolGroupSummary(items: ToolCallItem[]): string {
   return `${first} and ${extra} other ${extra === 1 ? "action" : "actions"}`;
 }
 
-function buildVisualGroups(steps: SessionStep[]): VisualGroup[] {
+function buildVisualGroups(steps: AgentSessionStep[]): VisualGroup[] {
   const groups: VisualGroup[] = [];
   let i = 0;
 
@@ -172,7 +192,7 @@ function buildVisualGroups(steps: SessionStep[]): VisualGroup[] {
     ) {
       const rawCalls = s.tool_calls as RawToolCall[];
       let j = i + 1;
-      const resultSteps: SessionStep[] = [];
+      const resultSteps: AgentSessionStep[] = [];
       while (j < steps.length && steps[j].role === "tool") {
         resultSteps.push(steps[j]);
         j++;
@@ -198,7 +218,6 @@ function buildVisualGroups(steps: SessionStep[]): VisualGroup[] {
       }
       i++;
     } else if (s.role === "tool") {
-      // Orphan tool step — wrap as single-item group
       const items: ToolCallItem[] = [{ name: s.tool_name ?? "tool", result: s }];
       groups.push({
         kind: "tool_group",
@@ -215,7 +234,34 @@ function buildVisualGroups(steps: SessionStep[]): VisualGroup[] {
   return groups;
 }
 
-function ArtifactOutputRow({ step, parsed }: { step: SessionStep; parsed: ArtifactOutput }) {
+/* ── Icon mapping ─────────────────────────────────────────── */
+
+function getToolIcon(name: string) {
+  switch (name) {
+    case "search_code": return Search;
+    case "get_file_contents": return FileText;
+    case "list_directory": return FolderOpen;
+    case "get_commit_diff": return GitCommit;
+    case "get_pull_request": return GitPullRequest;
+    case "get_issue": return CircleDot;
+    case "get_recent_commits": return History;
+    case "create_artifact": return FileOutput;
+    case "post_linear_comment":
+    case "post_slack_reply": return MessageSquare;
+    case "gather_event_context": return Download;
+    case "fetch_repo_instructions": return BookOpen;
+    default: return Wrench;
+  }
+}
+
+function StepIcon({ name, className }: { name: string; className?: string }) {
+  const Icon = getToolIcon(name);
+  return <Icon className={className} />;
+}
+
+/* ── Rows ───────────────────────────────────────────────── */
+
+function ArtifactOutputRow({ step, parsed }: { step: AgentSessionStep; parsed: ArtifactOutput }) {
   const [open, setOpen] = useState(false);
   const [showFull, setShowFull] = useState(false);
   const confidencePct = parsed.confidence != null ? `${Math.round(parsed.confidence * 100)}%` : null;
@@ -224,40 +270,41 @@ function ArtifactOutputRow({ step, parsed }: { step: SessionStep; parsed: Artifa
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted/20 transition-colors text-left"
+        className="w-full flex items-start gap-3 px-4 py-2 hover:bg-muted/10 transition-colors text-left"
       >
-        {open ? (
-          <ChevronDown className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
-        ) : (
-          <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
-        )}
+        <FileOutput className="w-4 h-4 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
         <span className="text-[13px] text-foreground/80 flex-1 min-w-0 truncate">Created summary</span>
         {confidencePct && (
           <span className="text-[10px] tabular-nums text-muted-foreground/45 ml-2 flex-shrink-0">
             {confidencePct} confidence
           </span>
         )}
+        {open ? (
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30 flex-shrink-0 mt-0.5" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 flex-shrink-0 mt-0.5" />
+        )}
       </button>
       {open && (
-        <div className="pb-1 space-y-0.5">
-          <div className="px-4 pl-9 pb-1.5">
-            <p className="text-[12px] text-foreground/65 leading-relaxed">{parsed.summary}</p>
+        <div className="pb-2 space-y-1">
+          <div className="px-4 pl-11 pb-1.5">
+            <p className="text-[13px] text-muted-foreground/70 leading-relaxed">{parsed.summary}</p>
           </div>
           <div>
             <button
               onClick={() => setShowFull((v) => !v)}
-              className="w-full flex items-center gap-1.5 py-1.5 pl-12 pr-4 hover:bg-muted/20 transition-colors text-left"
+              className="w-full flex items-center gap-1.5 py-1.5 pl-11 pr-4 hover:bg-muted/10 transition-colors text-left"
             >
               {showFull ? (
-                <ChevronDown className="w-3 h-3 text-muted-foreground/35 flex-shrink-0" />
+                <ChevronDown className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
               ) : (
-                <ChevronRight className="w-3 h-3 text-muted-foreground/35 flex-shrink-0" />
+                <ChevronRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
               )}
-              <span className="text-[11px] text-muted-foreground/50">Show full content</span>
+              <span className="text-[11px] text-muted-foreground/60">Show full content</span>
             </button>
             {showFull && (
-              <div className="px-4 pb-2 pl-16">
-                <pre className="text-[11px] font-mono text-foreground/50 whitespace-pre-wrap overflow-auto max-h-64 rounded bg-muted/30 p-2 leading-relaxed">
+              <div className="px-4 pb-2 pl-14">
+                <pre className="text-[11px] font-mono text-muted-foreground/60 whitespace-pre-wrap overflow-auto max-h-64 rounded bg-muted/30 p-2 leading-relaxed">
                   {step.content}
                 </pre>
               </div>
@@ -279,9 +326,12 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
     toolResult !== null &&
     (toolResult as Record<string, unknown>).success === false;
 
+  const Icon = getToolIcon(item.name);
+
   if (!hasDetail) {
     return (
-      <div className="flex items-center gap-2 py-1.5 pl-9 pr-4">
+      <div className="flex items-start gap-2.5 py-1.5 pl-11 pr-4">
+        <Icon className="w-3.5 h-3.5 text-muted-foreground/40 mt-0.5 flex-shrink-0" />
         <span className={`text-[12px] ${failed ? "text-destructive" : "text-muted-foreground/60"}`}>{label}</span>
         {failed && (
           <span className="text-[9px] uppercase tracking-wider bg-destructive/10 text-destructive font-medium px-1.5 py-0.5 rounded">
@@ -303,33 +353,58 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
         : JSON.stringify(toolResult, null, 2)
       : (item.result?.content ?? "");
 
+  // File reads: show path badge style like Devin
+  const isFileRead = item.name === "get_file_contents" && item.args && typeof item.args === "object";
+  const filePath = isFileRead ? String((item.args as Record<string, unknown>).path ?? "") : "";
+  const fileRange = isFileRead && item.result?.content
+    ? (() => {
+        const content = String(item.result.content);
+        // Try to extract line numbers from context
+        const lines = content.split("\n");
+        if (lines.length > 0) {
+          return `${lines.length} lines`;
+        }
+        return null;
+      })()
+    : null;
+
   return (
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-1.5 py-1.5 pl-9 pr-4 hover:bg-muted/20 transition-colors text-left"
+        className="w-full flex items-start gap-2.5 py-1.5 pl-11 pr-4 hover:bg-muted/10 transition-colors text-left"
       >
-        {open ? (
-          <ChevronDown className="w-3 h-3 text-muted-foreground/35 flex-shrink-0" />
+        <Icon className="w-3.5 h-3.5 text-muted-foreground/40 mt-0.5 flex-shrink-0" />
+        {isFileRead ? (
+          <span className="text-[12px] text-muted-foreground/70">
+            Read <code className="bg-muted/50 px-1 py-0.5 rounded text-[11px] font-mono">{basename(filePath)}</code>
+            {fileRange && <span className="text-muted-foreground/40 ml-1">{fileRange}</span>}
+          </span>
         ) : (
-          <ChevronRight className="w-3 h-3 text-muted-foreground/35 flex-shrink-0" />
+          <span className={`text-[12px] ${failed ? "text-destructive" : "text-muted-foreground/70"}`}>{label}</span>
         )}
-        <span className={`text-[12px] ${failed ? "text-destructive" : "text-muted-foreground/70"}`}>{label}</span>
         {failed && (
           <span className="text-[9px] uppercase tracking-wider bg-destructive/10 text-destructive font-medium px-1.5 py-0.5 rounded ml-1">
             failed
           </span>
         )}
+        {hasDetail && (
+          open ? (
+            <ChevronDown className="w-3 h-3 text-muted-foreground/25 flex-shrink-0 mt-0.5 ml-auto" />
+          ) : (
+            <ChevronRight className="w-3 h-3 text-muted-foreground/25 flex-shrink-0 mt-0.5 ml-auto" />
+          )
+        )}
       </button>
       {open && (
-        <div className="px-4 pb-2 pl-14 space-y-1.5">
+        <div className="px-4 pb-2 pl-16 space-y-1.5">
           {item.args != null && (
-            <pre className="text-[11px] font-mono text-foreground/50 whitespace-pre-wrap overflow-auto max-h-32 rounded bg-muted/30 p-2 leading-relaxed">
+            <pre className="text-[11px] font-mono text-muted-foreground/60 whitespace-pre-wrap overflow-auto max-h-32 rounded bg-muted/30 p-2 leading-relaxed">
               {JSON.stringify(item.args, null, 2)}
             </pre>
           )}
           {resultText && (
-            <pre className="text-[11px] font-mono text-foreground/50 whitespace-pre-wrap overflow-auto max-h-40 rounded bg-muted/30 p-2 leading-relaxed">
+            <pre className="text-[11px] font-mono text-muted-foreground/60 whitespace-pre-wrap overflow-auto max-h-40 rounded bg-muted/30 p-2 leading-relaxed">
               {resultText}
             </pre>
           )}
@@ -339,38 +414,42 @@ function SubToolItem({ item }: { item: ToolCallItem }) {
   );
 }
 
-function ThinkingRow({ step, durationMs }: { step: SessionStep; durationMs?: number }) {
+function ThinkingRow({ step, durationMs }: { step: AgentSessionStep; durationMs?: number }) {
   const [open, setOpen] = useState(false);
   const tok = formatTokenPair(step.prompt_tokens, step.completion_tokens);
+  const hasContent = !!step.content && step.content.trim().length > 0;
 
   return (
     <div>
       <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-4 py-1.5 hover:bg-muted/15 transition-colors text-left"
+        onClick={() => hasContent && setOpen((v) => !v)}
+        className={`w-full flex items-start gap-3 px-4 py-1.5 transition-colors text-left ${hasContent ? "hover:bg-muted/10 cursor-pointer" : ""}`}
       >
-        {open ? (
-          <ChevronDown className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
-        ) : (
-          <ChevronRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
-        )}
-        <span className="text-[12px] text-muted-foreground/55 flex-1 min-w-0 truncate">
+        <Brain className="w-4 h-4 text-muted-foreground/40 mt-0.5 flex-shrink-0" />
+        <span className="text-[13px] text-foreground/80 flex-1 min-w-0">
           Thought
           {durationMs != null && (
             <span className="text-muted-foreground/40"> for {formatDuration(durationMs)}</span>
           )}
         </span>
         {tok && (
-          <span className="text-[10px] tabular-nums text-muted-foreground/40 ml-2 flex-shrink-0">
+          <span className="text-[10px] tabular-nums text-muted-foreground/35 ml-2 flex-shrink-0">
             {tok}
           </span>
         )}
+        {hasContent && (
+          open ? (
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/25 flex-shrink-0 mt-0.5" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/25 flex-shrink-0 mt-0.5" />
+          )
+        )}
       </button>
-      {open && step.content && (
-        <div className="px-4 pb-2 pl-9">
-          <p className="text-[11px] text-muted-foreground/55 leading-relaxed italic whitespace-pre-wrap">
-            {step.content}
-          </p>
+      {open && hasContent && (
+        <div className="px-4 pb-3 pl-11">
+          <div className="text-[13px] text-muted-foreground/70 leading-relaxed max-h-64 overflow-y-auto">
+            <Markdown className="prose-p:text-muted-foreground/70 prose-strong:text-muted-foreground/70 prose-li:text-muted-foreground/70">{step.content ?? ""}</Markdown>
+          </div>
         </div>
       )}
     </div>
@@ -382,50 +461,48 @@ function ToolGroupRow({
   items,
   isSystem,
 }: {
-  call: SessionStep;
+  call: AgentSessionStep;
   items: ToolCallItem[];
   isSystem: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const summary = toolGroupSummary(items);
   const tok = formatTokenPair(call.prompt_tokens, call.completion_tokens);
+  const MainIcon = items.length > 0 ? getToolIcon(items[0].name) : Wrench;
 
   return (
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted/20 transition-colors text-left"
+        className="w-full flex items-start gap-3 px-4 py-2 hover:bg-muted/10 transition-colors text-left"
       >
-        {open ? (
-          <ChevronDown className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
-        ) : (
-          <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />
-        )}
-        <span
-          className={`text-[13px] flex-1 min-w-0 truncate ${
-            isSystem ? "text-muted-foreground/50" : "text-foreground/80"
-          }`}
-        >
+        <MainIcon className="w-4 h-4 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
+        <span className="text-[13px] flex-1 min-w-0 truncate text-foreground/80">
           {summary}
         </span>
         {tok && (
-          <span className="text-[10px] tabular-nums text-muted-foreground/40 ml-2 flex-shrink-0">
+          <span className="text-[10px] tabular-nums text-muted-foreground/35 ml-2 flex-shrink-0">
             {tok}
           </span>
         )}
         {isSystem && (
-          <span className="text-[9px] uppercase tracking-wider text-muted-foreground/30 font-medium ml-2 flex-shrink-0">
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground/25 font-medium ml-2 flex-shrink-0">
             system
           </span>
+        )}
+        {open ? (
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/25 flex-shrink-0 mt-0.5" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/25 flex-shrink-0 mt-0.5" />
         )}
       </button>
       {open && (
         <div className="pb-1">
           {call.role === "assistant" && call.content && (
-            <div className="px-4 pb-2 pl-9">
-              <p className="text-[11px] text-muted-foreground/55 leading-relaxed italic whitespace-pre-wrap">
-                {call.content}
-              </p>
+            <div className="px-4 pb-2 pl-11">
+              <div className="text-[12px] text-muted-foreground/60 leading-relaxed">
+                <Markdown className="prose-p:text-muted-foreground/50 prose-strong:text-muted-foreground/50 prose-li:text-muted-foreground/50">{call.content}</Markdown>
+              </div>
             </div>
           )}
           {items.map((item, i) => (
@@ -437,25 +514,26 @@ function ToolGroupRow({
   );
 }
 
-function UserRow({ step }: { step: SessionStep }) {
+function UserRow({ step }: { step: AgentSessionStep }) {
   const [open, setOpen] = useState(false);
 
   return (
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-4 py-1.5 hover:bg-muted/15 transition-colors text-left"
+        className="w-full flex items-start gap-3 px-4 py-1.5 hover:bg-muted/10 transition-colors text-left"
       >
+        <User className="w-4 h-4 text-muted-foreground/40 mt-0.5 flex-shrink-0" />
+        <span className="text-[13px] text-foreground/80 flex-1 min-w-0">Instructions</span>
         {open ? (
-          <ChevronDown className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/25 flex-shrink-0 mt-0.5" />
         ) : (
-          <ChevronRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/25 flex-shrink-0 mt-0.5" />
         )}
-        <span className="text-[12px] text-muted-foreground/55">Instructions</span>
       </button>
       {open && step.content && (
-        <div className="px-4 pb-2 pl-9">
-          <pre className="text-[11px] font-mono text-foreground/50 whitespace-pre-wrap overflow-auto max-h-48 rounded bg-muted/30 p-2 leading-relaxed">
+        <div className="px-4 pb-2 pl-11">
+          <pre className="text-[12px] font-mono text-muted-foreground/60 whitespace-pre-wrap overflow-auto max-h-48 rounded bg-muted/30 p-2 leading-relaxed">
             {step.content}
           </pre>
         </div>
@@ -464,15 +542,75 @@ function UserRow({ step }: { step: SessionStep }) {
   );
 }
 
+/* ── Main component ──────────────────────────────────────── */
+
 interface SessionTraceProps {
   sessionId: number;
+  status?: string | null;
   totalCost?: number | null;
+  durationMs?: number | null;
 }
 
-export default function SessionTrace({ sessionId, totalCost }: SessionTraceProps) {
-  const { data: steps, isLoading } = useGetSessionSteps(sessionId, {
-    query: { queryKey: getGetSessionStepsQueryKey(sessionId), enabled: !!sessionId },
-  });
+export default function SessionTrace({ sessionId, status, totalCost, durationMs }: SessionTraceProps) {
+  const [steps, setSteps] = useState<AgentSessionStep[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasReceivedEvent, setHasReceivedEvent] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const esRef = useRef<EventSource | null>(null);
+
+  const isRunning = status === "running";
+  const isLive = isRunning && hasReceivedEvent;
+
+  useEffect(() => {
+    setIsLoading(true);
+    setSteps([]);
+    setHasReceivedEvent(false);
+
+    // 1. Load initial steps via REST
+    fetch(`/api/agent-sessions/${sessionId}/steps`)
+      .then((r) => r.json())
+      .then((data: AgentSessionStep[]) => {
+        setSteps(data);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
+
+    // 2. Open SSE for live updates only if session is running
+    if (isRunning) {
+      const es = new EventSource(`/api/agent-sessions/${sessionId}/stream`);
+      esRef.current = es;
+      es.onmessage = (e) => {
+        try {
+          const step = JSON.parse(e.data) as AgentSessionStep;
+          setSteps((prev) => {
+            if (prev.some((s) => s.id === step.id)) return prev;
+            return [...prev, step].sort((a, b) => a.step_number - b.step_number);
+          });
+          setHasReceivedEvent(true);
+        } catch {
+          // ignore malformed events
+        }
+      };
+      es.onerror = () => {
+        setHasReceivedEvent(false);
+        es.close();
+      };
+    }
+
+    return () => {
+      esRef.current?.close();
+      esRef.current = null;
+    };
+  }, [sessionId, isRunning]);
+
+  // Auto-scroll to bottom when new steps arrive while live
+  useEffect(() => {
+    if (isLive && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [steps, isLive]);
 
   const groups = steps ? buildVisualGroups(steps) : [];
   const totalTok = steps?.reduce((s, st) => s + (st.tokens_used ?? 0), 0) ?? 0;
@@ -480,26 +618,46 @@ export default function SessionTrace({ sessionId, totalCost }: SessionTraceProps
   const totalCompletion = steps?.reduce((s, st) => s + (st.completion_tokens ?? 0), 0) ?? 0;
   const totalCostComputed = steps?.reduce((s, st) => s + (st.cost ?? 0), 0) ?? 0;
   const displayCost = formatCost(totalCostComputed || totalCost);
+  const displayTok = formatTokenPair(totalPrompt, totalCompletion) ?? formatTokens(totalTok);
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
-        <span className="text-sm font-medium">Agent Trace</span>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Agent Trace</span>
+          {isLive && (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+          )}
+        </div>
+        <div className="flex items-center gap-3">
           {steps && steps.length > 0 && (
             <span className="text-[11px] text-muted-foreground tabular-nums">
               {steps.length} steps
             </span>
           )}
+          {durationMs != null && durationMs > 0 && (
+            <span className="text-[11px] text-muted-foreground tabular-nums flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatDuration(durationMs)}
+            </span>
+          )}
+          {displayTok && (
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {displayTok}
+            </span>
+          )}
           {displayCost && (
-            <span className="text-[11px] text-muted-foreground tabular-nums">{displayCost}</span>
+            <span className="text-[11px] text-muted-foreground tabular-nums flex items-center gap-1">
+              <Coins className="w-3 h-3" />
+              {displayCost}
+            </span>
           )}
         </div>
       </div>
 
       {/* Scrollable feed */}
-      <div className="overflow-y-auto flex-1 min-h-0 divide-y divide-border/20">
+      <div ref={scrollRef} className="overflow-y-auto flex-1 min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-12 text-xs text-muted-foreground">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -526,22 +684,6 @@ export default function SessionTrace({ sessionId, totalCost }: SessionTraceProps
           })
         )}
       </div>
-
-      {/* Footer */}
-      {(totalTok > 0 || displayCost) && (
-        <div className="border-t border-border px-4 py-2 flex items-center justify-between flex-shrink-0">
-          {totalTok > 0 && (
-            <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-              {formatTokenPair(totalPrompt, totalCompletion) ?? formatTokens(totalTok)}
-            </span>
-          )}
-          {displayCost && (
-            <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-              {displayCost} total
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -268,6 +268,7 @@ export const SYSTEM_TOOL_NAMES = new Set([
   "post_slack_reply",
   "gather_event_context",
   "fetch_repo_instructions",
+  "critic_review",
 ]);
 
 export function getToolLabel(name: string, args?: unknown): string {
@@ -300,6 +301,8 @@ export function getToolLabel(name: string, args?: unknown): string {
       return "Gathered context";
     case "fetch_repo_instructions":
       return "Loaded instructions";
+    case "critic_review":
+      return "Plan review";
     default:
       return name.replace(/_/g, " ");
   }

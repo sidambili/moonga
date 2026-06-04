@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import {
-  useGetSession, useRetrySession, getGetSessionQueryKey, getListSessionsQueryKey,
+  useGetAgentSession, useRetryAgentSession, useRerunAgentSession, getGetAgentSessionQueryKey, getListAgentSessionsQueryKey,
   useListArtifacts, useApproveArtifact, useRejectArtifact, useEditArtifact, usePostArtifactToLinear,
-  getListArtifactsQueryKey,
+  getListArtifactsQueryKey, getGetAgentSessionStepsQueryOptions, getGetAgentSessionStepsQueryKey,
 } from "@workspace/api-client-react";
 import type { Artifact } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen } from "lucide-react";
+import { ArrowLeft, RefreshCw, RotateCcw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen, ShieldAlert } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge, ApprovalBadge, ArtifactTypeBadge, formatEventType, formatObjective, formatSource } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
@@ -44,6 +44,57 @@ function CopyButton({ text }: { text: string }) {
       {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
       <span className="ml-1.5 text-xs">{copied ? "Copied" : "Copy"}</span>
     </Button>
+  );
+}
+
+const VERDICT_STYLES: Record<string, string> = {
+  ship: "bg-green-500/10 text-green-600",
+  revise: "bg-amber-500/10 text-amber-600",
+  reject: "bg-destructive/10 text-destructive",
+};
+
+function CriticReviewCard({ sessionId }: { sessionId: number }) {
+  const { data: steps } = useQuery(
+    getGetAgentSessionStepsQueryOptions(sessionId, {
+      query: { queryKey: getGetAgentSessionStepsQueryKey(sessionId), enabled: !!sessionId, refetchInterval: 10_000 },
+    }),
+  );
+  const step = steps?.find((s) => s.tool_name === "critic_review");
+  if (!step) return null;
+
+  const result = (step.tool_result ?? null) as { verdict?: string | null; success?: boolean; error?: string } | null;
+  const failed = result?.success === false || (step.content ?? "").includes("Plan review skipped");
+
+  const review = (step.content ?? "").replace(/^\[System\] Plan review \(adversarial critic\)\s*/, "").trim();
+  const verdict = (result?.verdict ?? review.match(/verdict:\s*(ship|revise|reject)/i)?.[1] ?? "").toLowerCase();
+
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-3.5 h-3.5 text-muted-foreground" aria-hidden />
+          <span className="text-sm font-medium">Plan Review</span>
+          {!failed && verdict && (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${VERDICT_STYLES[verdict] ?? "bg-muted text-muted-foreground"}`}>
+              {verdict}
+            </span>
+          )}
+          {step.cost != null && (
+            <span className="text-[11px] text-muted-foreground tabular-nums">${step.cost.toFixed(4)}</span>
+          )}
+        </div>
+        {!failed && review && <CopyButton text={review} />}
+      </div>
+      <div className="px-5 py-4">
+        {failed ? (
+          <p className="text-sm text-muted-foreground">
+            Plan review unavailable{result?.error ? ` — ${result.error}` : "."}
+          </p>
+        ) : (
+          <Markdown className="text-sm">{review}</Markdown>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -254,14 +305,16 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
 }
 
 export default function SessionDetail() {
-  const [, params] = useRoute("/sessions/:id");
+  const [, params] = useRoute("/agent-sessions/:id");
   const id = Number(params?.id);
-  const { data: session, isLoading, refetch } = useGetSession(id, { query: { queryKey: getGetSessionQueryKey(id), enabled: !!id } });
+  const [, navigate] = useLocation();
+  const { data: session, isLoading, refetch } = useGetAgentSession(id, { query: { queryKey: getGetAgentSessionQueryKey(id), enabled: !!id } });
   const { data: artifactsData } = useListArtifacts(
     { session_id: id },
     { query: { queryKey: [...getListArtifactsQueryKey(), id], enabled: !!id, refetchInterval: 10_000 } },
   );
-  const retryMutation = useRetrySession();
+  const retryMutation = useRetryAgentSession();
+  const rerunMutation = useRerunAgentSession();
   const queryClient = useQueryClient();
 
   const handleRetry = () => {
@@ -269,7 +322,21 @@ export default function SessionDetail() {
       onSuccess: () => {
         toast({ title: "Session queued for retry" });
         refetch();
-        queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListAgentSessionsQueryKey() });
+      },
+    });
+  };
+
+  const handleRerun = () => {
+    rerunMutation.mutate({ id }, {
+      onSuccess: (newSession) => {
+        toast({ title: `Session ${newSession.id} queued for rerun` });
+        queryClient.invalidateQueries({ queryKey: getListAgentSessionsQueryKey() });
+        navigate(`/agent-sessions/${newSession.id}`);
+      },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to rerun session", description: message, variant: "destructive" });
       },
     });
   };
@@ -285,7 +352,7 @@ export default function SessionDetail() {
   if (!session) {
     return (
       <div className="px-5 py-5 max-w-6xl mx-auto space-y-4">
-        <Link href="/sessions">
+        <Link href="/agent-sessions">
           <Button variant="ghost" size="sm" className="rounded-lg">
             <ArrowLeft className="w-4 h-4 mr-2" />Back
           </Button>
@@ -304,7 +371,7 @@ export default function SessionDetail() {
     <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/sessions">
+        <Link href="/agent-sessions">
           <Button variant="ghost" size="sm" className="rounded-lg h-8 px-2">
             <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />Sessions
           </Button>
@@ -340,16 +407,24 @@ export default function SessionDetail() {
             )}
           </div>
         </div>
-        {(session.status === "failed" || session.status === "rejected") && (
-          <Button variant="outline" size="sm" onClick={handleRetry} disabled={retryMutation.isPending} className="rounded-lg text-sm self-start">
-            <RefreshCw className={`w-3.5 h-3.5 mr-2 ${retryMutation.isPending ? "animate-spin" : ""}`} />
-            Retry Session
-          </Button>
-        )}
+        <div className="flex items-center gap-2 self-start">
+          {(session.status === "failed" || session.status === "rejected") && (
+            <Button variant="outline" size="sm" onClick={handleRetry} disabled={retryMutation.isPending} className="rounded-lg text-sm">
+              <RefreshCw className={`w-3.5 h-3.5 mr-2 ${retryMutation.isPending ? "animate-spin" : ""}`} />
+              Retry Session
+            </Button>
+          )}
+          {session.status !== "pending" && session.status !== "running" && (
+            <Button variant="outline" size="sm" onClick={handleRerun} disabled={rerunMutation.isPending} className="rounded-lg text-sm">
+              <RotateCcw className={`w-3.5 h-3.5 mr-2 ${rerunMutation.isPending ? "animate-spin" : ""}`} />
+              Rerun Session
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Two-column body */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_480px] gap-5 items-start">
 
         {/* Left: content */}
         <div className="space-y-4 min-w-0">
@@ -442,6 +517,9 @@ export default function SessionDetail() {
             </div>
           )}
 
+          {/* Adversarial critic review of the plan */}
+          <CriticReviewCard sessionId={session.id} />
+
           {/* Inline artifacts */}
           {artifacts.length > 0 && (
             <div className="space-y-3">
@@ -468,7 +546,7 @@ export default function SessionDetail() {
 
         {/* Right: agent trace — sticky on large screens */}
         <div className="xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)] flex flex-col min-w-0">
-          <SessionTrace sessionId={session.id} totalCost={session.total_cost} />
+          <SessionTrace sessionId={session.id} status={session.status} totalCost={session.total_cost} durationMs={session.duration_ms} />
         </div>
       </div>
     </div>

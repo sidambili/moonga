@@ -5,10 +5,10 @@
  * Oncident API
  * OpenAPI spec version: 0.1.0
  */
-import type { Session } from './session';
+import type { AgentSession } from './agentSession';
 
-export interface SessionList {
-  items: Session[];
+export interface AgentSessionList {
+  items: AgentSession[];
   /**
      * ID to pass as `cursor` for the next page
      * @nullable

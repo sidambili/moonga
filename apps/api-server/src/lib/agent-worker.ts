@@ -1,5 +1,5 @@
 import { db } from "@workspace/db";
-import { sessionsTable } from "@workspace/db";
+import { agentSessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { runAgentSession } from "./agent-runner";
@@ -10,8 +10,8 @@ async function pollPendingSessions(): Promise<void> {
   try {
     const pending = await db
       .select()
-      .from(sessionsTable)
-      .where(eq(sessionsTable.status, "pending"))
+      .from(agentSessionsTable)
+      .where(eq(agentSessionsTable.status, "pending"))
       .limit(5);
 
     await Promise.all(
@@ -22,9 +22,9 @@ async function pollPendingSessions(): Promise<void> {
           logger.error({ err, sessionId: session.id }, "Failed to process session");
           try {
             await db
-              .update(sessionsTable)
+              .update(agentSessionsTable)
               .set({ status: "failed", updated_at: new Date() })
-              .where(eq(sessionsTable.id, session.id));
+              .where(eq(agentSessionsTable.id, session.id));
           } catch (dbErr) {
             logger.error({ dbErr }, "Failed to mark session as failed");
           }

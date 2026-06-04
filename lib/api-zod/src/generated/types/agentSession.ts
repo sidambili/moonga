@@ -5,10 +5,10 @@
  * Oncident API
  * OpenAPI spec version: 0.1.0
  */
+import type { AgentSessionContextSnapshot } from './agentSessionContextSnapshot';
 import type { Event } from './event';
-import type { SessionContextSnapshot } from './sessionContextSnapshot';
 
-export interface Session {
+export interface AgentSession {
   id: number;
   event_id: number;
   /** diagnose | plan | summarize | draft */
@@ -18,7 +18,7 @@ export interface Session {
   /** @nullable */
   model_used?: string | null;
   /** @nullable */
-  context_snapshot?: SessionContextSnapshot;
+  context_snapshot?: AgentSessionContextSnapshot;
   /** @nullable */
   output_summary?: string | null;
   /** @nullable */

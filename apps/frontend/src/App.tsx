@@ -10,8 +10,8 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import EventsFeed from "@/pages/events";
 import EventDetail from "@/pages/event-detail";
-import Sessions from "@/pages/sessions";
-import SessionDetail from "@/pages/session-detail";
+import Sessions from "@/pages/agent-sessions";
+import SessionDetail from "@/pages/agent-session-detail";
 import ArtifactsReview from "@/pages/artifacts";
 import ArtifactDetail from "@/pages/artifact-detail";
 import Integrations from "@/pages/integrations";
@@ -63,8 +63,8 @@ function AuthenticatedApp() {
         <Route path="/" component={DashboardRoute} />
         <Route path="/events" component={EventsFeedRoute} />
         <Route path="/events/:id" component={EventDetailRoute} />
-        <Route path="/sessions" component={SessionsRoute} />
-        <Route path="/sessions/:id" component={SessionDetailRoute} />
+        <Route path="/agent-sessions" component={SessionsRoute} />
+        <Route path="/agent-sessions/:id" component={SessionDetailRoute} />
         <Route path="/artifacts" component={ArtifactsReviewRoute} />
         <Route path="/artifacts/:id" component={ArtifactDetailRoute} />
         <Route path="/integrations" component={IntegrationsRoute} />

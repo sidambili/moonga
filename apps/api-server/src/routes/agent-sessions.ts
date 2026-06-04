@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { sessionsTable, eventsTable, sessionStepsTable, playbooksTable } from "@workspace/db";
+import { agentSessionsTable, eventsTable, agentSessionStepsTable, playbooksTable } from "@workspace/db";
 import { eq, desc, and, sql, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { subscribeToSession } from "../lib/session-stream";
 import { tenantScope, withTenantScope } from "../lib/tenant-scope";
 
 const router = Router();
@@ -14,34 +15,34 @@ router.get("/", async (req, res) => {
     const cursorN = cursor ? Number(cursor) : undefined;
 
     const conditions = [];
-    const scope = tenantScope(res, sessionsTable.project_id);
+    const scope = tenantScope(res, agentSessionsTable.project_id);
     if (scope) conditions.push(scope);
-    if (status) conditions.push(eq(sessionsTable.status, status));
-    if (cursorN) conditions.push(lt(sessionsTable.id, cursorN));
+    if (status) conditions.push(eq(agentSessionsTable.status, status));
+    if (cursorN) conditions.push(lt(agentSessionsTable.id, cursorN));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const stepStats = db
       .select({
-        session_id: sessionStepsTable.session_id,
+        session_id: agentSessionStepsTable.session_id,
         computed_step_count: sql<number>`count(*)::int`.as("computed_step_count"),
       })
-      .from(sessionStepsTable)
-      .groupBy(sessionStepsTable.session_id)
+      .from(agentSessionStepsTable)
+      .groupBy(agentSessionStepsTable.session_id)
       .as("step_stats");
 
     const rows = await db
       .select({
-        session: sessionsTable,
+        session: agentSessionsTable,
         event: eventsTable,
         computed_step_count: stepStats.computed_step_count,
         playbook_name: playbooksTable.name,
       })
-      .from(sessionsTable)
-      .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
-      .leftJoin(stepStats, eq(sessionsTable.id, stepStats.session_id))
-      .leftJoin(playbooksTable, eq(sessionsTable.playbook_id, playbooksTable.id))
+      .from(agentSessionsTable)
+      .leftJoin(eventsTable, eq(agentSessionsTable.event_id, eventsTable.id))
+      .leftJoin(stepStats, eq(agentSessionsTable.id, stepStats.session_id))
+      .leftJoin(playbooksTable, eq(agentSessionsTable.playbook_id, playbooksTable.id))
       .where(where)
-      .orderBy(desc(sessionsTable.id))
+      .orderBy(desc(agentSessionsTable.id))
       .limit(limitN + 1);
 
     const hasMore = rows.length > limitN;
@@ -66,26 +67,26 @@ router.get("/:id", async (req, res) => {
     const id = Number(req.params.id);
     const stepStats = db
       .select({
-        session_id: sessionStepsTable.session_id,
+        session_id: agentSessionStepsTable.session_id,
         computed_step_count: sql<number>`count(*)::int`.as("computed_step_count"),
       })
-      .from(sessionStepsTable)
-      .where(eq(sessionStepsTable.session_id, id))
-      .groupBy(sessionStepsTable.session_id)
+      .from(agentSessionStepsTable)
+      .where(eq(agentSessionStepsTable.session_id, id))
+      .groupBy(agentSessionStepsTable.session_id)
       .as("step_stats");
 
     const [row] = await db
       .select({
-        session: sessionsTable,
+        session: agentSessionsTable,
         event: eventsTable,
         computed_step_count: stepStats.computed_step_count,
         playbook_name: playbooksTable.name,
       })
-      .from(sessionsTable)
-      .leftJoin(eventsTable, eq(sessionsTable.event_id, eventsTable.id))
-      .leftJoin(stepStats, eq(sessionsTable.id, stepStats.session_id))
-      .leftJoin(playbooksTable, eq(sessionsTable.playbook_id, playbooksTable.id))
-      .where(withTenantScope(res, sessionsTable.project_id, eq(sessionsTable.id, id)));
+      .from(agentSessionsTable)
+      .leftJoin(eventsTable, eq(agentSessionsTable.event_id, eventsTable.id))
+      .leftJoin(stepStats, eq(agentSessionsTable.id, stepStats.session_id))
+      .leftJoin(playbooksTable, eq(agentSessionsTable.playbook_id, playbooksTable.id))
+      .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)));
 
     if (!row) return res.status(404).json({ error: "Session not found" });
     return res.json({ ...row.session, event: row.event, step_count: row.session.step_count ?? row.computed_step_count, playbook_name: row.playbook_name ?? null });
@@ -98,7 +99,7 @@ router.get("/:id", async (req, res) => {
 router.post("/:id/retry", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [updated] = await db.update(sessionsTable)
+    const [updated] = await db.update(agentSessionsTable)
       .set({
         status: "pending",
         total_tokens: null,
@@ -114,7 +115,7 @@ router.post("/:id/retry", async (req, res) => {
         duration_ms: null,
         updated_at: new Date(),
       })
-      .where(eq(sessionsTable.id, id))
+      .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)))
       .returning();
     if (!updated) return res.status(404).json({ error: "Session not found" });
 
@@ -126,26 +127,86 @@ router.post("/:id/retry", async (req, res) => {
   }
 });
 
+router.post("/:id/rerun", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [original] = await db
+      .select()
+      .from(agentSessionsTable)
+      .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)));
+    if (!original) return res.status(404).json({ error: "Session not found" });
+
+    const [session] = await db.insert(agentSessionsTable).values({
+      event_id: original.event_id,
+      objective: original.objective,
+      status: "pending",
+      model_used: null,
+      project_id: original.project_id,
+    }).returning();
+
+    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, original.event_id));
+    return res.json({ ...session, event, step_count: 0 });
+  } catch (err) {
+    logger.error({ err }, "Failed to rerun session");
+    return res.status(500).json({ error: "Failed to rerun session" });
+  }
+});
+
 router.get("/:id/steps", async (req, res) => {
   try {
     const id = Number(req.params.id);
     // Don't expose steps for a session outside the active org.
     const [sess] = await db
-      .select({ id: sessionsTable.id })
-      .from(sessionsTable)
-      .where(withTenantScope(res, sessionsTable.project_id, eq(sessionsTable.id, id)));
+      .select({ id: agentSessionsTable.id })
+      .from(agentSessionsTable)
+      .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)));
     if (!sess) return res.status(404).json({ error: "Session not found" });
 
     const steps = await db
       .select()
-      .from(sessionStepsTable)
-      .where(eq(sessionStepsTable.session_id, id))
-      .orderBy(sessionStepsTable.step_number);
+      .from(agentSessionStepsTable)
+      .where(eq(agentSessionStepsTable.session_id, id))
+      .orderBy(agentSessionStepsTable.step_number);
     return res.json(steps);
   } catch (err) {
     logger.error({ err }, "Failed to get session steps");
     return res.status(500).json({ error: "Failed to get session steps" });
   }
+});
+
+router.get("/:id/stream", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid session id" });
+    return;
+  }
+
+  // Don't stream steps for a session outside the active org.
+  const [sess] = await db
+    .select({ id: agentSessionsTable.id })
+    .from(agentSessionsTable)
+    .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)));
+  if (!sess) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  // Send a keep-alive comment immediately
+  res.write(":ok\n\n");
+
+  const unsubscribe = subscribeToSession(id, (step) => {
+    res.write(`data: ${JSON.stringify(step)}\n\n`);
+  });
+
+  req.on("close", () => {
+    unsubscribe();
+    res.end();
+  });
 });
 
 export default router;

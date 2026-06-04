@@ -22,6 +22,9 @@ import type {
 import type {
   ActiveProject,
   ActivityItem,
+  AgentSession,
+  AgentSessionList,
+  AgentSessionStep,
   Artifact,
   ArtifactEdit,
   ArtifactList,
@@ -33,9 +36,9 @@ import type {
   Integration,
   IntegrationInput,
   LinearTeam,
+  ListAgentSessionsParams,
   ListArtifactsParams,
   ListEventsParams,
-  ListSessionsParams,
   ModelSettings,
   ModelSettingsInput,
   Playbook,
@@ -48,9 +51,6 @@ import type {
   ProjectSource,
   ProjectSourceCreate,
   Repo,
-  Session,
-  SessionList,
-  SessionStep,
   SeverityCount,
   Skill,
   SkillCreate,
@@ -619,7 +619,7 @@ export function useGetEvent<TData = Awaited<ReturnType<typeof getEvent>>, TError
 
 
 
-export const getListSessionsUrl = (params?: ListSessionsParams,) => {
+export const getListAgentSessionsUrl = (params?: ListAgentSessionsParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -631,15 +631,15 @@ export const getListSessionsUrl = (params?: ListSessionsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/sessions?${stringifiedParams}` : `/api/sessions`
+  return stringifiedParams.length > 0 ? `/api/agent-sessions?${stringifiedParams}` : `/api/agent-sessions`
 }
 
 /**
  * @summary List all agent sessions
  */
-export const listSessions = async (params?: ListSessionsParams, options?: RequestInit): Promise<SessionList> => {
+export const listAgentSessions = async (params?: ListAgentSessionsParams, options?: RequestInit): Promise<AgentSessionList> => {
 
-  return customFetch<SessionList>(getListSessionsUrl(params),
+  return customFetch<AgentSessionList>(getListAgentSessionsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -652,45 +652,45 @@ export const listSessions = async (params?: ListSessionsParams, options?: Reques
 
 
 
-export const getListSessionsQueryKey = (params?: ListSessionsParams,) => {
+export const getListAgentSessionsQueryKey = (params?: ListAgentSessionsParams,) => {
     return [
-    `/api/sessions`, ...(params ? [params] : [])
+    `/api/agent-sessions`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listSessions>>, TError = ErrorType<unknown>>(params?: ListSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAgentSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listAgentSessions>>, TError = ErrorType<unknown>>(params?: ListAgentSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgentSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListSessionsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getListAgentSessionsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSessions>>> = ({ signal }) => listSessions(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgentSessions>>> = ({ signal }) => listAgentSessions(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgentSessions>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type ListSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listSessions>>>
-export type ListSessionsQueryError = ErrorType<unknown>
+export type ListAgentSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAgentSessions>>>
+export type ListAgentSessionsQueryError = ErrorType<unknown>
 
 
 /**
  * @summary List all agent sessions
  */
 
-export function useListSessions<TData = Awaited<ReturnType<typeof listSessions>>, TError = ErrorType<unknown>>(
- params?: ListSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useListAgentSessions<TData = Awaited<ReturnType<typeof listAgentSessions>>, TError = ErrorType<unknown>>(
+ params?: ListAgentSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAgentSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListSessionsQueryOptions(params,options)
+  const queryOptions = getListAgentSessionsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -703,20 +703,20 @@ export function useListSessions<TData = Awaited<ReturnType<typeof listSessions>>
 
 
 
-export const getGetSessionUrl = (id: number,) => {
+export const getGetAgentSessionUrl = (id: number,) => {
 
 
 
 
-  return `/api/sessions/${id}`
+  return `/api/agent-sessions/${id}`
 }
 
 /**
  * @summary Get session by ID
  */
-export const getSession = async (id: number, options?: RequestInit): Promise<Session> => {
+export const getAgentSession = async (id: number, options?: RequestInit): Promise<AgentSession> => {
 
-  return customFetch<Session>(getGetSessionUrl(id),
+  return customFetch<AgentSession>(getGetAgentSessionUrl(id),
   {
     ...options,
     method: 'GET'
@@ -729,45 +729,45 @@ export const getSession = async (id: number, options?: RequestInit): Promise<Ses
 
 
 
-export const getGetSessionQueryKey = (id: number,) => {
+export const getGetAgentSessionQueryKey = (id: number,) => {
     return [
-    `/api/sessions/${id}`
+    `/api/agent-sessions/${id}`
     ] as const;
     }
 
 
-export const getGetSessionQueryOptions = <TData = Awaited<ReturnType<typeof getSession>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAgentSessionQueryOptions = <TData = Awaited<ReturnType<typeof getAgentSession>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgentSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetSessionQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentSessionQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSession>>> = ({ signal }) => getSession(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentSession>>> = ({ signal }) => getAgentSession(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSession>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentSession>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getSession>>>
-export type GetSessionQueryError = ErrorType<void>
+export type GetAgentSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentSession>>>
+export type GetAgentSessionQueryError = ErrorType<void>
 
 
 /**
  * @summary Get session by ID
  */
 
-export function useGetSession<TData = Awaited<ReturnType<typeof getSession>>, TError = ErrorType<void>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetAgentSession<TData = Awaited<ReturnType<typeof getAgentSession>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgentSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetSessionQueryOptions(id,options)
+  const queryOptions = getGetAgentSessionQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -780,20 +780,20 @@ export function useGetSession<TData = Awaited<ReturnType<typeof getSession>>, TE
 
 
 
-export const getRetrySessionUrl = (id: number,) => {
+export const getRetryAgentSessionUrl = (id: number,) => {
 
 
 
 
-  return `/api/sessions/${id}/retry`
+  return `/api/agent-sessions/${id}/retry`
 }
 
 /**
  * @summary Retry a failed session
  */
-export const retrySession = async (id: number, options?: RequestInit): Promise<Session> => {
+export const retryAgentSession = async (id: number, options?: RequestInit): Promise<AgentSession> => {
 
-  return customFetch<Session>(getRetrySessionUrl(id),
+  return customFetch<AgentSession>(getRetryAgentSessionUrl(id),
   {
     ...options,
     method: 'POST'
@@ -805,11 +805,11 @@ export const retrySession = async (id: number, options?: RequestInit): Promise<S
 
 
 
-export const getRetrySessionMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retrySession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof retrySession>>, TError,{id: number}, TContext> => {
+export const getRetryAgentSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryAgentSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryAgentSession>>, TError,{id: number}, TContext> => {
 
-const mutationKey = ['retrySession'];
+const mutationKey = ['retryAgentSession'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -819,10 +819,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retrySession>>, {id: number}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryAgentSession>>, {id: number}> = (props) => {
           const {id} = props ?? {};
 
-          return  retrySession(id,requestOptions)
+          return  retryAgentSession(id,requestOptions)
         }
 
 
@@ -832,38 +832,108 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type RetrySessionMutationResult = NonNullable<Awaited<ReturnType<typeof retrySession>>>
+    export type RetryAgentSessionMutationResult = NonNullable<Awaited<ReturnType<typeof retryAgentSession>>>
 
-    export type RetrySessionMutationError = ErrorType<unknown>
+    export type RetryAgentSessionMutationError = ErrorType<unknown>
 
     /**
  * @summary Retry a failed session
  */
-export const useRetrySession = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retrySession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useRetryAgentSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryAgentSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof retrySession>>,
+        Awaited<ReturnType<typeof retryAgentSession>>,
         TError,
         {id: number},
         TContext
       > => {
-      return useMutation(getRetrySessionMutationOptions(options));
+      return useMutation(getRetryAgentSessionMutationOptions(options));
     }
 
-export const getGetSessionStepsUrl = (id: number,) => {
+export const getRerunAgentSessionUrl = (id: number,) => {
 
 
 
 
-  return `/api/sessions/${id}/steps`
+  return `/api/agent-sessions/${id}/rerun`
+}
+
+/**
+ * @summary Rerun a session with identical input
+ */
+export const rerunAgentSession = async (id: number, options?: RequestInit): Promise<AgentSession> => {
+
+  return customFetch<AgentSession>(getRerunAgentSessionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRerunAgentSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rerunAgentSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rerunAgentSession>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['rerunAgentSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rerunAgentSession>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  rerunAgentSession(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RerunAgentSessionMutationResult = NonNullable<Awaited<ReturnType<typeof rerunAgentSession>>>
+
+    export type RerunAgentSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Rerun a session with identical input
+ */
+export const useRerunAgentSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rerunAgentSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rerunAgentSession>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRerunAgentSessionMutationOptions(options));
+    }
+
+export const getGetAgentSessionStepsUrl = (id: number,) => {
+
+
+
+
+  return `/api/agent-sessions/${id}/steps`
 }
 
 /**
  * @summary Get reasoning steps for a session
  */
-export const getSessionSteps = async (id: number, options?: RequestInit): Promise<SessionStep[]> => {
+export const getAgentSessionSteps = async (id: number, options?: RequestInit): Promise<AgentSessionStep[]> => {
 
-  return customFetch<SessionStep[]>(getGetSessionStepsUrl(id),
+  return customFetch<AgentSessionStep[]>(getGetAgentSessionStepsUrl(id),
   {
     ...options,
     method: 'GET'
@@ -876,45 +946,45 @@ export const getSessionSteps = async (id: number, options?: RequestInit): Promis
 
 
 
-export const getGetSessionStepsQueryKey = (id: number,) => {
+export const getGetAgentSessionStepsQueryKey = (id: number,) => {
     return [
-    `/api/sessions/${id}/steps`
+    `/api/agent-sessions/${id}/steps`
     ] as const;
     }
 
 
-export const getGetSessionStepsQueryOptions = <TData = Awaited<ReturnType<typeof getSessionSteps>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionSteps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAgentSessionStepsQueryOptions = <TData = Awaited<ReturnType<typeof getAgentSessionSteps>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionSteps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetSessionStepsQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentSessionStepsQueryKey(id);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSessionSteps>>> = ({ signal }) => getSessionSteps(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentSessionSteps>>> = ({ signal }) => getAgentSessionSteps(id, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSessionSteps>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionSteps>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetSessionStepsQueryResult = NonNullable<Awaited<ReturnType<typeof getSessionSteps>>>
-export type GetSessionStepsQueryError = ErrorType<unknown>
+export type GetAgentSessionStepsQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentSessionSteps>>>
+export type GetAgentSessionStepsQueryError = ErrorType<unknown>
 
 
 /**
  * @summary Get reasoning steps for a session
  */
 
-export function useGetSessionSteps<TData = Awaited<ReturnType<typeof getSessionSteps>>, TError = ErrorType<unknown>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionSteps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetAgentSessionSteps<TData = Awaited<ReturnType<typeof getAgentSessionSteps>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgentSessionSteps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetSessionStepsQueryOptions(id,options)
+  const queryOptions = getGetAgentSessionStepsQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
