@@ -20,6 +20,15 @@ Tool use strategy:
 - For PRs: the diff is usually pre-fetched; only call tools if you need surrounding context.
 - Prefer search_code to locate symbols first, then get_file_contents to read the implementation.`
 
+// ── Triage tool strategy (lean — triage is the fast first pass) ───────────────
+
+export const TRIAGE_TOOL_STRATEGY_PROMPT = `You have Linear tools (search_linear_issues, get_linear_issue), an artifact-history tool (search_existing_artifacts), and GitHub read tools. Stay fast and shallow — deep investigation is the Plan agent's job, not yours.
+
+Triage tool strategy:
+- FIRST, dedupe: call search_linear_issues with 1-2 key phrases from the title to find duplicate or related tickets, and search_existing_artifacts to see whether this (or a related) ticket was already analyzed.
+- If a duplicate or a prior artifact already covers this work, reference it and do NOT re-investigate or escalate.
+- You MAY do at most one search_code and read at most 1-2 files to gauge the affected area — but do not deep-dive into the codebase. Base your scope call on the ticket text and history, not a full read.`
+
 // ── Fallback guidance (used only when no playbook is loaded) ─────────────────
 
 export const DIAGNOSE_GUIDANCE = `Be concise (200–300 words). Focus on root cause and the single most important action.`
@@ -69,8 +78,10 @@ export function buildSystemPrompt(
       ? `\n\n## Additional Context\n${skillContents.join("\n\n---\n\n")}`
       : "";
 
+  const toolStrategy = objective === "triage" ? TRIAGE_TOOL_STRATEGY_PROMPT : TOOL_STRATEGY_PROMPT;
+
   return `${AGENT_ROLE_PROMPT}${stackLine}
-${TOOL_STRATEGY_PROMPT}
+${toolStrategy}
 
 ${JUDGMENT_PROMPT}
 ${guidance}${skillsSection}
@@ -148,12 +159,17 @@ Event type: ${eventType}
 Title: ${title}
 ${ticketInfo}${contextBlock}
 
-Assess scope from the ticket and the related context above. Look for historically related issues that suggest a known pattern or prior resolution. Only escalate (needs_plan: true) when deep planning is genuinely warranted — bias toward false for trivial or well-specified tickets.
+REQUIRED first step — check for duplicates and prior art:
+1. Call search_linear_issues with 1-2 key phrases from the title/description to find existing related or duplicate tickets.
+2. If a strong candidate appears, call get_linear_issue on its UUID to confirm whether it is a true duplicate or a related ticket worth referencing.
+3. In your summary and slack_summary, explicitly name any duplicate/related issue by its identifier (e.g. ENG-123) and URL. If it is a clear duplicate, say so plainly and recommend linking/closing rather than escalating.
+
+Then assess scope. Only escalate (needs_plan: true) when deep, source-grounded planning is genuinely warranted — bias toward false for trivial, well-specified, or duplicate tickets.
 
 Respond with valid JSON only — no surrounding text or code fences:
 {
-  "content": "<markdown triage summary: what the ticket is, likely affected area, trivial-vs-needs-planning judgement, and any related prior issues>",
-  "slack_summary": "<2-3 plain-text sentences suitable for posting as a Linear comment: the triage read and the next step>",
+  "content": "<markdown triage summary: what the ticket is, likely affected area, any duplicate/related issues found (with identifier + URL), and the trivial-vs-needs-planning judgement>",
+  "slack_summary": "<2-3 plain-text sentences suitable for posting as a Linear comment: the triage read, any duplicate/related ticket to refer to, and the next step>",
   "confidence": <float 0.0–1.0>,
   "needs_plan": <true|false>
 }`;

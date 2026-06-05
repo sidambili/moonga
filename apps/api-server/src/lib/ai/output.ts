@@ -3,6 +3,7 @@ export interface AgentOutput {
   slack_summary: string;
   confidence: number;
   needs_plan?: boolean;
+  duplicate_of?: string;
 }
 
 /**
@@ -90,6 +91,7 @@ function tryParseJson(candidate: string): AgentOutput | null {
       slack_summary: String(parsed.slack_summary ?? "").trim() || content.slice(0, 300),
       confidence: Math.min(1, Math.max(0, Number(parsed.confidence ?? 0.75))),
       needs_plan: parsed.needs_plan === true,
+      duplicate_of: typeof parsed.duplicate_of === "string" && parsed.duplicate_of.trim() ? parsed.duplicate_of.trim() : undefined,
     };
   } catch {
     return null;

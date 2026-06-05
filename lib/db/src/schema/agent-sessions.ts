@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, jsonb, real, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb, real, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { eventsTable } from "./events";
@@ -15,6 +15,12 @@ export const agentSessionsTable = pgTable("agent_sessions", {
   output_summary: text("output_summary"),
   confidence_score: real("confidence_score"),
   failure_reason: text("failure_reason"),
+  // Triage-only escalation signals. needs_plan is the guarded recommendation
+  // (suppressed for duplicates / low confidence); duplicate_of holds the
+  // identifier of the issue this duplicates, if any. Drive the human "Escalate
+  // to Plan" gate — triage no longer auto-spawns Plan sessions.
+  needs_plan: boolean("needs_plan"),
+  duplicate_of: text("duplicate_of"),
   total_tokens: integer("total_tokens"),
   total_prompt_tokens: integer("total_prompt_tokens"),
   total_completion_tokens: integer("total_completion_tokens"),

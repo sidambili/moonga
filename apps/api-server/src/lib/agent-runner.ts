@@ -8,10 +8,11 @@ import { agentSessionsTable, agentSessionStepsTable, artifactsTable, eventsTable
 import { eq, and, desc } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost, getModelPrice } from "./model-prices";
-import { gatherLinearContext, extractLinearTicketInfo, postLinearComment } from "./integrations/linear-client";
+import { gatherLinearContext, extractLinearTicketInfo, postLinearComment, getLinearClient } from "./integrations/linear-client";
 import { extractSlackMessageInfo, getSlackBotToken, postSlackReply } from "./integrations/slack-client";
 import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEventContext } from "./integrations/github-context";
 import { createGithubTools } from "./integrations/github-ai-tools";
+import { createLinearTools } from "./integrations/linear-ai-tools";
 import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt, triageUserPrompt, CRITIC_SYSTEM_PROMPT, buildCriticPrompt } from "./ai/prompts";
 import { parseAgentOutput } from "./ai/output";
 import { loadPlaybook, loadActiveSkills } from "./playbook-loader";
@@ -280,6 +281,10 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
   const ghClient = repo && githubToken ? new Octokit({ auth: githubToken }) : null;
 
+  // Linear-sourced sessions (triage especially) get search/fetch tools so the
+  // agent can find duplicate/related issues and ground its read in ticket history.
+  const linearClient = event.source === "linear" ? await getLinearClient() : null;
+
   let toolCallsUsed = 0;
   function checkToolLimit(): string | null {
     if (++toolCallsUsed > MAX_TOOL_CALLS) {
@@ -287,6 +292,11 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     }
     return null;
   }
+
+  const tools = {
+    ...createGithubTools(ghClient, repo, checkToolLimit),
+    ...(linearClient ? createLinearTools(linearClient, checkToolLimit) : {}),
+  };
 
   const { model: modelConfig, capture: cacheCapture } = getModelConfig(settings, modelString, sessionId);
   const sessionStartTime = Date.now();
@@ -308,7 +318,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       maxSteps: MAX_STEPS,
       maxTokens,
       temperature: 0,
-      tools: createGithubTools(ghClient, repo, checkToolLimit),
+      tools,
       onStepFinish: async (step) => {
         const stepUsage = step.usage ? {
           promptTokens: step.usage.promptTokens,

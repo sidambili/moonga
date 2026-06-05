@@ -294,6 +294,12 @@ export function getToolLabel(name: string, args?: unknown): string {
       const p = a.path ? ` in ${a.path}` : "";
       return q ? `Searched ${q.includes(" ") ? `"${q}"` : q}${p}` : "Searched code";
     }
+    case "search_linear_issues": {
+      const q = a.query ? String(a.query) : "";
+      return q ? `Searched Linear: ${q.includes(" ") ? `"${q}"` : q}` : "Searched Linear issues";
+    }
+    case "get_linear_issue":
+      return a.id ? `Linear issue ${String(a.id).slice(0, 8)}` : "Linear issue";
     case "create_artifact":
       return "Artifact created";
     case "post_linear_comment":
