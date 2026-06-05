@@ -168,6 +168,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: event_id
+          in: query
+          schema:
+            type: integer
+            description: Filter sessions by the linked event ID
         - name: limit
           in: query
           schema:

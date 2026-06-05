@@ -472,6 +472,10 @@ cursor?: number;
 
 export type ListAgentSessionsParams = {
 status?: string;
+/**
+ * Filter sessions by the linked event ID
+ */
+event_id?: number;
 limit?: number;
 /**
  * ID of the last item from the previous page (for cursor pagination)

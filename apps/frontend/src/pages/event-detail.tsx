@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
-import { useGetEvent, getGetEventQueryKey } from "@workspace/api-client-react";
+import { useGetEvent, getGetEventQueryKey, useListAgentSessions, getListAgentSessionsQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArrowLeft, ExternalLink, Copy, Check, ChevronDown } from "lucide-react";
@@ -12,6 +12,11 @@ export default function EventDetail() {
   const [, params] = useRoute("/events/:id");
   const id = Number(params?.id);
   const { data: event, isLoading } = useGetEvent(id, { query: { queryKey: getGetEventQueryKey(id), enabled: !!id } });
+  const { data: sessionsData } = useListAgentSessions(
+    { event_id: id },
+    { query: { queryKey: getListAgentSessionsQueryKey({ event_id: id }), enabled: !!id } }
+  );
+  const linkedSessions = sessionsData?.items ?? [];
   const [rawOpen, setRawOpen] = useState(false);
   const [rawCopied, setRawCopied] = useState(false);
 
@@ -101,15 +106,30 @@ export default function EventDetail() {
           </div>
         </div>
 
-        {event.session_id && (
+        {linkedSessions.length > 0 && (
           <div className="rounded-lg border border-primary/20 bg-card p-4 space-y-3">
-            <p className="text-xs font-medium text-muted-foreground">Linked Agent Session</p>
-            <Link href={`/agent-sessions/${event.session_id}`}>
-              <Button variant="outline" className="w-full rounded-lg text-sm">
-                <ExternalLink className="w-3.5 h-3.5 mr-2" />
-                View Session #{event.session_id}
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Linked Agent Sessions</p>
+              <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+                {linkedSessions.length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {linkedSessions.map((session) => (
+                <Link key={session.id} href={`/agent-sessions/${session.id}`}>
+                  <Button variant="outline" className="w-full rounded-lg text-sm justify-between h-auto px-3 py-2">
+                    <span className="flex items-center gap-2">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Session #{session.id}</span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-[11px] text-muted-foreground capitalize">{session.objective}</span>
+                      <StatusBadge status={session.status} />
+                    </span>
+                  </Button>
+                </Link>
+              ))}
+            </div>
           </div>
         )}
       </div>

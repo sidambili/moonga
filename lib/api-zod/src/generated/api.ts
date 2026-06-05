@@ -131,6 +131,7 @@ export const listAgentSessionsQueryLimitDefault = 50;
 
 export const ListAgentSessionsQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
+  "event_id": zod.coerce.number().optional(),
   "limit": zod.coerce.number().default(listAgentSessionsQueryLimitDefault),
   "cursor": zod.coerce.number().optional()
 })
