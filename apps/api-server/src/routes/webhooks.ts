@@ -266,7 +266,7 @@ async function ingestWebhook(source: string, payload: Record<string, unknown>, r
     project_id: projectId,
   }).returning();
 
-  const objective = (source === "linear" || eventType === "ticket_created") ? "plan" : "diagnose";
+  const objective = source === "linear" ? "triage" : (eventType === "ticket_created" ? "plan" : "diagnose");
 
   const [session] = await db.insert(agentSessionsTable).values({
     event_id: event.id,

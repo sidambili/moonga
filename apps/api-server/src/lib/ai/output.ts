@@ -2,6 +2,7 @@ export interface AgentOutput {
   content: string;
   slack_summary: string;
   confidence: number;
+  needs_plan?: boolean;
 }
 
 /**
@@ -88,6 +89,7 @@ function tryParseJson(candidate: string): AgentOutput | null {
       content,
       slack_summary: String(parsed.slack_summary ?? "").trim() || content.slice(0, 300),
       confidence: Math.min(1, Math.max(0, Number(parsed.confidence ?? 0.75))),
+      needs_plan: parsed.needs_plan === true,
     };
   } catch {
     return null;

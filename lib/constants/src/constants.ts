@@ -151,10 +151,11 @@ export const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
 // ============================================================
 // Objectives
 // ============================================================
-export const OBJECTIVES = ["diagnose", "plan", "summarize", "draft"] as const;
+export const OBJECTIVES = ["triage", "diagnose", "plan", "summarize", "draft"] as const;
 export type Objective = (typeof OBJECTIVES)[number];
 
 export const OBJECTIVE_LABELS: Record<Objective, string> = {
+  triage: "Triage",
   diagnose: "Diagnose",
   plan: "Plan",
   summarize: "Summarize",
@@ -162,6 +163,7 @@ export const OBJECTIVE_LABELS: Record<Objective, string> = {
 };
 
 export const OBJECTIVE_COLORS: Record<Objective, string> = {
+  triage: "bg-green-500/10 text-green-400",
   diagnose: "bg-orange-500/10 text-orange-400",
   plan: "bg-primary/10 text-primary",
   summarize: "bg-purple-500/10 text-purple-400",
@@ -269,6 +271,7 @@ export const SYSTEM_TOOL_NAMES = new Set([
   "gather_event_context",
   "fetch_repo_instructions",
   "critic_review",
+  "delegate_plan",
 ]);
 
 export function getToolLabel(name: string, args?: unknown): string {
@@ -303,6 +306,8 @@ export function getToolLabel(name: string, args?: unknown): string {
       return "Loaded instructions";
     case "critic_review":
       return "Plan review";
+    case "delegate_plan":
+      return "Escalated to plan";
     default:
       return name.replace(/_/g, " ");
   }

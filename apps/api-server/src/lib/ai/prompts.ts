@@ -26,6 +26,11 @@ export const DIAGNOSE_GUIDANCE = `Be concise (200–300 words). Focus on root ca
 
 export const PLAN_GUIDANCE = `Write a tight, source-grounded plan. Every task must cite real file paths and function/class names you found in the code — no vague instructions. Be terse: structured sections over prose, no restating the ticket, no filler. List at most the 3 most material risks, one line each. Omit any section that does not change the decision.`
 
+export const TRIAGE_GUIDANCE = `You are a fast, super smart triage assistant — the first responder to an inbound ticket, NOT the deep planner. Be quick and decisive.
+- Read the ticket and any related issues/comments already provided in context. Use a search or two only if a single term obviously needs locating — do not embark on a full investigation.
+- Produce a short triage summary: what the ticket is, its likely area of the codebase, and whether it is trivial (clear, small, self-contained) or warrants deep planning.
+- Set needs_plan to true ONLY when deep, source-grounded planning is genuinely warranted (ambiguous scope, cross-cutting change, non-trivial design). Bias strongly toward false for typos, copy tweaks, config flips, one-line fixes, and well-specified small tasks — a downstream Plan agent is expensive, so do not escalate by default.`
+
 // ── Output format ─────────────────────────────────────────────────────────────
 
 export const OUTPUT_FORMAT_PROMPT = `Respond with valid JSON only — no surrounding text, no markdown code fences, no preamble, no explanation. Start your response with the opening brace and end with the closing brace.
@@ -57,7 +62,7 @@ export function buildSystemPrompt(
 
   const guidance = playbookInstructions
     ? `\n## Playbook\n${playbookInstructions}`
-    : `\n${objective === "plan" ? PLAN_GUIDANCE : DIAGNOSE_GUIDANCE}`;
+    : `\n${objective === "triage" ? TRIAGE_GUIDANCE : objective === "plan" ? PLAN_GUIDANCE : DIAGNOSE_GUIDANCE}`;
 
   const skillsSection =
     skillContents && skillContents.length > 0
@@ -131,6 +136,26 @@ Respond with valid JSON only — no surrounding text or code fences:
   "content": "<markdown diagnosis with: root cause assessment, severity justification, recommended immediate actions, estimated resolution time>",
   "slack_summary": "<2-3 plain-text sentences: what the issue is and the top action to take>",
   "confidence": <float 0.0–1.0>
+}`;
+}
+
+export function triageUserPrompt({ source, eventType, title, ticketInfo, context }: UserPromptParams): string {
+  const contextBlock = context ? `\n\nRelated context (ticket details, comments, related issues):\n${context}` : "";
+  return `Triage this inbound ticket quickly. Decide whether it can be handled with a quick response or whether it warrants deep, source-grounded planning by a more capable agent.
+
+Source: ${source}
+Event type: ${eventType}
+Title: ${title}
+${ticketInfo}${contextBlock}
+
+Assess scope from the ticket and the related context above. Look for historically related issues that suggest a known pattern or prior resolution. Only escalate (needs_plan: true) when deep planning is genuinely warranted — bias toward false for trivial or well-specified tickets.
+
+Respond with valid JSON only — no surrounding text or code fences:
+{
+  "content": "<markdown triage summary: what the ticket is, likely affected area, trivial-vs-needs-planning judgement, and any related prior issues>",
+  "slack_summary": "<2-3 plain-text sentences suitable for posting as a Linear comment: the triage read and the next step>",
+  "confidence": <float 0.0–1.0>,
+  "needs_plan": <true|false>
 }`;
 }
 

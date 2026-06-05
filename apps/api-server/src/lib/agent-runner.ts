@@ -5,14 +5,14 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOpenAI } from "@ai-sdk/openai";
 import { db } from "@workspace/db";
 import { agentSessionsTable, agentSessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost, getModelPrice } from "./model-prices";
-import { gatherLinearContext, extractLinearTicketInfo } from "./integrations/linear-client";
+import { gatherLinearContext, extractLinearTicketInfo, postLinearComment } from "./integrations/linear-client";
 import { extractSlackMessageInfo, getSlackBotToken, postSlackReply } from "./integrations/slack-client";
 import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEventContext } from "./integrations/github-context";
 import { createGithubTools } from "./integrations/github-ai-tools";
-import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt, CRITIC_SYSTEM_PROMPT, buildCriticPrompt } from "./ai/prompts";
+import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt, triageUserPrompt, CRITIC_SYSTEM_PROMPT, buildCriticPrompt } from "./ai/prompts";
 import { parseAgentOutput } from "./ai/output";
 import { loadPlaybook, loadActiveSkills } from "./playbook-loader";
 import { emitStep } from "./session-stream";
@@ -234,7 +234,24 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       .where(eq(agentSessionsTable.id, sessionId));
   }
 
-  const fullContext = [repoInstructions, linearContext, context].filter(Boolean).join("\n\n---\n\n");
+  // A plan session spawned by a prior triage run starts from the triage findings,
+  // not cold — pull the most recent triage artifact for this event into context so
+  // the (expensive) Plan agent builds on the work that justified escalating.
+  let triageContext = "";
+  if (session.objective === "plan") {
+    const [prior] = await db
+      .select({ content: artifactsTable.content })
+      .from(artifactsTable)
+      .innerJoin(agentSessionsTable, eq(artifactsTable.session_id, agentSessionsTable.id))
+      .where(and(eq(agentSessionsTable.event_id, event.id), eq(agentSessionsTable.objective, "triage")))
+      .orderBy(desc(artifactsTable.id))
+      .limit(1);
+    if (prior?.content) {
+      triageContext = `Prior triage assessment (from the fast triage agent — build on this, do not redo it):\n${prior.content}`;
+    }
+  }
+
+  const fullContext = [triageContext, repoInstructions, linearContext, context].filter(Boolean).join("\n\n---\n\n");
 
   const ticketInfo = event.source === "linear"
     ? extractLinearTicketInfo(event.payload_raw as Record<string, unknown>)
@@ -242,9 +259,12 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     ? extractSlackMessageInfo(event.payload_raw as Record<string, unknown>)
     : JSON.stringify(event.payload_raw, null, 2).slice(0, 2_000);
 
-  const userPrompt = session.objective === "plan"
-    ? planUserPrompt({ source: event.source, eventType: event.event_type, title: event.title ?? "Untitled", ticketInfo, context: fullContext })
-    : diagnoseUserPrompt({ source: event.source, eventType: event.event_type, title: event.title ?? "Untitled", ticketInfo, context: fullContext });
+  const promptParams = { source: event.source, eventType: event.event_type, title: event.title ?? "Untitled", ticketInfo, context: fullContext };
+  const userPrompt = session.objective === "triage"
+    ? triageUserPrompt(promptParams)
+    : session.objective === "plan"
+    ? planUserPrompt(promptParams)
+    : diagnoseUserPrompt(promptParams);
 
   // Persist pre-fetched context and user prompt
   if (repoInstructions) {
@@ -413,7 +433,10 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     let criticUsage: { promptTokens: number; completionTokens: number; totalTokens: number; cost: number } | undefined;
     let criticVerdict: string | null = null;
     let criticFailed: string | null = null;
-    try {
+    // Triage is the fast/cheap first pass — a second skeptical LLM call would
+    // double its cost and defeat the purpose. The downstream Plan session (if
+    // escalated) still gets its own critic review.
+    if (session.objective !== "triage") try {
       // Plain text, not structured output: a truncated markdown review is still
       // readable, whereas truncated JSON throws NoObjectGeneratedError and loses
       // the whole review.
@@ -529,6 +552,38 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       .update(eventsTable)
       .set({ status: "needs_review" })
       .where(eq(eventsTable.id, event.id));
+
+    // Post-triage: auto-comment the triage read back on the Linear ticket, and
+    // delegate to a deep Plan session only when the triage agent judged it
+    // warranted. The new pending session is picked up by the agent-worker poll.
+    if (session.objective === "triage") {
+      if (event.source === "linear" && event.ticket_id) {
+        try {
+          await postLinearComment(event.ticket_id, parsed.slack_summary);
+          await persistStep(sessionId, stepNum, "tool", `[System] Posted triage comment to Linear ticket ${event.ticket_id}\n\n${parsed.slack_summary}`, undefined, undefined, undefined, "post_linear_comment", { success: true });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          logger.warn({ err, sessionId }, "Failed to post Linear triage comment");
+          await persistStep(sessionId, stepNum, "tool", `[System] Failed to post Linear triage comment: ${msg}`, undefined, undefined, undefined, "post_linear_comment", { success: false, error: msg });
+        }
+        stepNum++;
+      }
+
+      if (parsed.needs_plan) {
+        const [planSession] = await db.insert(agentSessionsTable).values({
+          event_id: event.id,
+          objective: "plan",
+          status: "pending",
+          model_used: null,
+          project_id: session.project_id,
+        }).returning({ id: agentSessionsTable.id });
+        await persistStep(sessionId, stepNum, "tool", `[System] Triage escalated → spawned Plan session #${planSession?.id ?? "?"}`, undefined, undefined, undefined, "delegate_plan", { needs_plan: true });
+        stepNum++;
+        logger.info({ sessionId, planSessionId: planSession?.id, eventId: event.id }, "Triage escalated to plan session");
+      } else {
+        logger.info({ sessionId, eventId: event.id }, "Triage complete — no plan escalation needed");
+      }
+    }
 
     if (event.source === "slack") {
       const slackToken = await getSlackBotToken();

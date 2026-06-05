@@ -151,6 +151,11 @@ export async function loadPlaybook(
   objective: string,
   eventSource: string,
 ): Promise<Playbook | null> {
+  // playbooks.objective is a Postgres enum ["diagnose","plan"]. Objectives outside
+  // that set (e.g. "triage") have no playbook and would error the enum-typed query —
+  // their guidance lives in code (see TRIAGE_GUIDANCE), so short-circuit here.
+  if (objective !== "diagnose" && objective !== "plan") return null;
+
   const rows = await db
     .select()
     .from(playbooksTable)
