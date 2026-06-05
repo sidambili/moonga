@@ -13,6 +13,18 @@ export function getRepoFromPayload(
   return { owner, repo: name };
 }
 
+// Pull a commit SHA out of an event payload when one is present (push head commit
+// or PR head), so the repo map is built at the exact commit under analysis. Returns
+// undefined for events with no inherent commit (issues, tickets) — callers fall
+// back to the default branch head.
+export function extractPayloadSha(payload: Record<string, unknown>): string | undefined {
+  const headCommit = (payload.head_commit as { id?: string } | undefined)?.id;
+  if (headCommit) return headCommit;
+  const prHead = (payload.pull_request as { head?: { sha?: string } } | undefined)?.head?.sha;
+  if (prHead) return prHead;
+  return undefined;
+}
+
 // Ordered by priority — first match wins per "slot" (agent instructions, cursor, windsurf, github)
 export const INSTRUCTION_FILE_CANDIDATES = [
   // Agent instruction files (Claude, OpenAI, generic)
@@ -218,36 +230,8 @@ export async function gatherEventContext(
       }
     }
 
-    // List repo root + expand key source dirs one level deep so the agent has a map without burning tool calls
-    if (eventType === "ticket_created" || eventType === "issue_opened") {
-      try {
-        const { data: root } = await client.rest.repos.getContent({ owner, repo: repoName, path: "" });
-        if (Array.isArray(root)) {
-          parts.push("Repository root:");
-          parts.push(root.map((e) => `${e.type === "dir" ? "📁" : "📄"} ${e.name}`).join("\n"));
-
-          const expandDirs = root
-            .filter((e) => e.type === "dir" && ["src", "lib", "app", "apps", "packages", "services", "api", "server", "backend", "frontend"].includes(e.name))
-            .slice(0, 4);
-
-          await Promise.all(
-            expandDirs.map(async (dir) => {
-              try {
-                const { data: children } = await client.rest.repos.getContent({ owner, repo: repoName, path: dir.path });
-                if (Array.isArray(children)) {
-                  parts.push(`📁 ${dir.name}/`);
-                  parts.push(children.map((e) => `  ${e.type === "dir" ? "📁" : "📄"} ${e.name}`).join("\n"));
-                }
-              } catch {
-                // ignore
-              }
-            }),
-          );
-        }
-      } catch {
-        // ignore
-      }
-    }
+    // (Repo tree map is now provided separately by getOrBuildRepoMap — a single
+    // cached recursive Trees call — superseding the old root + one-level walk here.)
   } catch (err) {
     logger.warn({ err }, "Context gathering failed");
   }

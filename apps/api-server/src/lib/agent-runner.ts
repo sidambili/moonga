@@ -10,7 +10,8 @@ import { logger } from "./logger";
 import { estimateCost, getModelPrice } from "./model-prices";
 import { gatherLinearContext, extractLinearTicketInfo, postLinearComment, getLinearClient } from "./integrations/linear-client";
 import { extractSlackMessageInfo, getSlackBotToken, postSlackReply } from "./integrations/slack-client";
-import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEventContext } from "./integrations/github-context";
+import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEventContext, extractPayloadSha } from "./integrations/github-context";
+import { getOrBuildRepoMap, formatRepoMap } from "./integrations/repo-index";
 import { createGithubTools } from "./integrations/github-ai-tools";
 import { createLinearTools } from "./integrations/linear-ai-tools";
 import { createArtifactTools } from "./ai/artifact-tools";
@@ -202,8 +203,13 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
   const ghClientEarly = repo && githubToken ? new Octokit({ auth: githubToken }) : null;
 
-  // Fetch tech stack, event context, repo instruction files, and Linear context in parallel
-  const [techStack, context, repoInstructions, linearContext] = await Promise.all([
+  // SHA from the payload, when the event carries one (push/PR), so the repo map is
+  // built at exactly the commit under analysis; otherwise the default branch head.
+  const payloadSha = extractPayloadSha(event.payload_raw as Record<string, unknown>);
+
+  // Fetch tech stack, event context, repo instruction files, the cached repo map,
+  // and Linear context in parallel
+  const [techStack, context, repoInstructions, repoMap, linearContext] = await Promise.all([
     ghClientEarly
       ? detectTechStack(ghClientEarly, repo!.owner, repo!.repo)
       : Promise.resolve(""),
@@ -216,10 +222,15 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     ghClientEarly && (event.event_type === "ticket_created" || event.event_type === "issue_opened")
       ? fetchRepoInstructions(ghClientEarly, repo!.owner, repo!.repo)
       : Promise.resolve(""),
+    ghClientEarly
+      ? getOrBuildRepoMap(ghClientEarly, repo!.owner, repo!.repo, payloadSha)
+      : Promise.resolve(null),
     event.source === "linear" && event.ticket_id
       ? gatherLinearContext(event.ticket_id)
       : Promise.resolve(""),
   ]);
+
+  const repoMapText = repoMap ? formatRepoMap(repoMap) : "";
 
   const [playbook, activeSkills] = await Promise.all([
     loadPlaybook(session.objective, event.source).catch(() => undefined),
@@ -263,7 +274,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     ? `Revision feedback from adversarial critic — you MUST address every point raised before finalising your plan:\n${session.critique_context}`
     : "";
 
-  const fullContext = [triageContext, critiqueContext, repoInstructions, linearContext, context].filter(Boolean).join("\n\n---\n\n");
+  const fullContext = [triageContext, critiqueContext, repoInstructions, repoMapText, linearContext, context].filter(Boolean).join("\n\n---\n\n");
 
   const ticketInfo = event.source === "linear"
     ? extractLinearTicketInfo(event.payload_raw as Record<string, unknown>)
@@ -281,6 +292,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   // Persist pre-fetched context and user prompt
   if (repoInstructions) {
     await persistStep(sessionId, -3, "tool", `[System] Repo instruction files found:\n${repoInstructions}`, undefined, undefined, undefined, "fetch_repo_instructions");
+  }
+  if (repoMapText) {
+    await persistStep(sessionId, -4, "tool", `[System] Repo map (${repoMap?.file_count} files, cached):\n${repoMapText}`, undefined, undefined, undefined, "build_repo_map");
   }
   if (linearContext) {
     await persistStep(sessionId, -2, "tool", `[System] Linear ticket context:\n${linearContext}`, undefined, undefined, undefined, "gather_linear_context");

@@ -11,3 +11,4 @@ export * from "./projects";
 export * from "./project-sources";
 export * from "./playbooks";
 export * from "./skills";
+export * from "./repo-index";
