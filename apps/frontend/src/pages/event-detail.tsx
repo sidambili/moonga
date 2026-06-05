@@ -3,7 +3,7 @@ import { useRoute, Link } from "wouter";
 import { useGetEvent, getGetEventQueryKey, useListAgentSessions, getListAgentSessionsQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, ExternalLink, Copy, Check, ChevronDown } from "lucide-react";
+import { ArrowLeft, ExternalLink, Copy, Check, ChevronDown, Bot } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource } from "@/components/ui-helpers";
 import { EventPayloadRenderer } from "@/components/event-payload-renderers";
@@ -114,19 +114,24 @@ export default function EventDetail() {
                 {linkedSessions.length}
               </span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {linkedSessions.map((session) => (
                 <Link key={session.id} href={`/agent-sessions/${session.id}`}>
-                  <Button variant="outline" className="w-full rounded-lg text-sm justify-between h-auto px-3 py-2">
-                    <span className="flex items-center gap-2">
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Session #{session.id}</span>
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-[11px] text-muted-foreground capitalize">{session.objective}</span>
-                      <StatusBadge status={session.status} />
-                    </span>
-                  </Button>
+                  <div className="flex items-center gap-3 p-2 -mx-2 rounded-md hover:bg-muted/40 transition-colors cursor-pointer group">
+                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-3.5 h-3.5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium group-hover:text-primary transition-colors truncate">
+                        Session #{session.id}
+                      </p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {session.objective}
+                      </p>
+                    </div>
+                    <StatusBadge status={session.status} />
+                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+                  </div>
                 </Link>
               ))}
             </div>
