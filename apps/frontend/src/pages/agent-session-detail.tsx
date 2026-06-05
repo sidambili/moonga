@@ -466,6 +466,21 @@ export default function SessionDetail() {
                   <span className="text-xs font-medium tabular-nums">${session.total_cost.toFixed(4)}</span>
                 </div>
               )}
+              {session.cached_tokens != null && session.cached_tokens > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-xs text-muted-foreground">Cached</span>
+                  <span className="text-xs font-medium tabular-nums">
+                    {session.cached_tokens.toLocaleString()} tok
+                    {session.cached_cost != null && session.cached_cost > 0 ? (
+                      <span className="text-emerald-600 dark:text-emerald-500">
+                        {" "}−${session.cached_cost.toFixed(4)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground/60"> no discount</span>
+                    )}
+                  </span>
+                </div>
+              )}
               {(session.prompt_token_cost != null || session.completion_token_cost != null) && (
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-xs text-muted-foreground">Rate</span>

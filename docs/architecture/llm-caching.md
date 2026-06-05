@@ -51,17 +51,17 @@ createOpenRouter({
 
 ### 3. Cached-token cost accounting
 
-OpenRouter reports cached prompt tokens in `usage.prompt_tokens_details.cached_tokens`. **The AI SDK provider (`@openrouter/ai-sdk-provider` 0.4.x) drops this field** — it parses only prompt and completion token counts. So Oncident reads it off the raw HTTP response with a wrapped `fetch` (`makeCaptureFetch`) that accumulates cached tokens across every call in the session.
+OpenRouter's usage accounting carries everything we need: `usage.cost` (the authoritative billed amount, in credits == USD, **already net of any cache discount the upstream applied**), `usage.prompt_tokens_details.cached_tokens` (cache-read tokens), and `usage.cache_discount` (the realized savings on those reads). **The AI SDK provider (`@openrouter/ai-sdk-provider` 0.4.x) drops all of these** — it parses only prompt and completion token counts. So Oncident reads them off the raw HTTP response with a wrapped `fetch` (`makeCaptureFetch`) that accumulates them across every call in the session.
 
 `usage: { include: true }` is sent so OpenRouter populates the accounting details.
 
-At the end of a session the discount is reconciled into the session totals:
+At the end of a session the totals are reconciled from OpenRouter's own numbers — **not** from a re-derived estimate:
 
-- `cached_tokens` is a subset of the prompt tokens already billed at the full input rate per step, so the discount is credited back to keep `total_cost` honest.
-- The cached rate is `model_prices.cached_input_rate`, falling back to `0.1 × input_rate` (the typical cache-read multiple) when no explicit rate is configured.
-- Results are written to `agent_sessions.cached_tokens` and `agent_sessions.cached_cost`.
+- `total_cost` is set to the summed `usage.cost`. This is the real billed amount, so it already reflects whatever discount the upstream actually gave. The per-step `estimateCost` total is kept only as a fallback for providers that return no `usage.cost`.
+- `cached_cost` holds the summed `usage.cache_discount` — the **realized** cache savings, or null when the provider reported cache hits but no discount.
+- `cached_tokens` is the summed cache-read token count.
 
-`getModelPrice()` returns `cachedInputRate` and the pricing `unit` to support this.
+> **Why not estimate the discount?** An earlier version credited back a fixed `0.1 × input_rate` for every cached token. That was wrong: many third-party DeepSeek hosts on OpenRouter (e.g. Alibaba Cloud Int., SiliconFlow) report `cached_tokens` for the latency win but **bill them at the full input rate**. Assuming a 90% discount made Oncident's `total_cost` read lower than the actual OpenRouter bill. Trusting `usage.cost` removes the guess entirely. Per the [DeepSeek section of the OpenRouter caching docs](https://openrouter.ai/docs/guides/best-practices/prompt-caching#deepseek), the cache-read multiplier is provider-dependent, and Alibaba's DeepSeek caching is *explicit* (requires `cache_control` breakpoints) — automatic prefix caching there yields no discount.
 
 ## What is deliberately NOT used
 

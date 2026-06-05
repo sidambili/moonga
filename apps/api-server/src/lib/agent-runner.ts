@@ -72,12 +72,23 @@ async function persistStep(
   return row;
 }
 
-// Accumulates provider-side prompt-cache hits across every LLM call in a session.
+// Accumulates OpenRouter usage accounting across every LLM call in a session.
 // The OpenRouter AI SDK provider (0.4.x) parses only prompt/completion token
-// counts and discards usage.prompt_tokens_details — so we read cached_tokens off
-// the raw HTTP response ourselves via a wrapped fetch.
+// counts and discards the rest of the usage object — so we read the fields we
+// need off the raw HTTP response ourselves via a wrapped fetch.
 interface CacheCapture {
+  // Cache-read tokens (usage.prompt_tokens_details.cached_tokens).
   cachedTokens: number;
+  // OpenRouter's authoritative billed amount (usage.cost, in credits == USD),
+  // summed across the session. Already net of whatever cache discount the
+  // upstream actually applied. Stays 0 when the provider returns no cost
+  // (non-OpenRouter path / BYOK), in which case we fall back to estimateCost.
+  actualCost: number;
+  // Realized cache-read savings reported by OpenRouter (usage.cache_discount),
+  // summed across the session. Not every provider reports it — many third-party
+  // DeepSeek hosts (Alibaba, SiliconFlow) surface cached_tokens but give no
+  // discount, so this legitimately stays 0 there.
+  cacheDiscount: number;
 }
 
 function makeCaptureFetch(capture: CacheCapture): typeof fetch {
@@ -85,8 +96,18 @@ function makeCaptureFetch(capture: CacheCapture): typeof fetch {
     const res = await fetch(input, init);
     try {
       const data = await res.clone().json();
-      const cached = data?.usage?.prompt_tokens_details?.cached_tokens;
+      const usage = data?.usage;
+      const cached = usage?.prompt_tokens_details?.cached_tokens;
       if (typeof cached === "number") capture.cachedTokens += cached;
+      // usage.cost is the source of truth for session cost — far better than
+      // re-deriving it from token counts and a guessed cache multiple, which
+      // silently understated cost on providers that don't discount cache reads.
+      const cost = usage?.cost;
+      if (typeof cost === "number") capture.actualCost += cost;
+      // cache_discount (positive = money saved on cache reads). Lives under
+      // usage in the inline accounting; tolerate a top-level fallback too.
+      const discount = usage?.cache_discount ?? data?.cache_discount;
+      if (typeof discount === "number") capture.cacheDiscount += discount;
     } catch {
       // Non-JSON / streaming / error body — nothing to capture, leave response intact.
     }
@@ -100,7 +121,7 @@ function getModelConfig(
   modelString: string,
   sessionId: number,
 ) {
-  const capture: CacheCapture = { cachedTokens: 0 };
+  const capture: CacheCapture = { cachedTokens: 0, actualCost: 0, cacheDiscount: 0 };
   const isOpenRouter = settings.provider === "openrouter" || (settings.base_url && settings.base_url.includes("openrouter"));
   if (isOpenRouter) {
     const openrouter = createOpenRouter({
@@ -438,20 +459,27 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       logger.warn({ err: criticErr, sessionId }, "Critic pass failed — continuing without review");
     }
 
-    // Reconcile provider-side prompt-cache savings. cached_tokens is a subset of
-    // the prompt tokens already billed at full input rate in the per-step
-    // estimateCost above, so credit back the discount to keep total_cost honest.
-    // Fall back to 0.1x input rate — the typical cache-read multiple — when the
-    // model has no explicit cached_input_rate.
+    // Reconcile cost from OpenRouter's authoritative usage.cost (summed across
+    // every call by makeCaptureFetch), which is already net of whatever cache
+    // discount the upstream actually applied. We deliberately do NOT re-derive
+    // savings from a guessed cache multiple: many third-party DeepSeek hosts
+    // (Alibaba, SiliconFlow) report cached_tokens but bill them at full input
+    // rate, so assuming a 0.1x discount understated real cost. The estimateCost
+    // total is kept only as a fallback for providers that return no usage.cost.
     const cachedTokens = cacheCapture.cachedTokens;
-    let cachedCost: number | null = null;
+    if (cacheCapture.actualCost > 0) {
+      totalCost = parseFloat(cacheCapture.actualCost.toFixed(6));
+    }
+    // cached_cost holds the realized cache savings reported by OpenRouter
+    // (cache_discount), not an estimate. Null when no savings were reported —
+    // i.e. cache hits that the provider didn't actually discount.
+    const cachedCost =
+      cacheCapture.cacheDiscount > 0 ? parseFloat(cacheCapture.cacheDiscount.toFixed(6)) : null;
     if (cachedTokens > 0) {
-      const divisor = modelPrice.unit === "1K" ? 1_000 : 1_000_000;
-      const cachedRate = modelPrice.cachedInputRate ?? modelPrice.inputRate * 0.1;
-      cachedCost = parseFloat(((cachedTokens / divisor) * cachedRate).toFixed(6));
-      const savings = (cachedTokens / divisor) * (modelPrice.inputRate - cachedRate);
-      totalCost = Math.max(0, parseFloat((totalCost - savings).toFixed(6)));
-      logger.info({ sessionId, cachedTokens, cachedCost, model: modelString }, "Prompt cache hits reconciled");
+      logger.info(
+        { sessionId, cachedTokens, cacheSavings: cachedCost, billedCost: totalCost, model: modelString },
+        "Prompt cache usage reconciled from OpenRouter usage.cost",
+      );
     }
 
     await db

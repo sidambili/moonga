@@ -22,6 +22,8 @@ export const agentSessionsTable = pgTable("agent_sessions", {
   prompt_token_cost: real("prompt_token_cost"),
   completion_token_cost: real("completion_token_cost"),
   cached_tokens: integer("cached_tokens"),
+  // Realized cache-read savings (USD) reported by OpenRouter via usage.cache_discount,
+  // not an estimate. Null when the upstream reported cache hits but no discount.
   cached_cost: real("cached_cost"),
   tool_calls_count: integer("tool_calls_count"),
   step_count: integer("step_count"),
