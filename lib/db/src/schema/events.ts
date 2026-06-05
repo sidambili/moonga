@@ -9,6 +9,8 @@ export const eventsTable = pgTable("events", {
   event_type: text("event_type").notNull(),
   severity: text("severity").notNull().default("low"),
   status: text("status").notNull().default("new"),
+  // Why a terminal-status event was closed: resolved | duplicate | wont_fix | escalated.
+  resolution: text("resolution"),
   service: text("service"),
   repo_id: text("repo_id"),
   ticket_id: text("ticket_id"),

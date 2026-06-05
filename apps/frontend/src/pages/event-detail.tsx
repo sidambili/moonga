@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArrowLeft, ExternalLink, Copy, Check, ChevronDown, Bot } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
-import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource } from "@/components/ui-helpers";
+import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource, formatEventResolution } from "@/components/ui-helpers";
 import { EventPayloadRenderer } from "@/components/event-payload-renderers";
 
 export default function EventDetail() {
@@ -75,6 +75,11 @@ export default function EventDetail() {
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <SeverityBadge severity={event.severity} />
               <StatusBadge status={event.status} />
+              {event.resolution && (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-500/10 text-amber-500">
+                  {formatEventResolution(event.resolution)}
+                </span>
+              )}
               <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground">
                 {formatEventType(event.event_type)}
               </span>

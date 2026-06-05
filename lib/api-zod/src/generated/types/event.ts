@@ -15,8 +15,13 @@ export interface Event {
   event_type: string;
   /** low | medium | high | critical */
   severity: string;
-  /** new | processing | processed | ignored */
+  /** new | processing | needs_review | resolved | closed */
   status: string;
+  /**
+     * resolved | duplicate | wont_fix | escalated — why a terminal event closed
+     * @nullable
+     */
+  resolution?: string | null;
   /** @nullable */
   service?: string | null;
   /** @nullable */

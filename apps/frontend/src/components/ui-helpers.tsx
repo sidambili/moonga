@@ -8,6 +8,7 @@ import {
   formatArtifactType,
   formatObjective,
   formatEventStatus,
+  formatEventResolution,
   formatApprovalState,
   SEVERITY_LABELS,
   APPROVAL_STATE_LABELS,
@@ -16,7 +17,7 @@ import {
 
 const badgeBase = "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium";
 
-export { formatSource, formatEventType, formatArtifactType, formatObjective, formatEventStatus, formatApprovalState };
+export { formatSource, formatEventType, formatArtifactType, formatObjective, formatEventStatus, formatEventResolution, formatApprovalState };
 
 export function SourceIcon({ source, className }: { source: string; className?: string }) {
   const normalized = source.toLowerCase();

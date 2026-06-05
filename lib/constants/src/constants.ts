@@ -50,15 +50,34 @@ export const SEVERITY_COLORS: Record<SeverityLevel, string> = {
 // ============================================================
 // Event Statuses
 // ============================================================
-export const EVENT_STATUSES = ["new", "open", "in_progress", "resolved"] as const;
+// Mirrors the values actually written by the pipeline: webhook ingest → processing,
+// agent run → needs_review, then a terminal resolved/closed. ("open"/"in_progress"
+// were never written.)
+export const EVENT_STATUSES = ["new", "processing", "needs_review", "resolved", "closed"] as const;
 export type EventStatus = (typeof EVENT_STATUSES)[number];
 
 export const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
   new: "New",
-  open: "Open",
-  in_progress: "In progress",
+  processing: "Processing",
+  needs_review: "Needs review",
   resolved: "Resolved",
+  closed: "Closed",
 };
+
+// Why a terminal-status event reached its end state.
+export const EVENT_RESOLUTIONS = ["resolved", "duplicate", "wont_fix", "escalated"] as const;
+export type EventResolution = (typeof EVENT_RESOLUTIONS)[number];
+
+export const EVENT_RESOLUTION_LABELS: Record<EventResolution, string> = {
+  resolved: "Resolved",
+  duplicate: "Duplicate",
+  wont_fix: "Won't fix",
+  escalated: "Escalated",
+};
+
+export function formatEventResolution(resolution: string): string {
+  return EVENT_RESOLUTION_LABELS[resolution as EventResolution] || resolution.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
 
 // ============================================================
 // Session Statuses

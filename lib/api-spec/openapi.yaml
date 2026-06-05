@@ -1118,7 +1118,10 @@ components:
           description: "low | medium | high | critical"
         status:
           type: string
-          description: "new | processing | processed | ignored"
+          description: "new | processing | needs_review | resolved | closed"
+        resolution:
+          type: ["string", "null"]
+          description: "resolved | duplicate | wont_fix | escalated — why a terminal event closed"
         service:
           type: ["string", "null"]
         repo_id:

@@ -242,7 +242,7 @@ router.post("/:id/mark-duplicate", async (req, res) => {
     await db.update(agentSessionsTable)
       .set({ marked_duplicate_at: new Date(), duplicate_of: result.canonicalIdentifier, updated_at: new Date() })
       .where(eq(agentSessionsTable.id, id));
-    await db.update(eventsTable).set({ status: "resolved" }).where(eq(eventsTable.id, event.id));
+    await db.update(eventsTable).set({ status: "closed", resolution: "duplicate" }).where(eq(eventsTable.id, event.id));
 
     return res.json({ ok: true, canonical_identifier: result.canonicalIdentifier, state_name: result.stateName });
   } catch (err) {
