@@ -1,4 +1,4 @@
-import { LinearClient, IssueRelationType } from "@linear/sdk";
+import { LinearClient } from "@linear/sdk";
 import { db } from "@workspace/db";
 import { integrationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -101,11 +101,16 @@ export async function markLinearDuplicate(
 
   try {
     // 1. Relation: this issue is a duplicate of the canonical one.
+    // Use the string literal rather than the IssueRelationType enum: the enum is
+    // not re-exported from the SDK's main entry and is erased in the esbuild
+    // bundle anyway (undefined at runtime). Its members are plain lowercase
+    // strings ("duplicate"); cast the input to the method's own param type.
+    type RelationInput = Parameters<typeof linear.createIssueRelation>[0];
     await linear.createIssueRelation({
       issueId,
       relatedIssueId: canonical.id,
-      type: IssueRelationType.Duplicate,
-    });
+      type: "duplicate",
+    } as RelationInput);
 
     // 2. Move the duplicate into a canceled-type state (Linear has no dedicated
     //    "duplicate" state type — duplicates resolve as canceled). Prefer a state
