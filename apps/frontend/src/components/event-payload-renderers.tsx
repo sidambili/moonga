@@ -271,7 +271,7 @@ function LinearEventRenderer({ payload }: { payload: Record<string, unknown> }) 
 
 function FallbackPayloadRenderer() {
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div className="rounded-lg border border-border bg-card px-4 py-10 text-center">
       <p className="text-sm text-muted-foreground">No structured view available for this source.</p>
     </div>
   );
