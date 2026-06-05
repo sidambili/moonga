@@ -257,7 +257,13 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     }
   }
 
-  const fullContext = [triageContext, repoInstructions, linearContext, context].filter(Boolean).join("\n\n---\n\n");
+  // Replan sessions carry the critic's review as revision context so the plan
+  // agent addresses the flagged issues without needing another critic pass.
+  const critiqueContext = session.critique_context
+    ? `Revision feedback from adversarial critic — you MUST address every point raised before finalising your plan:\n${session.critique_context}`
+    : "";
+
+  const fullContext = [triageContext, critiqueContext, repoInstructions, linearContext, context].filter(Boolean).join("\n\n---\n\n");
 
   const ticketInfo = event.source === "linear"
     ? extractLinearTicketInfo(event.payload_raw as Record<string, unknown>)
@@ -456,7 +462,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     // Triage is the fast/cheap first pass — a second skeptical LLM call would
     // double its cost and defeat the purpose. The downstream Plan session (if
     // escalated) still gets its own critic review.
-    if (session.objective !== "triage") try {
+    // Replan sessions already carry the critic's feedback as context — running
+    // the critic again would just re-flag what the agent was told to fix.
+    if (session.objective !== "triage" && !session.critique_context) try {
       // Plain text, not structured output: a truncated markdown review is still
       // readable, whereas truncated JSON throws NoObjectGeneratedError and loses
       // the whole review.

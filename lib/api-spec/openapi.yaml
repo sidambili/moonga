@@ -250,6 +250,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentSession"
 
+  /agent-sessions/{id}/replan:
+    post:
+      operationId: replanAgentSession
+      tags: [agent-sessions]
+      summary: Re-run a plan session incorporating the critic's revision feedback
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: New session created with critique context injected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentSession"
+
   /agent-sessions/{id}/escalate:
     post:
       operationId: escalateAgentSession
@@ -1204,6 +1223,9 @@ components:
           type: ["integer", "null"]
         duration_ms:
           type: ["integer", "null"]
+        critique_context:
+          type: ["string", "null"]
+          description: Set on replan sessions — holds the critic's review text that the plan agent must address
         playbook_id:
           type: ["integer", "null"]
         playbook_name:

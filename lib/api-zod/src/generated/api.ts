@@ -164,6 +164,7 @@ export const ListAgentSessionsResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -223,6 +224,7 @@ export const GetAgentSessionResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -279,6 +281,7 @@ export const RetryAgentSessionResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -335,6 +338,64 @@ export const RerunAgentSessionResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
+  "created_at": zod.string(),
+  "updated_at": zod.string(),
+  "event": zod.object({
+  "id": zod.number(),
+  "source": zod.string().describe('github | linear | betterstack | sentry | slack | email'),
+  "event_type": zod.string().describe('error | anomaly | ticket_created | issue_updated | deploy_failed | push | pr_opened'),
+  "severity": zod.string().describe('low | medium | high | critical'),
+  "status": zod.string().describe('new | processing | needs_review | resolved | closed'),
+  "resolution": zod.string().nullish().describe('resolved | duplicate | wont_fix | escalated — why a terminal event closed'),
+  "service": zod.string().nullish(),
+  "repo_id": zod.string().nullish(),
+  "ticket_id": zod.string().nullish(),
+  "title": zod.string().nullish(),
+  "payload_raw": zod.object({
+
+}).passthrough().optional(),
+  "session_id": zod.number().nullish(),
+  "created_at": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Re-run a plan session incorporating the critic's revision feedback
+ */
+export const ReplanAgentSessionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ReplanAgentSessionResponse = zod.object({
+  "id": zod.number(),
+  "event_id": zod.number(),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
+  "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
+  "model_used": zod.string().nullish(),
+  "context_snapshot": zod.object({
+
+}).passthrough().nullish(),
+  "output_summary": zod.string().nullish(),
+  "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
+  "marked_duplicate_at": zod.string().nullish().describe('Set once the duplicate was actioned in Linear'),
+  "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -391,6 +452,7 @@ export const EscalateAgentSessionResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -512,6 +574,7 @@ export const ListArtifactsResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -580,6 +643,7 @@ export const GetArtifactResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -645,6 +709,7 @@ export const ApproveArtifactResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -710,6 +775,7 @@ export const RejectArtifactResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -779,6 +845,7 @@ export const EditArtifactResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),
@@ -844,6 +911,7 @@ export const PostArtifactToLinearResponse = zod.object({
   "cached_cost": zod.number().nullish(),
   "tool_calls_count": zod.number().nullish(),
   "duration_ms": zod.number().nullish(),
+  "critique_context": zod.string().nullish().describe('Set on replan sessions — holds the critic\'s review text that the plan agent must address'),
   "playbook_id": zod.number().nullish(),
   "playbook_name": zod.string().nullish(),
   "created_at": zod.string(),

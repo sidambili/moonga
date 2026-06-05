@@ -922,6 +922,76 @@ export const useRerunAgentSession = <TError = ErrorType<unknown>,
       return useMutation(getRerunAgentSessionMutationOptions(options));
     }
 
+export const getReplanAgentSessionUrl = (id: number,) => {
+
+
+
+
+  return `/api/agent-sessions/${id}/replan`
+}
+
+/**
+ * @summary Re-run a plan session incorporating the critic's revision feedback
+ */
+export const replanAgentSession = async (id: number, options?: RequestInit): Promise<AgentSession> => {
+
+  return customFetch<AgentSession>(getReplanAgentSessionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReplanAgentSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replanAgentSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof replanAgentSession>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['replanAgentSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof replanAgentSession>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  replanAgentSession(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReplanAgentSessionMutationResult = NonNullable<Awaited<ReturnType<typeof replanAgentSession>>>
+
+    export type ReplanAgentSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Re-run a plan session incorporating the critic's revision feedback
+ */
+export const useReplanAgentSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof replanAgentSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof replanAgentSession>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getReplanAgentSessionMutationOptions(options));
+    }
+
 export const getEscalateAgentSessionUrl = (id: number,) => {
 
 

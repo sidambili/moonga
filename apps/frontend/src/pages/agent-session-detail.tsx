@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import {
-  useGetAgentSession, useRetryAgentSession, useRerunAgentSession, useEscalateAgentSession, useMarkSessionDuplicate, getGetAgentSessionQueryKey, getListAgentSessionsQueryKey,
+  useGetAgentSession, useRetryAgentSession, useRerunAgentSession, useReplanAgentSession, useEscalateAgentSession, useMarkSessionDuplicate, getGetAgentSessionQueryKey, getListAgentSessionsQueryKey,
   useListArtifacts, useApproveArtifact, useRejectArtifact, useEditArtifact, usePostArtifactToLinear,
   getListArtifactsQueryKey, getGetAgentSessionStepsQueryOptions, getGetAgentSessionStepsQueryKey,
 } from "@workspace/api-client-react";
@@ -53,7 +53,7 @@ const VERDICT_STYLES: Record<string, string> = {
   reject: "bg-destructive/10 text-destructive",
 };
 
-function CriticReviewCard({ sessionId }: { sessionId: number }) {
+function CriticReviewCard({ sessionId, onReplan }: { sessionId: number; onReplan: () => void }) {
   const { data: steps } = useQuery(
     getGetAgentSessionStepsQueryOptions(sessionId, {
       query: { queryKey: getGetAgentSessionStepsQueryKey(sessionId), enabled: !!sessionId, refetchInterval: 10_000 },
@@ -67,6 +67,8 @@ function CriticReviewCard({ sessionId }: { sessionId: number }) {
 
   const review = (step.content ?? "").replace(/^\[System\] Plan review \(adversarial critic\)\s*/, "").trim();
   const verdict = (result?.verdict ?? review.match(/verdict:\s*(ship|revise|reject)/i)?.[1] ?? "").toLowerCase();
+
+  const showReplan = failed || verdict === "revise" || verdict === "reject";
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -83,7 +85,15 @@ function CriticReviewCard({ sessionId }: { sessionId: number }) {
             <span className="text-[11px] text-muted-foreground tabular-nums">${step.cost.toFixed(4)}</span>
           )}
         </div>
-        {!failed && review && <CopyButton text={review} />}
+        <div className="flex items-center gap-2">
+          {showReplan && (
+            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs gap-1.5" onClick={onReplan}>
+              <RefreshCw className="w-3 h-3" />
+              Re-plan
+            </Button>
+          )}
+          {!failed && review && <CopyButton text={review} />}
+        </div>
       </div>
       <div className="px-5 py-4">
         {failed ? (
@@ -315,6 +325,7 @@ export default function SessionDetail() {
   );
   const retryMutation = useRetryAgentSession();
   const rerunMutation = useRerunAgentSession();
+  const replanMutation = useReplanAgentSession();
   const escalateMutation = useEscalateAgentSession();
   const markDuplicateMutation = useMarkSessionDuplicate();
   const queryClient = useQueryClient();
@@ -339,6 +350,20 @@ export default function SessionDetail() {
       onError: (err: any) => {
         const message = err?.message || String(err);
         toast({ title: "Failed to rerun session", description: message, variant: "destructive" });
+      },
+    });
+  };
+
+  const handleReplan = () => {
+    replanMutation.mutate({ id }, {
+      onSuccess: (newSession) => {
+        toast({ title: `Re-plan session ${newSession.id} queued` });
+        queryClient.invalidateQueries({ queryKey: getListAgentSessionsQueryKey() });
+        navigate(`/agent-sessions/${newSession.id}`);
+      },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to start re-plan", description: message, variant: "destructive" });
       },
     });
   };
@@ -614,7 +639,7 @@ export default function SessionDetail() {
           )}
 
           {/* Adversarial critic review of the plan */}
-          <CriticReviewCard sessionId={session.id} />
+          <CriticReviewCard sessionId={session.id} onReplan={handleReplan} />
 
           {/* Inline artifacts */}
           {artifacts.length > 0 && (

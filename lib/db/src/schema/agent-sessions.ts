@@ -37,6 +37,9 @@ export const agentSessionsTable = pgTable("agent_sessions", {
   tool_calls_count: integer("tool_calls_count"),
   step_count: integer("step_count"),
   duration_ms: integer("duration_ms"),
+  // Set on sessions created via the "Re-plan" action — holds the critic's review
+  // text so the plan agent can address it. Also gates the critic pass (skip when set).
+  critique_context: text("critique_context"),
   playbook_id: integer("playbook_id").references(() => playbooksTable.id, { onDelete: "set null" }),
   project_id: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   created_at: timestamp("created_at").notNull().defaultNow(),

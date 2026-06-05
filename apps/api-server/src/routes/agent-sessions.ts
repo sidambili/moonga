@@ -154,6 +154,52 @@ router.post("/:id/rerun", async (req, res) => {
   }
 });
 
+// Re-plan: create a new plan session that carries the critic's review as
+// revision context. The plan agent will address the critique points and the
+// critic pass is skipped (the human already saw what needed fixing).
+router.post("/:id/replan", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [original] = await db
+      .select()
+      .from(agentSessionsTable)
+      .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)));
+    if (!original) return res.status(404).json({ error: "Session not found" });
+    if (original.objective === "triage") {
+      return res.status(400).json({ error: "Triage sessions do not have a critic review to incorporate" });
+    }
+
+    // Pull the critic_review step from the original session
+    const [criticStep] = await db
+      .select({ content: agentSessionStepsTable.content })
+      .from(agentSessionStepsTable)
+      .where(and(
+        eq(agentSessionStepsTable.session_id, id),
+        eq(agentSessionStepsTable.tool_name, "critic_review"),
+      ))
+      .limit(1);
+
+    const critiqueContext = criticStep?.content
+      ? criticStep.content.replace(/^\[System\] Plan review \(adversarial critic\)\s*/, "").trim()
+      : null;
+
+    const [session] = await db.insert(agentSessionsTable).values({
+      event_id: original.event_id,
+      objective: original.objective,
+      status: "pending",
+      model_used: null,
+      project_id: original.project_id,
+      critique_context: critiqueContext,
+    }).returning();
+
+    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, original.event_id));
+    return res.json({ ...session, event, step_count: 0 });
+  } catch (err) {
+    logger.error({ err }, "Failed to replan session");
+    return res.status(500).json({ error: "Failed to replan session" });
+  }
+});
+
 // Human-gated escalation: promote a completed triage session to a deep Plan
 // session for the same event. The Plan runner inherits the triage artifact as
 // context (see agent-runner's sibling-artifact lookup). Idempotent — if an open

@@ -60,6 +60,11 @@ export interface AgentSession {
   tool_calls_count?: number | null;
   /** @nullable */
   duration_ms?: number | null;
+  /**
+     * Set on replan sessions — holds the critic's review text that the plan agent must address
+     * @nullable
+     */
+  critique_context?: string | null;
   /** @nullable */
   playbook_id?: number | null;
   /** @nullable */
