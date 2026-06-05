@@ -8,6 +8,9 @@ Oncident is an operations intelligence control plane. Webhooks from GitHub/Linea
 
 Session objectives are derived from event type: `diagnose` for incidents/errors/anomalies, `plan` for Linear tickets/feature requests.
 
+> your living memories are stored in `.claude/memories/` and should be used to provide context and should be updated as needed to reflect changes to the project.
+> Always load .`claude/memories/local/MEMORY.md` at the start of each session (if it exists).
+
 ## Commands
 
 ```bash
