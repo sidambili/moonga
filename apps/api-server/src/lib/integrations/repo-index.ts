@@ -1,7 +1,15 @@
 import { Octokit } from "octokit";
 import { db, repoIndexTable, type RepoIndex } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { logger } from "../logger";
+
+// Bump whenever the builder's output changes (ignore rules, render format, budgets)
+// so previously-cached rows are treated as stale and rebuilt on next access.
+const BUILDER_VERSION = 2;
+
+// Per repo, keep only this many most-recent SHAs; older rows are pruned after a
+// build so the cache doesn't grow unbounded as a repo accumulates commits.
+const KEEP_SHAS_PER_REPO = 5;
 
 // Tier 1 repo indexing: render the full file tree of a repo at a commit ONCE via
 // the git Trees API (a single recursive call), then cache it keyed by (repo, sha).
@@ -163,17 +171,53 @@ export async function getOrBuildRepoMap(
       .from(repoIndexTable)
       .where(and(eq(repoIndexTable.repo, repoFull), eq(repoIndexTable.sha, resolved)))
       .limit(1);
-    if (cached) return cached;
+    // A hit is only valid if it was built by the current builder version; an older
+    // row falls through to a rebuild that overwrites it (see upsert below).
+    if (cached && cached.builder_version === BUILDER_VERSION) return cached;
 
     const built = await buildRepoMap(client, owner, repoName, resolved);
-    // Concurrent sessions on the same SHA may race to insert — first writer wins,
-    // the rest no-op and just use their own freshly-built (identical) value.
-    await db.insert(repoIndexTable).values(built).onConflictDoNothing();
-    return built;
+    const row = { ...built, builder_version: BUILDER_VERSION };
+    // Upsert: a concurrent same-SHA build or a stale older-version row both resolve
+    // to the freshly-built value rather than racing or going ignored.
+    await db
+      .insert(repoIndexTable)
+      .values(row)
+      .onConflictDoUpdate({
+        target: [repoIndexTable.repo, repoIndexTable.sha],
+        set: { tree_map: row.tree_map, file_count: row.file_count, truncated: row.truncated, builder_version: BUILDER_VERSION },
+      });
+    await pruneOldShas(repoFull);
+    return row;
   } catch (err) {
     logger.warn({ err, repo: repoFull }, "Repo map build failed");
     return null;
   }
+}
+
+// Keep only the most-recent KEEP_SHAS_PER_REPO rows for a repo; drop the rest.
+async function pruneOldShas(repoFull: string): Promise<void> {
+  const keep = await db
+    .select({ id: repoIndexTable.id })
+    .from(repoIndexTable)
+    .where(eq(repoIndexTable.repo, repoFull))
+    .orderBy(desc(repoIndexTable.created_at))
+    .limit(KEEP_SHAS_PER_REPO);
+  if (keep.length < KEEP_SHAS_PER_REPO) return; // nothing older to prune
+  const cutoff = keep[keep.length - 1].id;
+  await db
+    .delete(repoIndexTable)
+    .where(and(eq(repoIndexTable.repo, repoFull), lt(repoIndexTable.id, cutoff)));
+}
+
+// Force a rebuild of a repo's map(s) by dropping its cached rows. Pass a specific
+// SHA to invalidate just that commit, or omit to clear every SHA for the repo. The
+// next session rebuilds lazily. Returns the number of rows removed.
+export async function reindexRepo(repoFull: string, sha?: string): Promise<number> {
+  const where = sha
+    ? and(eq(repoIndexTable.repo, repoFull), eq(repoIndexTable.sha, sha))
+    : eq(repoIndexTable.repo, repoFull);
+  const deleted = await db.delete(repoIndexTable).where(where).returning({ id: repoIndexTable.id });
+  return deleted.length;
 }
 
 // Render the map for injection into agent context.

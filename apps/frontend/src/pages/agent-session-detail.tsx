@@ -13,6 +13,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ArrowLeft, RefreshCw, RotateCcw, ArrowUpCircle, Files, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen, ShieldAlert } from "lucide-react";
@@ -108,7 +109,7 @@ function CriticReviewCard({ sessionId, onReplan }: { sessionId: number; onReplan
   );
 }
 
-function InlineArtifact({ artifact }: { artifact: Artifact }) {
+function InlineArtifact({ artifact, onEscalate }: { artifact: Artifact; onEscalate?: () => void }) {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
   const queryClient = useQueryClient();
@@ -182,6 +183,21 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
     });
   };
 
+  const handleApproveAndPlan = () => {
+    approveMutation.mutate({ id: artifact.id }, {
+      onSuccess: () => {
+        toast({ title: "Artifact approved" });
+        invalidate();
+        onEscalate?.();
+      },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to approve", description: message, variant: "destructive" });
+      },
+    });
+  };
+
+  const needsPlan = !!onEscalate;
   const isDraft = artifact.approval_state === "draft";
   const isApproved = artifact.approval_state === "approved";
   const isLinear = artifact.session?.event?.source === "linear";
@@ -215,15 +231,19 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
               >
                 <XCircle className="w-3.5 h-3.5 mr-1" />Reject
               </Button>
-              {isLinear ? (
+              {needsPlan || isLinear ? (
                 <div className="flex items-center">
                   <Button
                     variant="ghost" size="sm"
                     className="h-7 px-2 text-xs text-green-600 hover:text-green-700 rounded-r-none"
-                    onClick={handleApprove}
+                    onClick={needsPlan ? handleApproveAndPlan : handleApprove}
                     disabled={approveMutation.isPending}
                   >
-                    <CheckCircle className="w-3.5 h-3.5 mr-1" />Approve
+                    {needsPlan ? (
+                      <><ArrowUpCircle className="w-3.5 h-3.5 mr-1" />Approve & Plan</>
+                    ) : (
+                      <><CheckCircle className="w-3.5 h-3.5 mr-1" />Approve</>
+                    )}
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -236,14 +256,31 @@ function InlineArtifact({ artifact }: { artifact: Artifact }) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={handleApprove} className="cursor-pointer">
-                        <CheckCircle className="w-3.5 h-3.5 mr-2 text-green-600" />
-                        <span>Approve</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleApproveAndPostToLinear} className="cursor-pointer">
-                        <SiLinear className="w-3.5 h-3.5 mr-2" />
-                        <span>Approve & Add to Linear</span>
-                      </DropdownMenuItem>
+                      {needsPlan && (
+                        <>
+                          <DropdownMenuItem onClick={handleApproveAndPlan} className="cursor-pointer">
+                            <ArrowUpCircle className="w-3.5 h-3.5 mr-2 text-primary" />
+                            <span>Approve & Plan</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleApprove} className="cursor-pointer">
+                            <CheckCircle className="w-3.5 h-3.5 mr-2 text-green-600" />
+                            <span>Approve only</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      {!needsPlan && (
+                        <DropdownMenuItem onClick={handleApprove} className="cursor-pointer">
+                          <CheckCircle className="w-3.5 h-3.5 mr-2 text-green-600" />
+                          <span>Approve</span>
+                        </DropdownMenuItem>
+                      )}
+                      {isLinear && needsPlan && <DropdownMenuSeparator />}
+                      {isLinear && (
+                        <DropdownMenuItem onClick={handleApproveAndPostToLinear} className="cursor-pointer">
+                          <SiLinear className="w-3.5 h-3.5 mr-2" />
+                          <span>Approve & Add to Linear</span>
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -649,7 +686,7 @@ export default function SessionDetail() {
                 <span className="ml-1.5 text-[11px] bg-muted px-1.5 py-0.5 rounded tabular-nums">{artifacts.length}</span>
               </p>
               {artifacts.map((artifact) => (
-                <InlineArtifact key={artifact.id} artifact={artifact} />
+                <InlineArtifact key={artifact.id} artifact={artifact} onEscalate={session.objective === "triage" && session.needs_plan ? handleEscalate : undefined} />
               ))}
             </div>
           )}

@@ -14,6 +14,10 @@ export const repoIndexTable = pgTable(
     sha: text("sha").notNull(), // commit SHA the tree was read at
     tree_map: text("tree_map").notNull(), // rendered, token-budgeted file tree
     file_count: integer("file_count").notNull(),
+    // Version of the builder logic (filters/render) that produced this row. A row
+    // built by an older version is treated as a miss and rebuilt — so changing the
+    // ignore rules invalidates the cache without touching SHAs or manual cleanup.
+    builder_version: integer("builder_version").notNull().default(1),
     // True when the tree was larger than the render budget and got clipped, or
     // when GitHub flagged the recursive tree response as truncated.
     truncated: boolean("truncated").notNull().default(false),
