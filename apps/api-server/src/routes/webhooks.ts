@@ -58,6 +58,15 @@ function detectSeverity(source: string, payload: Record<string, unknown>): strin
     if (level === "warning") return "medium";
     return "low";
   }
+  if (source === "linear") {
+    const data = payload.data as Record<string, unknown> | undefined;
+    const priority = typeof data?.priority === "number" ? data.priority : null;
+    if (priority == null) return "low";
+    if (priority >= 3) return "critical";
+    if (priority === 2) return "high";
+    if (priority === 1) return "medium";
+    return "low";
+  }
   return "low";
 }
 
