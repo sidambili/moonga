@@ -9,6 +9,22 @@ const DEFAULT_OUTPUT_RATE = 10.0;
 interface ModelPrice {
   inputRate: number;
   outputRate: number;
+  // Discounted rate for cache-read (cached prompt) tokens. Null when unknown —
+  // callers fall back to a provider-typical multiple of inputRate.
+  cachedInputRate: number | null;
+  // "1M" (per 1,000,000 tokens) or "1K" (per 1,000 tokens).
+  unit: string;
+}
+
+type PriceRow = typeof modelPricesTable.$inferSelect;
+
+function toModelPrice(row: PriceRow): ModelPrice {
+  return {
+    inputRate: row.input_rate,
+    outputRate: row.output_rate,
+    cachedInputRate: row.cached_input_rate ?? null,
+    unit: row.pricing_unit ?? "1M",
+  };
 }
 
 export async function getModelPrice(model: string): Promise<ModelPrice> {
@@ -22,7 +38,7 @@ export async function getModelPrice(model: string): Promise<ModelPrice> {
     .limit(1);
 
   if (exact) {
-    return { inputRate: exact.input_rate, outputRate: exact.output_rate };
+    return toModelPrice(exact);
   }
 
   // 2. Substring match (model slug contains the query, or vice versa)
@@ -33,7 +49,7 @@ export async function getModelPrice(model: string): Promise<ModelPrice> {
     .limit(1);
 
   if (rows.length > 0) {
-    return { inputRate: rows[0].input_rate, outputRate: rows[0].output_rate };
+    return toModelPrice(rows[0]);
   }
 
   // 3. Reverse substring match (query contains model slug)
@@ -44,32 +60,19 @@ export async function getModelPrice(model: string): Promise<ModelPrice> {
 
   for (const row of allRows) {
     if (m.includes(row.model_slug.toLowerCase())) {
-      return { inputRate: row.input_rate, outputRate: row.output_rate };
+      return toModelPrice(row);
     }
   }
 
   logger.warn({ model }, "No price found for model — using default fallback");
-  return { inputRate: DEFAULT_INPUT_RATE, outputRate: DEFAULT_OUTPUT_RATE };
+  return { inputRate: DEFAULT_INPUT_RATE, outputRate: DEFAULT_OUTPUT_RATE, cachedInputRate: null, unit: "1M" };
 }
 
 export async function estimateCost(
   model: string,
   usage: { promptTokens: number; completionTokens: number },
 ): Promise<number> {
-  const m = model.toLowerCase().trim();
-
-  // Try to get the pricing unit from DB; fallback to "1M"
-  let unit = "1M";
-  const [exact] = await db
-    .select()
-    .from(modelPricesTable)
-    .where(and(eq(modelPricesTable.model_slug, m), eq(modelPricesTable.is_active, true)))
-    .limit(1);
-  if (exact?.pricing_unit) {
-    unit = exact.pricing_unit;
-  }
-
-  const { inputRate, outputRate } = await getModelPrice(model);
+  const { inputRate, outputRate, unit } = await getModelPrice(model);
   const divisor = unit === "1K" ? 1_000 : 1_000_000;
   const promptCost = (usage.promptTokens / divisor) * inputRate;
   const completionCost = (usage.completionTokens / divisor) * outputRate;

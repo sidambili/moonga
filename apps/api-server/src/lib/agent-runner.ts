@@ -72,14 +72,54 @@ async function persistStep(
   return row;
 }
 
-function getModelConfig(settings: NonNullable<Awaited<ReturnType<typeof getModelSettings>>>, modelString: string) {
+// Accumulates provider-side prompt-cache hits across every LLM call in a session.
+// The OpenRouter AI SDK provider (0.4.x) parses only prompt/completion token
+// counts and discards usage.prompt_tokens_details — so we read cached_tokens off
+// the raw HTTP response ourselves via a wrapped fetch.
+interface CacheCapture {
+  cachedTokens: number;
+}
+
+function makeCaptureFetch(capture: CacheCapture): typeof fetch {
+  const wrapped: typeof fetch = async (input, init) => {
+    const res = await fetch(input, init);
+    try {
+      const data = await res.clone().json();
+      const cached = data?.usage?.prompt_tokens_details?.cached_tokens;
+      if (typeof cached === "number") capture.cachedTokens += cached;
+    } catch {
+      // Non-JSON / streaming / error body — nothing to capture, leave response intact.
+    }
+    return res;
+  };
+  return wrapped;
+}
+
+function getModelConfig(
+  settings: NonNullable<Awaited<ReturnType<typeof getModelSettings>>>,
+  modelString: string,
+  sessionId: number,
+) {
+  const capture: CacheCapture = { cachedTokens: 0 };
   const isOpenRouter = settings.provider === "openrouter" || (settings.base_url && settings.base_url.includes("openrouter"));
   if (isOpenRouter) {
-    const openrouter = createOpenRouter({ apiKey: settings.api_key! });
-    return openrouter.chat(modelString);
+    const openrouter = createOpenRouter({
+      apiKey: settings.api_key!,
+      // Prompt caching is automatic on OpenRouter for DeepSeek/OpenAI/Gemini. A
+      // stable session_id keeps OpenRouter's sticky routing pinned to the same
+      // upstream so the provider-side prefix cache actually hits across the
+      // multi-step loop. usage.include surfaces the cached-token accounting we read
+      // back in makeCaptureFetch.
+      // TODO: Anthropic models need explicit cache_control breakpoints (deferred) —
+      // requires moving the system/prompt strings into a messages array and tagging
+      // the system message with providerMetadata.openrouter.cacheControl.
+      extraBody: { usage: { include: true }, session_id: `oncident-session-${sessionId}` },
+      fetch: makeCaptureFetch(capture),
+    });
+    return { model: openrouter.chat(modelString), capture };
   }
   const openaiProvider = createOpenAI({ apiKey: settings.api_key!, baseURL: settings.base_url ?? undefined });
-  return openaiProvider.chat(modelString);
+  return { model: openaiProvider.chat(modelString), capture };
 }
 
 function categorizeError(err: unknown): string {
@@ -127,8 +167,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   const { session, event } = row;
   const modelString =
     session.objective === "plan"
-      ? (settings.plan_model ?? "gpt-4o")
-      : (settings.triage_model ?? "gpt-4o-mini");
+      ? (settings.plan_model ?? "deepseek/deepseek-v4-pro")
+      : (settings.triage_model ?? "deepseek/deepseek-v4-flash");
 
   const { token: githubToken, selectedRepo } = await getGithubIntegration();
   const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, event.repo_id ?? selectedRepo ?? undefined);
@@ -207,7 +247,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     return null;
   }
 
-  const modelConfig = getModelConfig(settings, modelString);
+  const { model: modelConfig, capture: cacheCapture } = getModelConfig(settings, modelString, sessionId);
   const sessionStartTime = Date.now();
 
   try {
@@ -398,6 +438,22 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       logger.warn({ err: criticErr, sessionId }, "Critic pass failed — continuing without review");
     }
 
+    // Reconcile provider-side prompt-cache savings. cached_tokens is a subset of
+    // the prompt tokens already billed at full input rate in the per-step
+    // estimateCost above, so credit back the discount to keep total_cost honest.
+    // Fall back to 0.1x input rate — the typical cache-read multiple — when the
+    // model has no explicit cached_input_rate.
+    const cachedTokens = cacheCapture.cachedTokens;
+    let cachedCost: number | null = null;
+    if (cachedTokens > 0) {
+      const divisor = modelPrice.unit === "1K" ? 1_000 : 1_000_000;
+      const cachedRate = modelPrice.cachedInputRate ?? modelPrice.inputRate * 0.1;
+      cachedCost = parseFloat(((cachedTokens / divisor) * cachedRate).toFixed(6));
+      const savings = (cachedTokens / divisor) * (modelPrice.inputRate - cachedRate);
+      totalCost = Math.max(0, parseFloat((totalCost - savings).toFixed(6)));
+      logger.info({ sessionId, cachedTokens, cachedCost, model: modelString }, "Prompt cache hits reconciled");
+    }
+
     await db
       .update(agentSessionsTable)
       .set({
@@ -409,6 +465,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         total_prompt_tokens: totalPromptTokens || null,
         total_completion_tokens: totalCompletionTokens || null,
         total_cost: totalCost || null,
+        cached_tokens: cachedTokens || null,
+        cached_cost: cachedCost,
         prompt_token_cost: modelPrice.inputRate,
         completion_token_cost: modelPrice.outputRate,
         tool_calls_count: toolCallsCount || null,
