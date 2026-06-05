@@ -7,5 +7,5 @@
  */
 
 export interface ActiveProject {
-  activeProjectId: string;
+  activeProjectId: string | null;
 }

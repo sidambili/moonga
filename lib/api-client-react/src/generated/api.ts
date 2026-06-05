@@ -2543,6 +2543,76 @@ export const useActivateProject = <TError = ErrorType<unknown>,
       return useMutation(getActivateProjectMutationOptions(options));
     }
 
+export const getDeactivateProjectUrl = () => {
+
+
+
+
+  return `/api/projects/deactivate`
+}
+
+/**
+ * @summary Clear the caller's active project (view all projects in the org)
+ */
+export const deactivateProject = async ( options?: RequestInit): Promise<ActiveProject> => {
+
+  return customFetch<ActiveProject>(getDeactivateProjectUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getDeactivateProjectMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deactivateProject>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deactivateProject>>, TError,void, TContext> => {
+
+const mutationKey = ['deactivateProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deactivateProject>>, void> = () => {
+
+
+          return  deactivateProject(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeactivateProjectMutationResult = NonNullable<Awaited<ReturnType<typeof deactivateProject>>>
+
+    export type DeactivateProjectMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Clear the caller's active project (view all projects in the org)
+ */
+export const useDeactivateProject = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deactivateProject>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deactivateProject>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeactivateProjectMutationOptions(options));
+    }
+
 export const getListProjectSourcesUrl = () => {
 
 

@@ -710,6 +710,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/ActiveProject"
 
+  /projects/deactivate:
+    post:
+      operationId: deactivateProject
+      tags: [projects]
+      summary: Clear the caller's active project (view all projects in the org)
+      responses:
+        "200":
+          description: Active project cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveProject"
+
   # ── Project sources ───────────────────────────────────────────────
   /project-sources:
     get:
@@ -1665,6 +1678,7 @@ components:
       properties:
         activeProjectId:
           type: string
+          nullable: true
 
     ProjectSource:
       type: object

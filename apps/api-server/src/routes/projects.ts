@@ -202,4 +202,20 @@ router.post(
   }),
 );
 
+// Clear the caller's active project — "All Projects" view (any org member).
+// Operational reads then scope to the whole org again instead of one project.
+router.post(
+  "/deactivate",
+  asyncHandler(async (_req, res) => {
+    const membership = await getActiveMembership(res);
+    if (!membership) return res.status(403).json({ error: "forbidden" });
+
+    await db
+      .update(authSession)
+      .set({ activeProjectId: null })
+      .where(eq(authSession.id, res.locals.sessionId));
+    return res.json({ activeProjectId: null });
+  }),
+);
+
 export default router;

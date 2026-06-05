@@ -1,9 +1,10 @@
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { FolderGit2, Check, ChevronsUpDown, Settings2 } from "lucide-react";
+import { FolderGit2, Check, ChevronsUpDown, Settings2, Layers } from "lucide-react";
 import {
   useListProjects,
   useActivateProject,
+  useDeactivateProject,
 } from "@workspace/api-client-react";
 import {
   DropdownMenu,
@@ -16,23 +17,21 @@ import {
 import { cn } from "@/lib/format";
 
 /**
- * Topbar project picker, scoped to the active org. Lists the org's projects and
- * switches the caller's active project via POST /projects/{id}/activate. The list
- * refetches when the org changes because OrgSwitcher invalidates all queries on
- * setActive.
+ * Topbar project picker, scoped to the active org. Selecting a project sets the
+ * caller's active project (POST /projects/{id}/activate); "All Projects" clears it
+ * (POST /projects/deactivate). Operational reads (events / sessions / artifacts)
+ * scope to the active project, or the whole org when "All Projects" is selected —
+ * see lib/tenant-scope.ts. Invalidating all queries on change refetches those views.
  *
- * Active project only changes session.activeProjectId today — write-scoping that
- * stamps new operational data with it is unbuilt — but we invalidate all queries
- * so scoped views refetch once that layer lands.
- *
- * Hidden when the active org has no projects; a single project renders as a plain
- * label.
+ * The list refetches when the org changes because OrgSwitcher invalidates all
+ * queries on setActive. Hidden when the active org has no projects.
  */
 export function ProjectSwitcher() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const { data, isPending } = useListProjects();
   const activateMutation = useActivateProject();
+  const deactivateMutation = useDeactivateProject();
 
   const projects = data?.items ?? [];
   if (isPending || projects.length === 0) {
@@ -40,30 +39,25 @@ export function ProjectSwitcher() {
   }
 
   const active = projects.find((p) => p.id === data?.activeProjectId) ?? null;
-
-  // Single project: nothing to switch to — render a plain label.
-  if (projects.length === 1) {
-    return (
-      <>
-        <span className="text-muted-foreground/40 text-sm">/</span>
-        <span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-          <FolderGit2 className="w-3.5 h-3.5" />
-          <span className="truncate max-w-40">{projects[0].name}</span>
-        </span>
-      </>
-    );
-  }
+  const busy = activateMutation.isPending || deactivateMutation.isPending;
 
   const handleSelect = (id: string) => {
-    if (id === active?.id || activateMutation.isPending) return;
+    if (id === active?.id || busy) return;
     activateMutation.mutate(
       { id },
       {
-        // Active project may change scoped data once write-scoping reads it.
         onSuccess: () => queryClient.invalidateQueries(),
         onError: (err) => console.error("Failed to switch project:", err),
       },
     );
+  };
+
+  const handleSelectAll = () => {
+    if (!active || busy) return;
+    deactivateMutation.mutate(undefined, {
+      onSuccess: () => queryClient.invalidateQueries(),
+      onError: (err) => console.error("Failed to clear project:", err),
+    });
   };
 
   return (
@@ -71,16 +65,35 @@ export function ProjectSwitcher() {
       <span className="text-muted-foreground/40 text-sm">/</span>
       <DropdownMenu>
         <DropdownMenuTrigger
-          disabled={activateMutation.isPending}
+          disabled={busy}
           className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
-          <FolderGit2 className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="truncate max-w-40">{active?.name ?? "Select project"}</span>
+          {active ? (
+            <FolderGit2 className="w-3.5 h-3.5 text-muted-foreground" />
+          ) : (
+            <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+          )}
+          <span className="truncate max-w-40">{active?.name ?? "All Projects"}</span>
           <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuLabel className="text-xs text-muted-foreground">Projects</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={handleSelectAll}
+            className="flex items-center justify-between gap-2 cursor-pointer"
+          >
+            <span className="flex items-center gap-2 truncate">
+              <Layers className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              All Projects
+            </span>
+            <Check
+              className={cn(
+                "w-3.5 h-3.5 shrink-0",
+                !active ? "opacity-100 text-primary" : "opacity-0"
+              )}
+            />
+          </DropdownMenuItem>
           {projects.map((p) => (
             <DropdownMenuItem
               key={p.id}

@@ -409,7 +409,7 @@ export interface ProjectEdit {
 }
 
 export interface ActiveProject {
-  activeProjectId: string;
+  activeProjectId: string | null;
 }
 
 export interface ProjectSource {

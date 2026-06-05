@@ -9,15 +9,19 @@ import {
   useCreateProjectSource,
   useUpdateProjectSource,
   useDeleteProjectSource,
+  useListIntegrationRepos,
+  useListIntegrationTeams,
   getListProjectsQueryKey,
   getListProjectSourcesQueryKey,
 } from "@workspace/api-client-react";
-import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug, Loader2 } from "lucide-react";
+import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug, Loader2, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/hooks/use-toast";
 
@@ -335,6 +339,92 @@ const SOURCE_PROVIDERS = [
   { id: "github", label: "GitHub", placeholder: "owner/repo" },
 ] as const;
 
+// Picks the external resource from the connected integration so users select a
+// repo / team by name instead of typing a raw id. Falls back to free text when
+// the integration isn't connected (no api key) or the fetch fails. `onSelect`
+// receives the value to store (repo full_name / team id) and a human label.
+function SourceResourceCombobox({
+  provider,
+  value,
+  onSelect,
+}: {
+  provider: string;
+  value: string;
+  onSelect: (value: string, label: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { data: repos, isLoading: reposLoading } = useListIntegrationRepos(provider === "github" ? "github" : "");
+  const { data: teams, isLoading: teamsLoading } = useListIntegrationTeams(provider === "linear" ? "linear" : "");
+
+  const options =
+    provider === "github"
+      ? (repos ?? []).map((r) => ({ value: r.full_name, label: r.full_name }))
+      : provider === "linear"
+      ? (teams ?? []).map((t) => ({ value: t.id, label: t.name }))
+      : [];
+  const isLoading = provider === "github" ? reposLoading : teamsLoading;
+  const selected = options.find((o) => o.value === value);
+
+  // Unknown provider: plain text entry.
+  if (provider !== "github" && provider !== "linear") {
+    return (
+      <Input
+        value={value}
+        onChange={(e) => onSelect(e.target.value, "")}
+        placeholder="External id"
+        className="h-8 text-sm bg-muted/40 border-border flex-1 min-w-[140px] font-mono"
+      />
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-8 justify-between bg-muted/40 border-border text-sm flex-1 min-w-[160px] font-normal"
+        >
+          <span className="truncate">
+            {selected?.label || value || (isLoading ? "Loading…" : provider === "github" ? "Select a repository…" : "Select a team…")}
+          </span>
+          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={provider === "github" ? "Search repositories…" : "Search teams…"} className="h-9" />
+          <CommandList>
+            <CommandEmpty>
+              {isLoading ? "Loading…" : provider === "github" ? "No repository found." : "No team found. Connect the integration first."}
+            </CommandEmpty>
+            <CommandGroup>
+              {options.map((o) => (
+                <CommandItem
+                  key={o.value}
+                  value={`${o.label} ${o.value}`}
+                  onSelect={() => {
+                    onSelect(o.value, o.label);
+                    setOpen(false);
+                  }}
+                  className="text-sm"
+                >
+                  <Check className={`mr-2 h-4 w-4 ${value === o.value ? "opacity-100" : "opacity-0"}`} />
+                  <span className="truncate">{o.label}</span>
+                  {provider === "linear" && (
+                    <span className="ml-auto pl-2 text-[10px] text-muted-foreground font-mono shrink-0">{o.value.slice(0, 8)}</span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; invalidate: () => void }) {
   const { data: projectData } = useListProjects();
   const { data: sources, isLoading } = useListProjectSources();
@@ -356,9 +446,6 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
   useEffect(() => {
     if (!projectId && projects.length > 0) setProjectId(projects[0].id);
   }, [projects, projectId]);
-
-  const placeholder =
-    SOURCE_PROVIDERS.find((p) => p.id === provider)?.placeholder ?? "External id";
 
   const add = () => {
     if (!projectId || !externalId.trim()) return;
@@ -535,7 +622,14 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
                 ))}
               </SelectContent>
             </Select>
-            <Select value={provider} onValueChange={setProvider}>
+            <Select
+              value={provider}
+              onValueChange={(v) => {
+                setProvider(v);
+                setExternalId("");
+                setLabel("");
+              }}
+            >
               <SelectTrigger className="w-[110px] h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -545,11 +639,15 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
                 ))}
               </SelectContent>
             </Select>
-            <Input
+            <SourceResourceCombobox
+              provider={provider}
               value={externalId}
-              onChange={(e) => setExternalId(e.target.value)}
-              placeholder={placeholder}
-              className="h-8 text-sm bg-muted/40 border-border flex-1 min-w-[140px] font-mono"
+              onSelect={(v, l) => {
+                setExternalId(v);
+                // Auto-fill the label with the human name (team name / repo) unless
+                // the user has typed their own; keeps the table readable for ids.
+                if (l && (!label || label === externalId)) setLabel(l);
+              }}
             />
             <Input
               value={label}

@@ -7,17 +7,18 @@ import { db, projectsTable } from "@workspace/db";
  * Read-time tenant scoping for operational data (events / sessions / artifacts).
  *
  * These tables are scoped to a project via a nullable `project_id`; an org owns
- * many projects. To scope by the caller's active org we match any project_id that
- * belongs to that org, via a correlated subquery so it stays a single statement.
+ * many projects. Two modes, driven by the caller's session:
  *
- * NULL project_id is deliberately included: webhooks don't yet stamp project_id
- * (the write-scoping layer is unbuilt), so excluding NULL would hide all incoming
- * data from every org. Including it keeps this purely additive and migration-safe
- * — backfilled/stamped rows scope correctly, unstamped rows remain visible until
- * write-scoping lands.
+ *  - Active project set ("scoped view") → match exactly that project_id, but only
+ *    if it belongs to the active org (the inArray subquery guards against a stale
+ *    id left over from a previous org). NULL rows are excluded — they belong to no
+ *    project, so they don't show under a single-project view.
+ *  - No active project ("All Projects") → match any project_id in the active org,
+ *    plus NULL. NULL is included because pre-routing / unmapped webhooks may still
+ *    land unstamped; keeping them visible is migration-safe.
  *
  * Returns `undefined` when there is no active org (no scoping → current behavior).
- * `requireAuth` populates `res.locals.activeOrganizationId`.
+ * `requireAuth` populates `res.locals.activeOrganizationId` / `activeProjectId`.
  */
 export function tenantScope(res: Response, projectIdColumn: PgColumn): SQL | undefined {
   const organizationId = res.locals.activeOrganizationId as string | null | undefined;
@@ -27,6 +28,11 @@ export function tenantScope(res: Response, projectIdColumn: PgColumn): SQL | und
     .select({ id: projectsTable.id })
     .from(projectsTable)
     .where(eq(projectsTable.organization_id, organizationId));
+
+  const activeProjectId = res.locals.activeProjectId as string | null | undefined;
+  if (activeProjectId) {
+    return and(eq(projectIdColumn, activeProjectId), inArray(projectIdColumn, orgProjectIds));
+  }
 
   return or(inArray(projectIdColumn, orgProjectIds), isNull(projectIdColumn));
 }

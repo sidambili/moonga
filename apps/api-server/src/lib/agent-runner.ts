@@ -77,6 +77,25 @@ async function getGithubIntegration(organizationId?: string | null): Promise<{ t
   return { token: undefined, selectedRepo: undefined };
 }
 
+// The GitHub repo bound to a project via project_sources. This is how a Linear
+// event (whose payload carries no repository) reaches the right codebase: the
+// team routed the event to a project, and that project names its repo here.
+// Returns the `owner/repo` full_name, or null when the project has no GitHub source.
+async function getProjectGithubRepo(projectId: string | null): Promise<string | null> {
+  if (!projectId) return null;
+  try {
+    const [row] = await db
+      .select({ externalId: projectSourcesTable.external_id })
+      .from(projectSourcesTable)
+      .where(and(eq(projectSourcesTable.project_id, projectId), eq(projectSourcesTable.provider, "github")))
+      .orderBy(projectSourcesTable.created_at)
+      .limit(1);
+    return row?.externalId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Load the notes field from the project_source that routed this event (if any),
 // so per-source custom instructions can be injected into the agent context.
 async function getProjectSourceNotes(
@@ -256,7 +275,12 @@ export async function runAgentSession(sessionId: number): Promise<void> {
 
   const orgId = await getOrgIdForSession(session.project_id);
   const { token: githubToken, selectedRepo } = await getGithubIntegration(orgId);
-  const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, event.repo_id ?? selectedRepo ?? undefined);
+  // Prefer the GitHub repo bound to this event's project (project_sources) so a
+  // Linear team routed to a project operates on that project's repo, not the
+  // org-wide default. Falls back to the event's repo / the global selected repo.
+  const projectRepo = await getProjectGithubRepo(session.project_id);
+  const fallbackRepo = projectRepo ?? event.repo_id ?? selectedRepo ?? undefined;
+  const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, fallbackRepo);
 
   const ghClientEarly = repo && githubToken ? new Octokit({ auth: githubToken }) : null;
 
@@ -282,7 +306,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       event.event_type,
       event.payload_raw as Record<string, unknown>,
       githubToken,
-      event.repo_id ?? selectedRepo ?? undefined,
+      fallbackRepo,
     ),
     ghClientEarly && (event.event_type === "ticket_created" || event.event_type === "issue_opened")
       ? fetchRepoInstructions(ghClientEarly, repo!.owner, repo!.repo)

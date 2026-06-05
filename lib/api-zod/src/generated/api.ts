@@ -1161,7 +1161,15 @@ export const ActivateProjectParams = zod.object({
 })
 
 export const ActivateProjectResponse = zod.object({
-  "activeProjectId": zod.string()
+  "activeProjectId": zod.string().nullable()
+})
+
+
+/**
+ * @summary Clear the caller's active project (view all projects in the org)
+ */
+export const DeactivateProjectResponse = zod.object({
+  "activeProjectId": zod.string().nullable()
 })
 
 
