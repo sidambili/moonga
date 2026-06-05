@@ -33,6 +33,11 @@ export interface AgentSession {
      * @nullable
      */
   duplicate_of?: string | null;
+  /**
+     * Set once the duplicate was actioned in Linear
+     * @nullable
+     */
+  marked_duplicate_at?: string | null;
   /** @nullable */
   step_count?: number | null;
   /** @nullable */

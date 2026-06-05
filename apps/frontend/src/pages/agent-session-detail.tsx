@@ -451,17 +451,24 @@ export default function SessionDetail() {
         </div>
         <div className="flex items-center gap-2 self-start">
           {session.objective === "triage" && session.duplicate_of && session.event?.source === "linear" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleMarkDuplicate}
-              disabled={markDuplicateMutation.isPending}
-              className="rounded-lg text-sm"
-              title={`Mark the Linear ticket as a duplicate of ${session.duplicate_of}`}
-            >
-              <Files className={`w-3.5 h-3.5 mr-2 ${markDuplicateMutation.isPending ? "animate-pulse" : ""}`} />
-              Mark Duplicate of {session.duplicate_of}
-            </Button>
+            session.marked_duplicate_at ? (
+              <span className="inline-flex items-center rounded-lg px-2.5 py-1 text-sm font-medium bg-muted text-muted-foreground" title={`Closed in Linear as a duplicate of ${session.duplicate_of}`}>
+                <Files className="w-3.5 h-3.5 mr-2" />
+                Closed as duplicate of {session.duplicate_of}
+              </span>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleMarkDuplicate}
+                disabled={markDuplicateMutation.isPending}
+                className="rounded-lg text-sm"
+                title={`Mark the Linear ticket as a duplicate of ${session.duplicate_of}`}
+              >
+                <Files className={`w-3.5 h-3.5 mr-2 ${markDuplicateMutation.isPending ? "animate-pulse" : ""}`} />
+                {markDuplicateMutation.isPending ? "Closing…" : `Mark Duplicate of ${session.duplicate_of}`}
+              </Button>
+            )
           )}
           {session.objective === "triage" && !["pending", "running", "failed"].includes(session.status) && (
             <Button

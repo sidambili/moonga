@@ -14,4 +14,6 @@ export interface DuplicateMarkResult {
      * @nullable
      */
   state_name?: string | null;
+  /** True when the ticket had already been marked as a duplicate */
+  already?: boolean;
 }

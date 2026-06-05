@@ -21,6 +21,9 @@ export const agentSessionsTable = pgTable("agent_sessions", {
   // to Plan" gate — triage no longer auto-spawns Plan sessions.
   needs_plan: boolean("needs_plan"),
   duplicate_of: text("duplicate_of"),
+  // Set when the duplicate was actioned in Linear (relation + canceled state).
+  // Gates the "Mark Duplicate" button so it can't fire repeat comments/relations.
+  marked_duplicate_at: timestamp("marked_duplicate_at"),
   total_tokens: integer("total_tokens"),
   total_prompt_tokens: integer("total_prompt_tokens"),
   total_completion_tokens: integer("total_completion_tokens"),

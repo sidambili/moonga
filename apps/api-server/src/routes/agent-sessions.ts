@@ -220,6 +220,11 @@ router.post("/:id/mark-duplicate", async (req, res) => {
       return res.status(400).json({ error: "Session is not tied to a Linear ticket" });
     }
 
+    // Idempotent: already actioned — don't fire a second relation/comment.
+    if (session.marked_duplicate_at) {
+      return res.json({ ok: true, canonical_identifier: session.duplicate_of ?? "", state_name: null, already: true });
+    }
+
     const bodyTarget = typeof req.body?.duplicate_of === "string" ? req.body.duplicate_of.trim() : "";
     const duplicateOf = bodyTarget || session.duplicate_of || "";
     if (!duplicateOf) {
@@ -234,6 +239,9 @@ router.post("/:id/mark-duplicate", async (req, res) => {
     } catch (commentErr) {
       logger.warn({ err: commentErr, id }, "Marked duplicate but failed to post note comment");
     }
+    await db.update(agentSessionsTable)
+      .set({ marked_duplicate_at: new Date(), duplicate_of: result.canonicalIdentifier, updated_at: new Date() })
+      .where(eq(agentSessionsTable.id, id));
     await db.update(eventsTable).set({ status: "resolved" }).where(eq(eventsTable.id, event.id));
 
     return res.json({ ok: true, canonical_identifier: result.canonicalIdentifier, state_name: result.stateName });

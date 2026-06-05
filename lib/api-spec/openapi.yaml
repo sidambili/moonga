@@ -1176,6 +1176,9 @@ components:
         duplicate_of:
           type: ["string", "null"]
           description: Triage-only — identifier of the issue this duplicates, if any
+        marked_duplicate_at:
+          type: ["string", "null"]
+          description: Set once the duplicate was actioned in Linear
         step_count:
           type: ["integer", "null"]
         total_tokens:
@@ -1227,6 +1230,9 @@ components:
         state_name:
           type: ["string", "null"]
           description: Workflow state the duplicate was moved to, if one was found
+        already:
+          type: boolean
+          description: True when the ticket had already been marked as a duplicate
 
     AgentSessionList:
       type: object
