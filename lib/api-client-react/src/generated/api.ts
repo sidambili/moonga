@@ -29,6 +29,8 @@ import type {
   ArtifactEdit,
   ArtifactList,
   DashboardSummary,
+  DuplicateMark,
+  DuplicateMarkResult,
   Error,
   Event,
   EventList,
@@ -988,6 +990,78 @@ export const useEscalateAgentSession = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getEscalateAgentSessionMutationOptions(options));
+    }
+
+export const getMarkSessionDuplicateUrl = (id: number,) => {
+
+
+
+
+  return `/api/agent-sessions/${id}/mark-duplicate`
+}
+
+/**
+ * @summary Mark the session's Linear ticket as a duplicate of another issue
+ */
+export const markSessionDuplicate = async (id: number,
+    duplicateMark?: DuplicateMark, options?: RequestInit): Promise<DuplicateMarkResult> => {
+
+  return customFetch<DuplicateMarkResult>(getMarkSessionDuplicateUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      duplicateMark,)
+  }
+);}
+
+
+
+
+export const getMarkSessionDuplicateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markSessionDuplicate>>, TError,{id: number;data?: BodyType<DuplicateMark>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markSessionDuplicate>>, TError,{id: number;data?: BodyType<DuplicateMark>}, TContext> => {
+
+const mutationKey = ['markSessionDuplicate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markSessionDuplicate>>, {id: number;data?: BodyType<DuplicateMark>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  markSessionDuplicate(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkSessionDuplicateMutationResult = NonNullable<Awaited<ReturnType<typeof markSessionDuplicate>>>
+    export type MarkSessionDuplicateMutationBody = BodyType<DuplicateMark> | undefined
+    export type MarkSessionDuplicateMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark the session's Linear ticket as a duplicate of another issue
+ */
+export const useMarkSessionDuplicate = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markSessionDuplicate>>, TError,{id: number;data?: BodyType<DuplicateMark>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markSessionDuplicate>>,
+        TError,
+        {id: number;data?: BodyType<DuplicateMark>},
+        TContext
+      > => {
+      return useMutation(getMarkSessionDuplicateMutationOptions(options));
     }
 
 export const getGetAgentSessionStepsUrl = (id: number,) => {

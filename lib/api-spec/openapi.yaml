@@ -264,6 +264,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentSession"
 
+  /agent-sessions/{id}/mark-duplicate:
+    post:
+      operationId: markSessionDuplicate
+      tags: [agent-sessions]
+      summary: Mark the session's Linear ticket as a duplicate of another issue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DuplicateMark"
+      responses:
+        "200":
+          description: Ticket marked as duplicate in Linear
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateMarkResult"
+
   /agent-sessions/{id}/steps:
     get:
       operationId: getAgentSessionSteps
@@ -1178,6 +1203,25 @@ components:
           type: string
         event:
           $ref: "#/components/schemas/Event"
+
+    DuplicateMark:
+      type: object
+      properties:
+        duplicate_of:
+          type: string
+          description: Identifier (e.g. ENG-7) or UUID of the canonical issue. Defaults to the triage-detected duplicate_of.
+
+    DuplicateMarkResult:
+      type: object
+      required: [ok, canonical_identifier]
+      properties:
+        ok:
+          type: boolean
+        canonical_identifier:
+          type: string
+        state_name:
+          type: ["string", "null"]
+          description: Workflow state the duplicate was moved to, if one was found
 
     AgentSessionList:
       type: object

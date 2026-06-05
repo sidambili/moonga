@@ -5,6 +5,7 @@ import { eq, desc, and, sql, lt, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { subscribeToSession } from "../lib/session-stream";
 import { tenantScope, withTenantScope } from "../lib/tenant-scope";
+import { markLinearDuplicate, postLinearComment } from "../lib/integrations/linear-client";
 
 const router = Router();
 
@@ -196,6 +197,49 @@ router.post("/:id/escalate", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Failed to escalate session");
     return res.status(500).json({ error: "Failed to escalate session" });
+  }
+});
+
+// Mark the session's Linear ticket as a duplicate of another issue: creates a
+// `duplicate` relation and moves the ticket to a canceled/duplicate state in
+// Linear. Defaults to the duplicate target triage detected (session.duplicate_of),
+// but accepts an override in the body.
+router.post("/:id/mark-duplicate", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [row] = await db
+      .select({ session: agentSessionsTable, event: eventsTable })
+      .from(agentSessionsTable)
+      .leftJoin(eventsTable, eq(agentSessionsTable.event_id, eventsTable.id))
+      .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)));
+    if (!row?.session) return res.status(404).json({ error: "Session not found" });
+
+    const { session, event } = row;
+    if (event?.source !== "linear" || !event?.ticket_id) {
+      return res.status(400).json({ error: "Session is not tied to a Linear ticket" });
+    }
+
+    const bodyTarget = typeof req.body?.duplicate_of === "string" ? req.body.duplicate_of.trim() : "";
+    const duplicateOf = bodyTarget || session.duplicate_of || "";
+    if (!duplicateOf) {
+      return res.status(400).json({ error: "No duplicate target — provide duplicate_of" });
+    }
+
+    const result = await markLinearDuplicate(event.ticket_id, duplicateOf);
+
+    // Best-effort: note the action on the ticket and resolve our event.
+    try {
+      await postLinearComment(event.ticket_id, `Closed as a duplicate of ${result.canonicalIdentifier} via Oncident.`);
+    } catch (commentErr) {
+      logger.warn({ err: commentErr, id }, "Marked duplicate but failed to post note comment");
+    }
+    await db.update(eventsTable).set({ status: "resolved" }).where(eq(eventsTable.id, event.id));
+
+    return res.json({ ok: true, canonical_identifier: result.canonicalIdentifier, state_name: result.stateName });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error({ err }, "Failed to mark session ticket as duplicate");
+    return res.status(502).json({ error: message });
   }
 });
 

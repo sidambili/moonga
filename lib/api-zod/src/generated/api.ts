@@ -403,6 +403,24 @@ export const EscalateAgentSessionResponse = zod.object({
 
 
 /**
+ * @summary Mark the session's Linear ticket as a duplicate of another issue
+ */
+export const MarkSessionDuplicateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MarkSessionDuplicateBody = zod.object({
+  "duplicate_of": zod.string().optional().describe('Identifier (e.g. ENG-7) or UUID of the canonical issue. Defaults to the triage-detected duplicate_of.')
+})
+
+export const MarkSessionDuplicateResponse = zod.object({
+  "ok": zod.boolean(),
+  "canonical_identifier": zod.string(),
+  "state_name": zod.string().nullish().describe('Workflow state the duplicate was moved to, if one was found')
+})
+
+
+/**
  * @summary Get reasoning steps for a session
  */
 export const GetAgentSessionStepsParams = zod.object({

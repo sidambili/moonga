@@ -18,6 +18,8 @@ export * from './artifact';
 export * from './artifactEdit';
 export * from './artifactList';
 export * from './dashboardSummary';
+export * from './duplicateMark';
+export * from './duplicateMarkResult';
 export * from './error';
 export * from './event';
 export * from './eventList';

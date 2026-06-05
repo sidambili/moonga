@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import {
-  useGetAgentSession, useRetryAgentSession, useRerunAgentSession, useEscalateAgentSession, getGetAgentSessionQueryKey, getListAgentSessionsQueryKey,
+  useGetAgentSession, useRetryAgentSession, useRerunAgentSession, useEscalateAgentSession, useMarkSessionDuplicate, getGetAgentSessionQueryKey, getListAgentSessionsQueryKey,
   useListArtifacts, useApproveArtifact, useRejectArtifact, useEditArtifact, usePostArtifactToLinear,
   getListArtifactsQueryKey, getGetAgentSessionStepsQueryOptions, getGetAgentSessionStepsQueryKey,
 } from "@workspace/api-client-react";
@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, RefreshCw, RotateCcw, ArrowUpCircle, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen, ShieldAlert } from "lucide-react";
+import { ArrowLeft, RefreshCw, RotateCcw, ArrowUpCircle, Files, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen, ShieldAlert } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge, ApprovalBadge, ArtifactTypeBadge, formatEventType, formatObjective, formatSource } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
@@ -316,6 +316,7 @@ export default function SessionDetail() {
   const retryMutation = useRetryAgentSession();
   const rerunMutation = useRerunAgentSession();
   const escalateMutation = useEscalateAgentSession();
+  const markDuplicateMutation = useMarkSessionDuplicate();
   const queryClient = useQueryClient();
 
   const handleRetry = () => {
@@ -352,6 +353,22 @@ export default function SessionDetail() {
       onError: (err: any) => {
         const message = err?.message || String(err);
         toast({ title: "Failed to escalate session", description: message, variant: "destructive" });
+      },
+    });
+  };
+
+  const handleMarkDuplicate = () => {
+    if (!session?.duplicate_of) return;
+    if (!window.confirm(`Mark this Linear ticket as a duplicate of ${session.duplicate_of}? This updates the ticket in Linear.`)) return;
+    markDuplicateMutation.mutate({ id, data: {} }, {
+      onSuccess: (result) => {
+        toast({ title: `Marked as duplicate of ${result.canonical_identifier}${result.state_name ? ` (${result.state_name})` : ""}` });
+        refetch();
+        queryClient.invalidateQueries({ queryKey: getListAgentSessionsQueryKey() });
+      },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to mark as duplicate", description: message, variant: "destructive" });
       },
     });
   };
@@ -433,6 +450,19 @@ export default function SessionDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2 self-start">
+          {session.objective === "triage" && session.duplicate_of && session.event?.source === "linear" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarkDuplicate}
+              disabled={markDuplicateMutation.isPending}
+              className="rounded-lg text-sm"
+              title={`Mark the Linear ticket as a duplicate of ${session.duplicate_of}`}
+            >
+              <Files className={`w-3.5 h-3.5 mr-2 ${markDuplicateMutation.isPending ? "animate-pulse" : ""}`} />
+              Mark Duplicate of {session.duplicate_of}
+            </Button>
+          )}
           {session.objective === "triage" && !["pending", "running", "failed"].includes(session.status) && (
             <Button
               variant={session.needs_plan ? "default" : "outline"}

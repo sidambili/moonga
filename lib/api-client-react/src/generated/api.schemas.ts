@@ -119,6 +119,21 @@ export interface AgentSession {
   event?: Event;
 }
 
+export interface DuplicateMark {
+  /** Identifier (e.g. ENG-7) or UUID of the canonical issue. Defaults to the triage-detected duplicate_of. */
+  duplicate_of?: string;
+}
+
+export interface DuplicateMarkResult {
+  ok: boolean;
+  canonical_identifier: string;
+  /**
+     * Workflow state the duplicate was moved to, if one was found
+     * @nullable
+     */
+  state_name?: string | null;
+}
+
 export interface AgentSessionList {
   items: AgentSession[];
   /**

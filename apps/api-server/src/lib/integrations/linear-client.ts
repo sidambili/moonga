@@ -1,4 +1,4 @@
-import { LinearClient } from "@linear/sdk";
+import { LinearClient, IssueRelationType } from "@linear/sdk";
 import { db } from "@workspace/db";
 import { integrationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -51,6 +51,86 @@ export async function postLinearComment(ticketId: string, body: string): Promise
     const msg = err instanceof Error ? err.message : String(err);
     logger.warn({ err, ticketId }, "Failed to post Linear comment");
     throw new Error(`Linear comment failed: ${msg}`);
+  }
+}
+
+/**
+ * Resolve a Linear issue reference — either a UUID or a human identifier like
+ * "ENG-7" — to its id + identifier. Returns null if not found.
+ */
+async function resolveLinearIssue(
+  linear: LinearClient,
+  ref: string,
+): Promise<{ id: string; identifier: string } | null> {
+  const trimmed = ref.trim();
+  if (/^[A-Za-z]+-\d+$/.test(trimmed)) {
+    // Human identifier — resolve via search and take the exact match.
+    const payload = await linear.searchIssues(trimmed);
+    const match = (payload.nodes ?? []).find(
+      (n) => n.identifier.toLowerCase() === trimmed.toLowerCase(),
+    );
+    return match ? { id: match.id, identifier: match.identifier } : null;
+  }
+  // Assume UUID.
+  const issue = await linear.issue(trimmed);
+  return issue ? { id: issue.id, identifier: issue.identifier } : null;
+}
+
+/**
+ * Mark a Linear issue as a duplicate of another: creates a `duplicate` relation
+ * and moves the duplicate issue into a canceled-type workflow state (preferring
+ * one literally named "Duplicate" if the team has one). `duplicateOf` may be a
+ * UUID or a human identifier (e.g. "ENG-7").
+ */
+export async function markLinearDuplicate(
+  issueId: string,
+  duplicateOf: string,
+): Promise<{ canonicalIdentifier: string; stateName: string | null }> {
+  const linear = await getLinearClient();
+  if (!linear) {
+    throw new Error("Linear integration disabled or missing API key");
+  }
+
+  const canonical = await resolveLinearIssue(linear, duplicateOf);
+  if (!canonical) {
+    throw new Error(`Could not find Linear issue '${duplicateOf}'`);
+  }
+  if (canonical.id === issueId) {
+    throw new Error("An issue cannot be a duplicate of itself");
+  }
+
+  try {
+    // 1. Relation: this issue is a duplicate of the canonical one.
+    await linear.createIssueRelation({
+      issueId,
+      relatedIssueId: canonical.id,
+      type: IssueRelationType.Duplicate,
+    });
+
+    // 2. Move the duplicate into a canceled-type state (Linear has no dedicated
+    //    "duplicate" state type — duplicates resolve as canceled). Prefer a state
+    //    literally named "Duplicate" when the team defines one.
+    let stateName: string | null = null;
+    const issue = await linear.issue(issueId);
+    const team = await issue?.team;
+    if (team) {
+      const statesConn = await team.states();
+      const states = statesConn?.nodes ?? [];
+      const target =
+        states.find((s) => s.name.toLowerCase() === "duplicate") ??
+        states.find((s) => s.type === "canceled");
+      if (target) {
+        await linear.updateIssue(issueId, { stateId: target.id });
+        stateName = target.name;
+      }
+    }
+
+    logger.info({ issueId, canonical: canonical.identifier, stateName }, "Marked Linear issue as duplicate");
+    return { canonicalIdentifier: canonical.identifier, stateName };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn({ err, issueId, duplicateOf }, "Failed to mark Linear issue as duplicate");
+    throw new Error(`Mark-duplicate failed: ${msg}`);
   }
 }
 
