@@ -139,7 +139,7 @@ export const ListAgentSessionsResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -147,6 +147,8 @@ export const ListAgentSessionsResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),
@@ -194,7 +196,7 @@ export const GetAgentSessionParams = zod.object({
 export const GetAgentSessionResponse = zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -202,6 +204,8 @@ export const GetAgentSessionResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),
@@ -246,7 +250,7 @@ export const RetryAgentSessionParams = zod.object({
 export const RetryAgentSessionResponse = zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -254,6 +258,8 @@ export const RetryAgentSessionResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),
@@ -298,7 +304,7 @@ export const RerunAgentSessionParams = zod.object({
 export const RerunAgentSessionResponse = zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -306,6 +312,62 @@ export const RerunAgentSessionResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
+  "step_count": zod.number().nullish(),
+  "total_tokens": zod.number().nullish(),
+  "total_prompt_tokens": zod.number().nullish(),
+  "total_completion_tokens": zod.number().nullish(),
+  "total_cost": zod.number().nullish(),
+  "prompt_token_cost": zod.number().nullish(),
+  "completion_token_cost": zod.number().nullish(),
+  "cached_tokens": zod.number().nullish(),
+  "cached_cost": zod.number().nullish(),
+  "tool_calls_count": zod.number().nullish(),
+  "duration_ms": zod.number().nullish(),
+  "playbook_id": zod.number().nullish(),
+  "playbook_name": zod.string().nullish(),
+  "created_at": zod.string(),
+  "updated_at": zod.string(),
+  "event": zod.object({
+  "id": zod.number(),
+  "source": zod.string().describe('github | linear | betterstack | sentry | slack | email'),
+  "event_type": zod.string().describe('error | anomaly | ticket_created | issue_updated | deploy_failed | push | pr_opened'),
+  "severity": zod.string().describe('low | medium | high | critical'),
+  "status": zod.string().describe('new | processing | processed | ignored'),
+  "service": zod.string().nullish(),
+  "repo_id": zod.string().nullish(),
+  "ticket_id": zod.string().nullish(),
+  "title": zod.string().nullish(),
+  "payload_raw": zod.object({
+
+}).passthrough().optional(),
+  "session_id": zod.number().nullish(),
+  "created_at": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Escalate a triage session to a deep Plan session
+ */
+export const EscalateAgentSessionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EscalateAgentSessionResponse = zod.object({
+  "id": zod.number(),
+  "event_id": zod.number(),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
+  "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
+  "model_used": zod.string().nullish(),
+  "context_snapshot": zod.object({
+
+}).passthrough().nullish(),
+  "output_summary": zod.string().nullish(),
+  "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),
@@ -396,7 +458,7 @@ export const ListArtifactsResponse = zod.object({
   "session": zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -404,6 +466,8 @@ export const ListArtifactsResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),
@@ -460,7 +524,7 @@ export const GetArtifactResponse = zod.object({
   "session": zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -468,6 +532,8 @@ export const GetArtifactResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),
@@ -521,7 +587,7 @@ export const ApproveArtifactResponse = zod.object({
   "session": zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -529,6 +595,8 @@ export const ApproveArtifactResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),
@@ -582,7 +650,7 @@ export const RejectArtifactResponse = zod.object({
   "session": zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -590,6 +658,8 @@ export const RejectArtifactResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),
@@ -647,7 +717,7 @@ export const EditArtifactResponse = zod.object({
   "session": zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -655,6 +725,8 @@ export const EditArtifactResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),
@@ -708,7 +780,7 @@ export const PostArtifactToLinearResponse = zod.object({
   "session": zod.object({
   "id": zod.number(),
   "event_id": zod.number(),
-  "objective": zod.string().describe('diagnose | plan | summarize | draft'),
+  "objective": zod.string().describe('triage | diagnose | plan | summarize | draft'),
   "status": zod.string().describe('pending | running | needs_review | approved | rejected | completed | failed'),
   "model_used": zod.string().nullish(),
   "context_snapshot": zod.object({
@@ -716,6 +788,8 @@ export const PostArtifactToLinearResponse = zod.object({
 }).passthrough().nullish(),
   "output_summary": zod.string().nullish(),
   "confidence_score": zod.number().nullish(),
+  "needs_plan": zod.boolean().nullish().describe('Triage-only — guarded recommendation to escalate to a Plan session'),
+  "duplicate_of": zod.string().nullish().describe('Triage-only — identifier of the issue this duplicates, if any'),
   "step_count": zod.number().nullish(),
   "total_tokens": zod.number().nullish(),
   "total_prompt_tokens": zod.number().nullish(),

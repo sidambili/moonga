@@ -66,7 +66,7 @@ export type AgentSessionContextSnapshot = { [key: string]: unknown } | null;
 export interface AgentSession {
   id: number;
   event_id: number;
-  /** diagnose | plan | summarize | draft */
+  /** triage | diagnose | plan | summarize | draft */
   objective: string;
   /** pending | running | needs_review | approved | rejected | completed | failed */
   status: string;
@@ -78,6 +78,16 @@ export interface AgentSession {
   output_summary?: string | null;
   /** @nullable */
   confidence_score?: number | null;
+  /**
+     * Triage-only — guarded recommendation to escalate to a Plan session
+     * @nullable
+     */
+  needs_plan?: boolean | null;
+  /**
+     * Triage-only — identifier of the issue this duplicates, if any
+     * @nullable
+     */
+  duplicate_of?: string | null;
   /** @nullable */
   step_count?: number | null;
   /** @nullable */

@@ -13,6 +13,7 @@ import { extractSlackMessageInfo, getSlackBotToken, postSlackReply } from "./int
 import { getRepoFromPayload, detectTechStack, fetchRepoInstructions, gatherEventContext } from "./integrations/github-context";
 import { createGithubTools } from "./integrations/github-ai-tools";
 import { createLinearTools } from "./integrations/linear-ai-tools";
+import { createArtifactTools } from "./ai/artifact-tools";
 import { buildSystemPrompt, diagnoseUserPrompt, planUserPrompt, triageUserPrompt, CRITIC_SYSTEM_PROMPT, buildCriticPrompt } from "./ai/prompts";
 import { parseAgentOutput } from "./ai/output";
 import { loadPlaybook, loadActiveSkills } from "./playbook-loader";
@@ -20,6 +21,10 @@ import { emitStep } from "./session-stream";
 
 const MAX_STEPS = 15;
 const MAX_TOOL_CALLS = 30;
+// Triage is the fast first pass — keep it shallow so it can't run up the same
+// exploration budget as the deep Plan agent.
+const TRIAGE_MAX_STEPS = 6;
+const TRIAGE_MAX_TOOL_CALLS = 8;
 
 async function getModelSettings() {
   const rows = await db.select().from(modelSettingsTable).limit(1);
@@ -285,9 +290,13 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   // agent can find duplicate/related issues and ground its read in ticket history.
   const linearClient = event.source === "linear" ? await getLinearClient() : null;
 
+  const isTriage = session.objective === "triage";
+  const maxSteps = isTriage ? TRIAGE_MAX_STEPS : MAX_STEPS;
+  const maxToolCalls = isTriage ? TRIAGE_MAX_TOOL_CALLS : MAX_TOOL_CALLS;
+
   let toolCallsUsed = 0;
   function checkToolLimit(): string | null {
-    if (++toolCallsUsed > MAX_TOOL_CALLS) {
+    if (++toolCallsUsed > maxToolCalls) {
       return "Tool call limit reached. Write your final answer using the information gathered so far.";
     }
     return null;
@@ -296,6 +305,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   const tools = {
     ...createGithubTools(ghClient, repo, checkToolLimit),
     ...(linearClient ? createLinearTools(linearClient, checkToolLimit) : {}),
+    ...createArtifactTools(checkToolLimit),
   };
 
   const { model: modelConfig, capture: cacheCapture } = getModelConfig(settings, modelString, sessionId);
@@ -315,7 +325,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       model: modelConfig,
       system: systemPrompt,
       prompt: userPrompt,
-      maxSteps: MAX_STEPS,
+      maxSteps,
       maxTokens,
       temperature: 0,
       tools,
@@ -515,12 +525,23 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       );
     }
 
+    // Triage escalation signal — guarded. A duplicate or a low-confidence read
+    // never recommends the expensive Plan agent. Escalation is a human decision
+    // (the "Escalate to Plan" button) so triage no longer auto-spawns a Plan
+    // session; we only persist the recommendation for the UI to surface.
+    const triageDuplicateOf = isTriage ? (parsed.duplicate_of ?? null) : null;
+    const triageNeedsPlan = isTriage
+      ? parsed.needs_plan === true && !triageDuplicateOf && parsed.confidence >= 0.5
+      : null;
+
     await db
       .update(agentSessionsTable)
       .set({
         status: "needs_review",
         output_summary: parsed.slack_summary,
         confidence_score: parsed.confidence,
+        needs_plan: triageNeedsPlan,
+        duplicate_of: triageDuplicateOf,
         model_used: modelString,
         total_tokens: totalTokens || null,
         total_prompt_tokens: totalPromptTokens || null,
@@ -563,10 +584,11 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       .set({ status: "needs_review" })
       .where(eq(eventsTable.id, event.id));
 
-    // Post-triage: auto-comment the triage read back on the Linear ticket, and
-    // delegate to a deep Plan session only when the triage agent judged it
-    // warranted. The new pending session is picked up by the agent-worker poll.
-    if (session.objective === "triage") {
+    // Post-triage: auto-comment the triage read back on the Linear ticket and
+    // record the escalation recommendation. Escalation to the expensive Plan
+    // agent is gated behind a human "Escalate to Plan" action (no auto-spawn) so
+    // duplicates and trivial tickets don't trigger a costly re-plan.
+    if (isTriage) {
       if (event.source === "linear" && event.ticket_id) {
         try {
           await postLinearComment(event.ticket_id, parsed.slack_summary);
@@ -579,20 +601,14 @@ export async function runAgentSession(sessionId: number): Promise<void> {
         stepNum++;
       }
 
-      if (parsed.needs_plan) {
-        const [planSession] = await db.insert(agentSessionsTable).values({
-          event_id: event.id,
-          objective: "plan",
-          status: "pending",
-          model_used: null,
-          project_id: session.project_id,
-        }).returning({ id: agentSessionsTable.id });
-        await persistStep(sessionId, stepNum, "tool", `[System] Triage escalated → spawned Plan session #${planSession?.id ?? "?"}`, undefined, undefined, undefined, "delegate_plan", { needs_plan: true });
-        stepNum++;
-        logger.info({ sessionId, planSessionId: planSession?.id, eventId: event.id }, "Triage escalated to plan session");
-      } else {
-        logger.info({ sessionId, eventId: event.id }, "Triage complete — no plan escalation needed");
-      }
+      const recText = triageDuplicateOf
+        ? `[System] Triage recommendation: duplicate of ${triageDuplicateOf} — escalation to Plan not recommended.`
+        : triageNeedsPlan
+        ? `[System] Triage recommendation: escalate to Plan (deep planning warranted). Use the "Escalate to Plan" action to proceed.`
+        : `[System] Triage recommendation: no escalation needed — handle as a quick task.`;
+      await persistStep(sessionId, stepNum, "tool", recText, undefined, undefined, undefined, "delegate_plan", { needs_plan: triageNeedsPlan, duplicate_of: triageDuplicateOf });
+      stepNum++;
+      logger.info({ sessionId, eventId: event.id, needsPlan: triageNeedsPlan, duplicateOf: triageDuplicateOf }, "Triage complete — escalation recommendation recorded");
     }
 
     if (event.source === "slack") {

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { agentSessionsTable, eventsTable, agentSessionStepsTable, playbooksTable } from "@workspace/db";
-import { eq, desc, and, sql, lt } from "drizzle-orm";
+import { eq, desc, and, sql, lt, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { subscribeToSession } from "../lib/session-stream";
 import { tenantScope, withTenantScope } from "../lib/tenant-scope";
@@ -149,6 +149,53 @@ router.post("/:id/rerun", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Failed to rerun session");
     return res.status(500).json({ error: "Failed to rerun session" });
+  }
+});
+
+// Human-gated escalation: promote a completed triage session to a deep Plan
+// session for the same event. The Plan runner inherits the triage artifact as
+// context (see agent-runner's sibling-artifact lookup). Idempotent — if an open
+// Plan session already exists for the event, return it instead of spawning a
+// duplicate (re-planning is expensive).
+router.post("/:id/escalate", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [original] = await db
+      .select()
+      .from(agentSessionsTable)
+      .where(withTenantScope(res, agentSessionsTable.project_id, eq(agentSessionsTable.id, id)));
+    if (!original) return res.status(404).json({ error: "Session not found" });
+    if (original.objective !== "triage") {
+      return res.status(400).json({ error: "Only triage sessions can be escalated to Plan" });
+    }
+
+    const [existingPlan] = await db
+      .select()
+      .from(agentSessionsTable)
+      .where(and(
+        eq(agentSessionsTable.event_id, original.event_id),
+        eq(agentSessionsTable.objective, "plan"),
+        inArray(agentSessionsTable.status, ["pending", "running", "needs_review", "approved", "completed"]),
+      ))
+      .orderBy(desc(agentSessionsTable.id));
+    if (existingPlan) {
+      const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, original.event_id));
+      return res.json({ ...existingPlan, event, step_count: existingPlan.step_count ?? 0 });
+    }
+
+    const [session] = await db.insert(agentSessionsTable).values({
+      event_id: original.event_id,
+      objective: "plan",
+      status: "pending",
+      model_used: null,
+      project_id: original.project_id,
+    }).returning();
+
+    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, original.event_id));
+    return res.json({ ...session, event, step_count: 0 });
+  } catch (err) {
+    logger.error({ err }, "Failed to escalate session");
+    return res.status(500).json({ error: "Failed to escalate session" });
   }
 });
 

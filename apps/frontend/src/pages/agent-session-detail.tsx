@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import {
-  useGetAgentSession, useRetryAgentSession, useRerunAgentSession, getGetAgentSessionQueryKey, getListAgentSessionsQueryKey,
+  useGetAgentSession, useRetryAgentSession, useRerunAgentSession, useEscalateAgentSession, getGetAgentSessionQueryKey, getListAgentSessionsQueryKey,
   useListArtifacts, useApproveArtifact, useRejectArtifact, useEditArtifact, usePostArtifactToLinear,
   getListArtifactsQueryKey, getGetAgentSessionStepsQueryOptions, getGetAgentSessionStepsQueryKey,
 } from "@workspace/api-client-react";
@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, RefreshCw, RotateCcw, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen, ShieldAlert } from "lucide-react";
+import { ArrowLeft, RefreshCw, RotateCcw, ArrowUpCircle, ExternalLink, CheckCircle, XCircle, Edit3, Save, X, Copy, Check, ChevronDown, BookOpen, ShieldAlert } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SourceIcon, SeverityBadge, StatusBadge, ApprovalBadge, ArtifactTypeBadge, formatEventType, formatObjective, formatSource } from "@/components/ui-helpers";
 import { toast } from "@/hooks/use-toast";
@@ -315,6 +315,7 @@ export default function SessionDetail() {
   );
   const retryMutation = useRetryAgentSession();
   const rerunMutation = useRerunAgentSession();
+  const escalateMutation = useEscalateAgentSession();
   const queryClient = useQueryClient();
 
   const handleRetry = () => {
@@ -337,6 +338,20 @@ export default function SessionDetail() {
       onError: (err: any) => {
         const message = err?.message || String(err);
         toast({ title: "Failed to rerun session", description: message, variant: "destructive" });
+      },
+    });
+  };
+
+  const handleEscalate = () => {
+    escalateMutation.mutate({ id }, {
+      onSuccess: (planSession) => {
+        toast({ title: `Escalated — Plan session ${planSession.id} queued` });
+        queryClient.invalidateQueries({ queryKey: getListAgentSessionsQueryKey() });
+        navigate(`/agent-sessions/${planSession.id}`);
+      },
+      onError: (err: any) => {
+        const message = err?.message || String(err);
+        toast({ title: "Failed to escalate session", description: message, variant: "destructive" });
       },
     });
   };
@@ -405,9 +420,38 @@ export default function SessionDetail() {
                 {session.playbook_name}
               </span>
             )}
+            {session.duplicate_of && (
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-500/10 text-amber-500" title="Triage flagged this ticket as a duplicate">
+                Duplicate of {session.duplicate_of}
+              </span>
+            )}
+            {session.objective === "triage" && session.needs_plan && (
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-primary/10 text-primary">
+                Recommends planning
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 self-start">
+          {session.objective === "triage" && !["pending", "running", "failed"].includes(session.status) && (
+            <Button
+              variant={session.needs_plan ? "default" : "outline"}
+              size="sm"
+              onClick={handleEscalate}
+              disabled={escalateMutation.isPending}
+              className="rounded-lg text-sm"
+              title={
+                session.duplicate_of
+                  ? `Triage flagged this as a duplicate of ${session.duplicate_of} — escalation not recommended`
+                  : session.needs_plan
+                  ? "Triage recommends deep planning"
+                  : "Triage did not flag this as needing deep planning"
+              }
+            >
+              <ArrowUpCircle className={`w-3.5 h-3.5 mr-2 ${escalateMutation.isPending ? "animate-spin" : ""}`} />
+              Escalate to Plan
+            </Button>
+          )}
           {(session.status === "failed" || session.status === "rejected") && (
             <Button variant="outline" size="sm" onClick={handleRetry} disabled={retryMutation.isPending} className="rounded-lg text-sm">
               <RefreshCw className={`w-3.5 h-3.5 mr-2 ${retryMutation.isPending ? "animate-spin" : ""}`} />

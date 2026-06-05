@@ -245,6 +245,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentSession"
 
+  /agent-sessions/{id}/escalate:
+    post:
+      operationId: escalateAgentSession
+      tags: [agent-sessions]
+      summary: Escalate a triage session to a deep Plan session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Plan session created (or existing open Plan session returned)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentSession"
+
   /agent-sessions/{id}/steps:
     get:
       operationId: getAgentSessionSteps
@@ -1109,7 +1128,7 @@ components:
           type: integer
         objective:
           type: string
-          description: "diagnose | plan | summarize | draft"
+          description: "triage | diagnose | plan | summarize | draft"
         status:
           type: string
           description: "pending | running | needs_review | approved | rejected | completed | failed"
@@ -1121,6 +1140,12 @@ components:
           type: ["string", "null"]
         confidence_score:
           type: ["number", "null"]
+        needs_plan:
+          type: ["boolean", "null"]
+          description: Triage-only — guarded recommendation to escalate to a Plan session
+        duplicate_of:
+          type: ["string", "null"]
+          description: Triage-only — identifier of the issue this duplicates, if any
         step_count:
           type: ["integer", "null"]
         total_tokens:

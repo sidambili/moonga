@@ -160,18 +160,19 @@ Title: ${title}
 ${ticketInfo}${contextBlock}
 
 REQUIRED first step — check for duplicates and prior art:
-1. Call search_linear_issues with 1-2 key phrases from the title/description to find existing related or duplicate tickets.
+1. Call search_linear_issues with 1-2 key phrases from the title/description to find existing related or duplicate tickets, and search_existing_artifacts to find any prior analysis that already covers this work.
 2. If a strong candidate appears, call get_linear_issue on its UUID to confirm whether it is a true duplicate or a related ticket worth referencing.
-3. In your summary and slack_summary, explicitly name any duplicate/related issue by its identifier (e.g. ENG-123) and URL. If it is a clear duplicate, say so plainly and recommend linking/closing rather than escalating.
+3. In your summary and slack_summary, explicitly name any duplicate/related issue by its identifier (e.g. ENG-123) and URL, and reference any existing artifact that already covers it. If it is a clear duplicate, say so plainly and recommend linking/closing rather than escalating.
 
-Then assess scope. Only escalate (needs_plan: true) when deep, source-grounded planning is genuinely warranted — bias toward false for trivial, well-specified, or duplicate tickets.
+Then assess scope. Only escalate (needs_plan: true) when deep, source-grounded planning is genuinely warranted — bias toward false for trivial or well-specified tickets. If the ticket is a duplicate or is already covered by an existing artifact, set needs_plan: false and put the duplicated issue's identifier in duplicate_of — re-planning duplicate work is expensive and must be avoided.
 
 Respond with valid JSON only — no surrounding text or code fences:
 {
-  "content": "<markdown triage summary: what the ticket is, likely affected area, any duplicate/related issues found (with identifier + URL), and the trivial-vs-needs-planning judgement>",
+  "content": "<markdown triage summary: what the ticket is, likely affected area, any duplicate/related issues or existing artifacts found (with identifier + URL), and the trivial-vs-needs-planning judgement>",
   "slack_summary": "<2-3 plain-text sentences suitable for posting as a Linear comment: the triage read, any duplicate/related ticket to refer to, and the next step>",
   "confidence": <float 0.0–1.0>,
-  "needs_plan": <true|false>
+  "needs_plan": <true|false>,
+  "duplicate_of": "<identifier of the issue this duplicates, e.g. ENG-7 — omit or empty string if not a duplicate>"
 }`;
 }
 

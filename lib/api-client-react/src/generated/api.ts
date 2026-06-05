@@ -920,6 +920,76 @@ export const useRerunAgentSession = <TError = ErrorType<unknown>,
       return useMutation(getRerunAgentSessionMutationOptions(options));
     }
 
+export const getEscalateAgentSessionUrl = (id: number,) => {
+
+
+
+
+  return `/api/agent-sessions/${id}/escalate`
+}
+
+/**
+ * @summary Escalate a triage session to a deep Plan session
+ */
+export const escalateAgentSession = async (id: number, options?: RequestInit): Promise<AgentSession> => {
+
+  return customFetch<AgentSession>(getEscalateAgentSessionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getEscalateAgentSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof escalateAgentSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof escalateAgentSession>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['escalateAgentSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof escalateAgentSession>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  escalateAgentSession(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EscalateAgentSessionMutationResult = NonNullable<Awaited<ReturnType<typeof escalateAgentSession>>>
+
+    export type EscalateAgentSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Escalate a triage session to a deep Plan session
+ */
+export const useEscalateAgentSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof escalateAgentSession>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof escalateAgentSession>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getEscalateAgentSessionMutationOptions(options));
+    }
+
 export const getGetAgentSessionStepsUrl = (id: number,) => {
 
 

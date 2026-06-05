@@ -300,6 +300,10 @@ export function getToolLabel(name: string, args?: unknown): string {
     }
     case "get_linear_issue":
       return a.id ? `Linear issue ${String(a.id).slice(0, 8)}` : "Linear issue";
+    case "search_existing_artifacts": {
+      const q = a.query ? String(a.query) : "";
+      return q ? `Searched artifacts: ${q.includes(" ") ? `"${q}"` : q}` : "Searched artifacts";
+    }
     case "create_artifact":
       return "Artifact created";
     case "post_linear_comment":
@@ -313,7 +317,7 @@ export function getToolLabel(name: string, args?: unknown): string {
     case "critic_review":
       return "Plan review";
     case "delegate_plan":
-      return "Escalated to plan";
+      return "Triage recommendation";
     default:
       return name.replace(/_/g, " ");
   }
