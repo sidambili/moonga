@@ -52,6 +52,7 @@ import type {
   ProjectList,
   ProjectSource,
   ProjectSourceCreate,
+  ProjectSourceUpdate,
   Repo,
   SeverityCount,
   Skill,
@@ -2688,6 +2689,78 @@ export const useCreateProjectSource = <TError = ErrorType<ValidationError | Erro
         TContext
       > => {
       return useMutation(getCreateProjectSourceMutationOptions(options));
+    }
+
+export const getUpdateProjectSourceUrl = (id: string,) => {
+
+
+
+
+  return `/api/project-sources/${id}`
+}
+
+/**
+ * @summary Update label or notes on a project source binding
+ */
+export const updateProjectSource = async (id: string,
+    projectSourceUpdate: ProjectSourceUpdate, options?: RequestInit): Promise<ProjectSource> => {
+
+  return customFetch<ProjectSource>(getUpdateProjectSourceUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      projectSourceUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateProjectSourceMutationOptions = <TError = ErrorType<ValidationError | Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectSource>>, TError,{id: string;data: BodyType<ProjectSourceUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProjectSource>>, TError,{id: string;data: BodyType<ProjectSourceUpdate>}, TContext> => {
+
+const mutationKey = ['updateProjectSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProjectSource>>, {id: string;data: BodyType<ProjectSourceUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateProjectSource(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProjectSourceMutationResult = NonNullable<Awaited<ReturnType<typeof updateProjectSource>>>
+    export type UpdateProjectSourceMutationBody = BodyType<ProjectSourceUpdate>
+    export type UpdateProjectSourceMutationError = ErrorType<ValidationError | Error>
+
+    /**
+ * @summary Update label or notes on a project source binding
+ */
+export const useUpdateProjectSource = <TError = ErrorType<ValidationError | Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectSource>>, TError,{id: string;data: BodyType<ProjectSourceUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProjectSource>>,
+        TError,
+        {id: string;data: BodyType<ProjectSourceUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateProjectSourceMutationOptions(options));
     }
 
 export const getDeleteProjectSourceUrl = (id: string,) => {

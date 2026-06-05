@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOpenAI } from "@ai-sdk/openai";
 import { db } from "@workspace/db";
-import { agentSessionsTable, agentSessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable } from "@workspace/db";
+import { agentSessionsTable, agentSessionStepsTable, artifactsTable, eventsTable, integrationsTable, modelSettingsTable, projectsTable, projectSourcesTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { logger } from "./logger";
 import { estimateCost, getModelPrice } from "./model-prices";
@@ -32,9 +32,27 @@ async function getModelSettings() {
   return rows[0] ?? null;
 }
 
-async function getGithubIntegration(): Promise<{ token: string | undefined; selectedRepo: string | undefined }> {
+async function getOrgIdForSession(projectId: string | null): Promise<string | null> {
+  if (!projectId) return null;
   try {
-    const [row] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "github"));
+    const [row] = await db
+      .select({ organization_id: projectsTable.organization_id })
+      .from(projectsTable)
+      .where(eq(projectsTable.id, projectId))
+      .limit(1);
+    return row?.organization_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getGithubIntegration(organizationId?: string | null): Promise<{ token: string | undefined; selectedRepo: string | undefined }> {
+  try {
+    // Prefer the org-scoped integration row; fall back to the first enabled one.
+    const where = organizationId
+      ? and(eq(integrationsTable.provider, "github"), eq(integrationsTable.organization_id, organizationId))
+      : eq(integrationsTable.provider, "github");
+    const [row] = await db.select().from(integrationsTable).where(where);
     if (row?.enabled) {
       const config = row.config as Record<string, unknown> | null;
       return {
@@ -42,10 +60,48 @@ async function getGithubIntegration(): Promise<{ token: string | undefined; sele
         selectedRepo: (config?.selected_repo as string | undefined) ?? undefined,
       };
     }
+    // If org-scoped lookup found nothing, fall back to unscoped (single-tenant mode).
+    if (organizationId) {
+      const [fallback] = await db.select().from(integrationsTable).where(eq(integrationsTable.provider, "github"));
+      if (fallback?.enabled) {
+        const config = fallback.config as Record<string, unknown> | null;
+        return {
+          token: fallback.api_key ?? undefined,
+          selectedRepo: (config?.selected_repo as string | undefined) ?? undefined,
+        };
+      }
+    }
   } catch {
     // ignore
   }
   return { token: undefined, selectedRepo: undefined };
+}
+
+// Load the notes field from the project_source that routed this event (if any),
+// so per-source custom instructions can be injected into the agent context.
+async function getProjectSourceNotes(
+  projectId: string | null,
+  provider: string,
+  externalId: string | undefined,
+): Promise<string | null> {
+  if (!projectId) return null;
+  try {
+    const conditions = externalId
+      ? and(
+          eq(projectSourcesTable.project_id, projectId),
+          eq(projectSourcesTable.provider, provider),
+          eq(projectSourcesTable.external_id, externalId),
+        )
+      : and(eq(projectSourcesTable.project_id, projectId), eq(projectSourcesTable.provider, provider));
+    const [row] = await db
+      .select({ notes: projectSourcesTable.notes })
+      .from(projectSourcesTable)
+      .where(conditions)
+      .limit(1);
+    return row?.notes ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function persistStep(
@@ -198,7 +254,8 @@ export async function runAgentSession(sessionId: number): Promise<void> {
       ? (settings.plan_model ?? "deepseek/deepseek-v4-pro")
       : (settings.triage_model ?? "deepseek/deepseek-v4-flash");
 
-  const { token: githubToken, selectedRepo } = await getGithubIntegration();
+  const orgId = await getOrgIdForSession(session.project_id);
+  const { token: githubToken, selectedRepo } = await getGithubIntegration(orgId);
   const repo = getRepoFromPayload(event.payload_raw as Record<string, unknown>, event.repo_id ?? selectedRepo ?? undefined);
 
   const ghClientEarly = repo && githubToken ? new Octokit({ auth: githubToken }) : null;
@@ -207,9 +264,17 @@ export async function runAgentSession(sessionId: number): Promise<void> {
   // built at exactly the commit under analysis; otherwise the default branch head.
   const payloadSha = extractPayloadSha(event.payload_raw as Record<string, unknown>);
 
+  // External ID for project_source lookup: Linear → team id, GitHub → repo full_name.
+  const payload = event.payload_raw as Record<string, unknown>;
+  const sourceExternalId = event.source === "github"
+    ? ((payload.repository as Record<string, unknown> | undefined)?.full_name as string | undefined)
+    : event.source === "linear"
+    ? ((payload.data as Record<string, unknown> | undefined)?.team as Record<string, unknown> | undefined)?.id as string | undefined
+    : undefined;
+
   // Fetch tech stack, event context, repo instruction files, the cached repo map,
-  // and Linear context in parallel
-  const [techStack, context, repoInstructions, repoMap, linearContext] = await Promise.all([
+  // Linear context, and project source notes in parallel
+  const [techStack, context, repoInstructions, repoMap, linearContext, sourceNotes] = await Promise.all([
     ghClientEarly
       ? detectTechStack(ghClientEarly, repo!.owner, repo!.repo)
       : Promise.resolve(""),
@@ -228,6 +293,7 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     event.source === "linear" && event.ticket_id
       ? gatherLinearContext(event.ticket_id)
       : Promise.resolve(""),
+    getProjectSourceNotes(session.project_id, event.source, sourceExternalId),
   ]);
 
   const repoMapText = repoMap ? formatRepoMap(repoMap) : "";
@@ -274,7 +340,11 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     ? `Revision feedback from adversarial critic — you MUST address every point raised before finalising your plan:\n${session.critique_context}`
     : "";
 
-  const fullContext = [triageContext, critiqueContext, repoInstructions, repoMapText, linearContext, context].filter(Boolean).join("\n\n---\n\n");
+  const sourceNotesText = sourceNotes
+    ? `Source-specific instructions (treat as authoritative guidance for handling events from this repository/team):\n${sourceNotes}`
+    : "";
+
+  const fullContext = [triageContext, critiqueContext, sourceNotesText, repoInstructions, repoMapText, linearContext, context].filter(Boolean).join("\n\n---\n\n");
 
   const ticketInfo = event.source === "linear"
     ? extractLinearTicketInfo(event.payload_raw as Record<string, unknown>)
@@ -290,6 +360,9 @@ export async function runAgentSession(sessionId: number): Promise<void> {
     : diagnoseUserPrompt(promptParams);
 
   // Persist pre-fetched context and user prompt
+  if (sourceNotes) {
+    await persistStep(sessionId, -5, "tool", `[System] Source-specific instructions:\n${sourceNotes}`, undefined, undefined, undefined, "load_source_notes");
+  }
   if (repoInstructions) {
     await persistStep(sessionId, -3, "tool", `[System] Repo instruction files found:\n${repoInstructions}`, undefined, undefined, undefined, "fetch_repo_instructions");
   }

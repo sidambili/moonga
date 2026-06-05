@@ -1175,6 +1175,7 @@ export const ListProjectSourcesResponseItem = zod.object({
   "provider": zod.string().describe('linear | github | ...'),
   "external_id": zod.string().describe('Linear team id, GitHub repo full_name, ...'),
   "label": zod.string().nullish(),
+  "notes": zod.string().nullish().describe('Custom instructions injected into agent context when this source triggers a session'),
   "created_at": zod.string(),
   "updated_at": zod.string()
 })
@@ -1188,7 +1189,33 @@ export const CreateProjectSourceBody = zod.object({
   "project_id": zod.string(),
   "provider": zod.string(),
   "external_id": zod.string(),
-  "label": zod.string().optional()
+  "label": zod.string().optional(),
+  "notes": zod.string().optional().describe('Custom instructions injected into agent context when this source triggers a session')
+})
+
+
+/**
+ * @summary Update label or notes on a project source binding
+ */
+export const UpdateProjectSourceParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateProjectSourceBody = zod.object({
+  "label": zod.string().optional(),
+  "notes": zod.string().nullish().describe('Custom instructions injected into agent context when this source triggers a session')
+})
+
+export const UpdateProjectSourceResponse = zod.object({
+  "id": zod.string(),
+  "project_id": zod.string(),
+  "project_name": zod.string().nullish(),
+  "provider": zod.string().describe('linear | github | ...'),
+  "external_id": zod.string().describe('Linear team id, GitHub repo full_name, ...'),
+  "label": zod.string().nullish(),
+  "notes": zod.string().nullish().describe('Custom instructions injected into agent context when this source triggers a session'),
+  "created_at": zod.string(),
+  "updated_at": zod.string()
 })
 
 

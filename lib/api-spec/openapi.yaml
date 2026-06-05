@@ -774,6 +774,47 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   /project-sources/{id}:
+    patch:
+      operationId: updateProjectSource
+      tags: [projects]
+      summary: Update label or notes on a project source binding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectSourceUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSource"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Source not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     delete:
       operationId: deleteProjectSource
       tags: [projects]
@@ -1643,6 +1684,9 @@ components:
           description: "Linear team id, GitHub repo full_name, ..."
         label:
           type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+          description: "Custom instructions injected into agent context when this source triggers a session"
         created_at:
           type: string
         updated_at:
@@ -1660,6 +1704,18 @@ components:
           type: string
         label:
           type: string
+        notes:
+          type: string
+          description: "Custom instructions injected into agent context when this source triggers a session"
+
+    ProjectSourceUpdate:
+      type: object
+      properties:
+        label:
+          type: string
+        notes:
+          type: ["string", "null"]
+          description: "Custom instructions injected into agent context when this source triggers a session"
 
     # ── Dashboard ───────────────────────────────────────────────────
 

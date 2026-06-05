@@ -7,6 +7,7 @@ import {
   useActivateProject,
   useListProjectSources,
   useCreateProjectSource,
+  useUpdateProjectSource,
   useDeleteProjectSource,
   getListProjectsQueryKey,
   getListProjectSourcesQueryKey,
@@ -15,6 +16,7 @@ import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug, Loader2 } fr
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/hooks/use-toast";
@@ -337,6 +339,7 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
   const { data: projectData } = useListProjects();
   const { data: sources, isLoading } = useListProjectSources();
   const createMutation = useCreateProjectSource();
+  const updateMutation = useUpdateProjectSource();
   const deleteMutation = useDeleteProjectSource();
 
   const projects = projectData?.items ?? [];
@@ -344,7 +347,10 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
   const [provider, setProvider] = useState<string>("linear");
   const [externalId, setExternalId] = useState("");
   const [label, setLabel] = useState("");
+  const [notes, setNotes] = useState("");
   const [pendingSourceId, setPendingSourceId] = useState<string | null>(null);
+  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+  const [editingNotesValue, setEditingNotesValue] = useState("");
 
   // Default the project select to the first project once loaded.
   useEffect(() => {
@@ -357,15 +363,35 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
   const add = () => {
     if (!projectId || !externalId.trim()) return;
     createMutation.mutate(
-      { data: { project_id: projectId, provider, external_id: externalId.trim(), label: label.trim() || undefined } },
+      { data: { project_id: projectId, provider, external_id: externalId.trim(), label: label.trim() || undefined, notes: notes.trim() || undefined } },
       {
         onSuccess: () => {
           setExternalId("");
           setLabel("");
+          setNotes("");
           invalidate();
           toast({ title: "Source mapped" });
         },
         onError: () => toast({ title: "Failed to map source", description: "That resource may already be mapped.", variant: "destructive" }),
+      },
+    );
+  };
+
+  const startEditNotes = (id: string, current: string | null) => {
+    setEditingNotesId(id);
+    setEditingNotesValue(current ?? "");
+  };
+
+  const saveNotes = (id: string) => {
+    updateMutation.mutate(
+      { id, data: { notes: editingNotesValue.trim() || null } },
+      {
+        onSuccess: () => {
+          setEditingNotesId(null);
+          invalidate();
+          toast({ title: "Notes saved" });
+        },
+        onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
       },
     );
   };
@@ -402,42 +428,87 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
           <tbody className="divide-y divide-border">
             {(sources ?? []).map((s) => {
               const isRemoving = pendingSourceId === s.id;
+              const isEditingNotes = editingNotesId === s.id;
 
               return (
-                <tr key={s.id} className="hover:bg-muted/40 transition-colors">
-                  <td className="px-4 py-2.5 max-w-0">
-                    <p className="text-sm truncate">{s.label || s.external_id}</p>
-                    {s.label && (
-                      <p className="text-[11px] text-muted-foreground truncate font-mono">{s.external_id}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 hidden sm:table-cell">
-                    <span className="text-xs text-muted-foreground capitalize">{s.provider}</span>
-                  </td>
-                  <td className="px-4 py-2.5 hidden md:table-cell">
-                    <span className="text-xs text-muted-foreground">{s.project_name}</span>
-                  </td>
-                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                    {canManage && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                        title={isRemoving ? "Removing source" : "Remove source"}
-                        aria-label={isRemoving ? "Removing source" : "Remove source"}
-                        aria-busy={isRemoving}
-                        onClick={() => remove(s.id)}
-                        disabled={isRemoving}
-                      >
-                        {isRemoving ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
-                      </Button>
-                    )}
-                  </td>
-                </tr>
+                <>
+                  <tr key={s.id} className="hover:bg-muted/40 transition-colors">
+                    <td className="px-4 py-2.5 max-w-0">
+                      <p className="text-sm truncate">{s.label || s.external_id}</p>
+                      {s.label && (
+                        <p className="text-[11px] text-muted-foreground truncate font-mono">{s.external_id}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 hidden sm:table-cell">
+                      <span className="text-xs text-muted-foreground capitalize">{s.provider}</span>
+                    </td>
+                    <td className="px-4 py-2.5 hidden md:table-cell">
+                      <span className="text-xs text-muted-foreground">{s.project_name}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                      {canManage && (
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                            title={isEditingNotes ? "Cancel editing notes" : "Edit source notes"}
+                            aria-label={isEditingNotes ? "Cancel editing notes" : "Edit source notes"}
+                            onClick={() => isEditingNotes ? setEditingNotesId(null) : startEditNotes(s.id, s.notes ?? null)}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                            title={isRemoving ? "Removing source" : "Remove source"}
+                            aria-label={isRemoving ? "Removing source" : "Remove source"}
+                            aria-busy={isRemoving}
+                            onClick={() => remove(s.id)}
+                            disabled={isRemoving}
+                          >
+                            {isRemoving ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {isEditingNotes && (
+                    <tr key={`${s.id}-notes`} className="bg-muted/20">
+                      <td colSpan={4} className="px-4 pb-3 pt-1">
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] text-muted-foreground">Custom instructions injected into the agent context when this source triggers a session.</p>
+                          <Textarea
+                            value={editingNotesValue}
+                            onChange={(e) => setEditingNotesValue(e.target.value)}
+                            placeholder="e.g. This is a monorepo — focus on the apps/api directory. Escalate to on-call if error rate exceeds 1%."
+                            className="text-xs min-h-[80px] bg-background"
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" className="h-7 text-xs" onClick={() => saveNotes(s.id)} disabled={updateMutation.isPending}>
+                              {updateMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+                              Save
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingNotesId(null)}>Cancel</Button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {!isEditingNotes && s.notes && (
+                    <tr key={`${s.id}-notes-display`} className="bg-muted/10">
+                      <td colSpan={4} className="px-4 pb-2.5 pt-0">
+                        <p className="text-[11px] text-muted-foreground whitespace-pre-wrap leading-relaxed">{s.notes}</p>
+                      </td>
+                    </tr>
+                  )}
+                </>
               );
             })}
             {(sources?.length ?? 0) === 0 && (
@@ -452,42 +523,52 @@ function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; in
       )}
 
       {canManage && projects.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-t border-border">
-          <Select value={projectId} onValueChange={setProjectId}>
-            <SelectTrigger className="w-[140px] h-8 text-xs">
-              <SelectValue placeholder="Project" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger className="w-[110px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SOURCE_PROVIDERS.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            value={externalId}
-            onChange={(e) => setExternalId(e.target.value)}
-            placeholder={placeholder}
-            className="h-8 text-sm bg-muted/40 border-border flex-1 min-w-[140px] font-mono"
-          />
-          <Input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Label (optional)"
-            className="h-8 text-sm bg-muted/40 border-border w-[150px]"
-          />
-          <Button className="h-8" onClick={add} disabled={createMutation.isPending || !projectId || !externalId.trim()}>
-            Map
-          </Button>
+        <div className="flex flex-col gap-2 px-4 py-3 border-t border-border">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={provider} onValueChange={setProvider}>
+              <SelectTrigger className="w-[110px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SOURCE_PROVIDERS.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              value={externalId}
+              onChange={(e) => setExternalId(e.target.value)}
+              placeholder={placeholder}
+              className="h-8 text-sm bg-muted/40 border-border flex-1 min-w-[140px] font-mono"
+            />
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Label (optional)"
+              className="h-8 text-sm bg-muted/40 border-border w-[150px]"
+            />
+          </div>
+          <div className="flex gap-2 items-start">
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Source notes (optional) — agent instructions for this repo or team, e.g. coding conventions, escalation rules"
+              className="text-xs min-h-[60px] bg-muted/40 border-border flex-1"
+            />
+            <Button className="h-8 shrink-0" onClick={add} disabled={createMutation.isPending || !projectId || !externalId.trim()}>
+              Map
+            </Button>
+          </div>
         </div>
       )}
     </Panel>

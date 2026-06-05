@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { and, eq } from "drizzle-orm";
-import { db, projectsTable, projectSourcesTable, projectSourceCreateSchema } from "@workspace/db";
+import { db, projectsTable, projectSourcesTable, projectSourceCreateSchema, projectSourceUpdateSchema } from "@workspace/db";
 import { newId } from "@workspace/utils";
 import { logger } from "../lib/logger";
 import { getActiveMembership, canManageOrg } from "../lib/org-access";
@@ -33,6 +33,7 @@ function toPublic(row: typeof projectSourcesTable.$inferSelect & { project_name?
     provider: row.provider,
     external_id: row.external_id,
     label: row.label,
+    notes: row.notes ?? null,
     created_at: row.created_at.toISOString(),
     updated_at: row.updated_at.toISOString(),
   };
@@ -64,6 +65,7 @@ router.get(
         provider: projectSourcesTable.provider,
         external_id: projectSourcesTable.external_id,
         label: projectSourcesTable.label,
+        notes: projectSourcesTable.notes,
         created_at: projectSourcesTable.created_at,
         updated_at: projectSourcesTable.updated_at,
         project_name: projectsTable.name,
@@ -101,6 +103,7 @@ router.post(
           provider: parsed.data.provider,
           external_id: parsed.data.external_id,
           label: parsed.data.label ?? null,
+          notes: parsed.data.notes ?? null,
         })
         .returning();
       return res.status(201).json(toPublic(row));
@@ -110,6 +113,40 @@ router.post(
       }
       throw err;
     }
+  }),
+);
+
+// Update label/notes on an existing binding (owner/admin only).
+router.patch(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const membership = await getActiveMembership(res);
+    if (!canManageOrg(membership)) return res.status(403).json({ error: "forbidden" });
+
+    const parsed = projectSourceUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "validation_error", details: parsed.error.issues });
+    }
+
+    const [existing] = await db
+      .select({ id: projectSourcesTable.id, project_id: projectSourcesTable.project_id })
+      .from(projectSourcesTable)
+      .where(eq(projectSourcesTable.id, req.params.id))
+      .limit(1);
+    if (!existing || !(await projectInActiveOrg(res, existing.project_id))) {
+      return res.status(404).json({ error: "not_found" });
+    }
+
+    const updates: Record<string, unknown> = { updated_at: new Date() };
+    if (parsed.data.label !== undefined) updates.label = parsed.data.label || null;
+    if (parsed.data.notes !== undefined) updates.notes = parsed.data.notes;
+
+    const [row] = await db
+      .update(projectSourcesTable)
+      .set(updates)
+      .where(eq(projectSourcesTable.id, existing.id))
+      .returning();
+    return res.json(toPublic(row));
   }),
 );
 

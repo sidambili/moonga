@@ -19,6 +19,9 @@ export const projectSourcesTable = pgTable(
     provider: text("provider").notNull(), // "linear" | "github" | ...
     external_id: text("external_id").notNull(), // linear team id, github repo full_name, ...
     label: text("label"), // human-friendly name shown in the UI
+    // Custom instructions injected into the agent context when this source triggers a session.
+    // Use this to tell the agent how/when to use this repo, coding conventions, escalation rules, etc.
+    notes: text("notes"),
     created_at: timestamp("created_at").notNull().defaultNow(),
     updated_at: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -37,5 +40,12 @@ export const projectSourceCreateSchema = z.object({
   provider: z.string().min(1).max(40),
   external_id: z.string().trim().min(1).max(200),
   label: z.string().trim().max(120).optional(),
+  notes: z.string().trim().max(4000).optional(),
 });
+
+export const projectSourceUpdateSchema = z.object({
+  label: z.string().trim().max(120).optional(),
+  notes: z.string().trim().max(4000).nullable().optional(),
+});
+
 export type ProjectSource = typeof projectSourcesTable.$inferSelect;

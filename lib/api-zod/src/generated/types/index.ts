@@ -45,6 +45,7 @@ export * from './projectEdit';
 export * from './projectList';
 export * from './projectSource';
 export * from './projectSourceCreate';
+export * from './projectSourceUpdate';
 export * from './repo';
 export * from './severityCount';
 export * from './skill';

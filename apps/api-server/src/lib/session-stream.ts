@@ -20,7 +20,7 @@ export function subscribeToSession(sessionId: number, listener: Listener): () =>
   };
 }
 
-export function emitStep(sessionId: number, step: SessionStep) {
+export function emitStep(sessionId: number, step: AgentSessionStep) {
   const listeners = subs.get(sessionId);
   if (!listeners) return;
   for (const listener of listeners) {

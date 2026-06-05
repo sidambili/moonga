@@ -17,6 +17,11 @@ export interface ProjectSource {
   external_id: string;
   /** @nullable */
   label?: string | null;
+  /**
+     * Custom instructions injected into agent context when this source triggers a session
+     * @nullable
+     */
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 }

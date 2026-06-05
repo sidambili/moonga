@@ -11,4 +11,6 @@ export interface ProjectSourceCreate {
   provider: string;
   external_id: string;
   label?: string;
+  /** Custom instructions injected into agent context when this source triggers a session */
+  notes?: string;
 }
