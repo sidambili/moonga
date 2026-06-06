@@ -19,6 +19,8 @@
     "build": "tsc -p tsconfig.json",
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
+    "generate": "drizzle-kit generate --config ./drizzle.config.ts",
+    "migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
     "backfill": "tsx src/backfill-tenancy.ts"
   },
   "dependencies": {

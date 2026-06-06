@@ -70,11 +70,11 @@ COPY --from=builder --chown=appuser:appgroup /app/lib/api-zod/dist ./lib/api-zod
 COPY --from=builder --chown=appuser:appgroup /app/lib/api-client-react/dist ./lib/api-client-react/dist
 COPY --from=builder --chown=appuser:appgroup /app/lib/constants/dist ./lib/constants/dist
 
-# Drizzle migrations require the original TS source files (and migration metadata)
-# so drizzle-kit push runs against source rather than compiled output.
-# dist/ does not contain the required migration definitions.
-COPY --from=builder --chown=appuser:appgroup /app/lib/db/src ./lib/db/src
+# Drizzle migrations: config + SQL migration files (no TS source needed for migrate).
 COPY --from=builder --chown=appuser:appgroup /app/lib/db/drizzle.config.ts lib/db/
+COPY --from=builder --chown=appuser:appgroup /app/lib/db/drizzle ./lib/db/drizzle
+# Schema source is still needed so drizzle-kit can resolve the config at migrate time.
+COPY --from=builder --chown=appuser:appgroup /app/lib/db/src ./lib/db/src
 COPY --from=builder --chown=appuser:appgroup /app/deploy/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 

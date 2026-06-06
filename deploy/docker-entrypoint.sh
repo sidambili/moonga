@@ -21,8 +21,8 @@ for i in {1..30}; do
   sleep 2
 done
 
-echo "[entrypoint] Running drizzle-kit push ..."
-./node_modules/.bin/drizzle-kit push --force --config ./lib/db/drizzle.config.ts
+echo "[entrypoint] Running drizzle-kit migrate ..."
+./node_modules/.bin/drizzle-kit migrate --config ./lib/db/drizzle.config.ts
 
 echo "[entrypoint] Starting API server ..."
 exec node --enable-source-maps ./apps/api-server/dist/index.mjs

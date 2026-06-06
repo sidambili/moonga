@@ -16,9 +16,10 @@ if (!process.env.DATABASE_URL) {
 }
 
 export default defineConfig({
-  // Absolute path so drizzle-kit resolves relative to this config file rather
-  // than CWD — critical when push is run from the repo root in production.
+  // Absolute paths so drizzle-kit resolves relative to this config file rather
+  // than CWD — critical when commands are run from the repo root in production.
   schema: path.resolve(__dirname, "./src/schema/index.ts"),
+  out: path.resolve(__dirname, "./drizzle"),
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,
