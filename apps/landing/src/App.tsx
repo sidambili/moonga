@@ -275,7 +275,7 @@ export default function App() {
                   </p>
                 </div>
                 <div className="panel-frame">
-                  <img src="/plan.png" alt="Implementation plan with agent trace" />
+                  <img src="/critic-review.png" alt="Critic review interface" />
                 </div>
               </div>
             </div>

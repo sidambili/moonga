@@ -96,6 +96,19 @@
   --status-high: 32 95% 58%;
   --status-medium: 45 90% 55%;
   --status-low: 217 80% 65%;
+
+  /* Syntax highlighting */
+  --code-bg: 240 4.8% 96%;
+  --code-fg: 240 10% 10%;
+  --code-comment: 240 3.8% 55%;
+  --code-keyword: 234 70% 45%;
+  --code-string: 140 60% 35%;
+  --code-number: 25 90% 45%;
+  --code-function: 270 60% 45%;
+  --code-operator: 240 10% 40%;
+  --code-punctuation: 240 5% 45%;
+  --code-class: 190 70% 35%;
+  --code-property: 240 10% 30%;
 }
 
 .dark {
@@ -141,6 +154,19 @@
   --status-high: 32 95% 58%;
   --status-medium: 45 90% 55%;
   --status-low: 217 80% 65%;
+
+  /* Syntax highlighting */
+  --code-bg: 240 10% 10%;
+  --code-fg: 240 5% 90%;
+  --code-comment: 240 6% 55%;
+  --code-keyword: 234 80% 70%;
+  --code-string: 140 50% 60%;
+  --code-number: 25 90% 65%;
+  --code-function: 270 60% 65%;
+  --code-operator: 240 5% 65%;
+  --code-punctuation: 240 5% 55%;
+  --code-class: 190 60% 55%;
+  --code-property: 240 5% 75%;
 }
 
 @layer base {
