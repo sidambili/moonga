@@ -2,6 +2,8 @@ import { defineConfig } from "drizzle-kit";
 import { existsSync } from "node:fs";
 import path from "path";
 
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
 // Load the monorepo-root .env so `drizzle-kit push` works without a per-package
 // copy. This file always lives at lib/db/, so the root is two levels up.
 const rootEnv = path.resolve(__dirname, "../../.env");
@@ -14,9 +16,9 @@ if (!process.env.DATABASE_URL) {
 }
 
 export default defineConfig({
-  // Forward slashes: drizzle-kit treats this as a glob, and Windows backslashes
-  // from path.join() would fail to match ("No schema files found").
-  schema: "./src/schema/index.ts",
+  // Absolute path so drizzle-kit resolves relative to this config file rather
+  // than CWD — critical when push is run from the repo root in production.
+  schema: path.resolve(__dirname, "./src/schema/index.ts"),
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,
