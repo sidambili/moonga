@@ -1,7 +1,7 @@
 CREATE TYPE "public"."objective" AS ENUM('diagnose', 'plan');--> statement-breakpoint
 CREATE TYPE "public"."playbook_source" AS ENUM('system', 'user');--> statement-breakpoint
 CREATE TYPE "public"."trigger_source" AS ENUM('linear', 'github', 'sentry');--> statement-breakpoint
-CREATE TABLE "events" (
+CREATE TABLE IF NOT EXISTS "events" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"source" text NOT NULL,
 	"event_type" text NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE "events" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "agent_sessions" (
+CREATE TABLE IF NOT EXISTS "agent_sessions" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"event_id" integer NOT NULL,
 	"objective" text NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE "agent_sessions" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "artifacts" (
+CREATE TABLE IF NOT EXISTS "artifacts" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"session_id" integer NOT NULL,
 	"type" text NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE "artifacts" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "integrations" (
+CREATE TABLE IF NOT EXISTS "integrations" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"organization_id" text,
 	"provider" text NOT NULL,
@@ -74,7 +74,7 @@ CREATE TABLE "integrations" (
 	CONSTRAINT "integrations_provider_unique" UNIQUE("provider")
 );
 --> statement-breakpoint
-CREATE TABLE "model_settings" (
+CREATE TABLE IF NOT EXISTS "model_settings" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"organization_id" text,
 	"provider" text DEFAULT 'openai' NOT NULL,
@@ -85,7 +85,7 @@ CREATE TABLE "model_settings" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "model_prices" (
+CREATE TABLE IF NOT EXISTS "model_prices" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"model_slug" text NOT NULL,
 	"display_name" text,
@@ -103,7 +103,7 @@ CREATE TABLE "model_prices" (
 	CONSTRAINT "model_prices_model_slug_unique" UNIQUE("model_slug")
 );
 --> statement-breakpoint
-CREATE TABLE "agent_session_steps" (
+CREATE TABLE IF NOT EXISTS "agent_session_steps" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"session_id" integer NOT NULL,
 	"step_number" integer NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE "agent_session_steps" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "account" (
+CREATE TABLE IF NOT EXISTS "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
 	"provider_id" text NOT NULL,
@@ -138,7 +138,7 @@ CREATE TABLE "account" (
 	"updated_at" timestamp NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "session" (
+CREATE TABLE IF NOT EXISTS "session" (
 	"id" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp NOT NULL,
 	"token" text NOT NULL,
@@ -152,7 +152,7 @@ CREATE TABLE "session" (
 	CONSTRAINT "session_token_unique" UNIQUE("token")
 );
 --> statement-breakpoint
-CREATE TABLE "user" (
+CREATE TABLE IF NOT EXISTS "user" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"email" text NOT NULL,
@@ -163,7 +163,7 @@ CREATE TABLE "user" (
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
-CREATE TABLE "verification" (
+CREATE TABLE IF NOT EXISTS "verification" (
 	"id" text PRIMARY KEY NOT NULL,
 	"identifier" text NOT NULL,
 	"value" text NOT NULL,
@@ -172,7 +172,7 @@ CREATE TABLE "verification" (
 	"updated_at" timestamp
 );
 --> statement-breakpoint
-CREATE TABLE "invitation" (
+CREATE TABLE IF NOT EXISTS "invitation" (
 	"id" text PRIMARY KEY NOT NULL,
 	"organization_id" text NOT NULL,
 	"email" text NOT NULL,
@@ -182,7 +182,7 @@ CREATE TABLE "invitation" (
 	"inviter_id" text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "member" (
+CREATE TABLE IF NOT EXISTS "member" (
 	"id" text PRIMARY KEY NOT NULL,
 	"organization_id" text NOT NULL,
 	"user_id" text NOT NULL,
@@ -190,7 +190,7 @@ CREATE TABLE "member" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "organization" (
+CREATE TABLE IF NOT EXISTS "organization" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"slug" text,
@@ -200,7 +200,7 @@ CREATE TABLE "organization" (
 	CONSTRAINT "organization_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE "projects" (
+CREATE TABLE IF NOT EXISTS "projects" (
 	"id" text PRIMARY KEY NOT NULL,
 	"organization_id" text NOT NULL,
 	"name" text NOT NULL,
@@ -209,7 +209,7 @@ CREATE TABLE "projects" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "project_sources" (
+CREATE TABLE IF NOT EXISTS "project_sources" (
 	"id" text PRIMARY KEY NOT NULL,
 	"project_id" text NOT NULL,
 	"provider" text NOT NULL,
@@ -221,7 +221,7 @@ CREATE TABLE "project_sources" (
 	CONSTRAINT "project_sources_provider_external_id_unique" UNIQUE("provider","external_id")
 );
 --> statement-breakpoint
-CREATE TABLE "playbooks" (
+CREATE TABLE IF NOT EXISTS "playbooks" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"organization_id" text,
 	"slug" text NOT NULL,
@@ -236,7 +236,7 @@ CREATE TABLE "playbooks" (
 	CONSTRAINT "playbooks_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE "skills" (
+CREATE TABLE IF NOT EXISTS "skills" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"organization_id" text,
 	"slug" text NOT NULL,
@@ -249,7 +249,7 @@ CREATE TABLE "skills" (
 	CONSTRAINT "skills_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE "repo_index" (
+CREATE TABLE IF NOT EXISTS "repo_index" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"repo" text NOT NULL,
 	"sha" text NOT NULL,
