@@ -67,8 +67,8 @@ When editing copy, prefer changing inline strings in TSX files. If you find a st
 - Don't: "categorising", "colour", "analyse"
 
 **Active voice** whenever possible.
-- Do: "Oncident gathers context from connected tools."
-- Don't: "Context is gathered by Oncident from connected tools."
+- Do: "Moonga gathers context from connected tools."
+- Don't: "Context is gathered by Moonga from connected tools."
 
 **Sentence case** for all titles, headings, menu items, labels, and buttons.
 Only capitalize the first word and proper nouns.
@@ -128,13 +128,13 @@ Write like a knowledgeable colleague, not a manual or a marketing page. Be techn
 - Use simple words: "use" not "utilize", "so" not "therefore", "but" not "however", "give" not "provide".
 - Write short sentences. Break complex ideas into smaller pieces.
 - Use humor sparingly and only in low-stakes contexts (tooltips, empty states). Never in errors or warnings.
-- Address the user as "you". Refer to Oncident as "Oncident" or "we" depending on context.
+- Address the user as "you". Refer to Moonga as "Moonga" or "we" depending on context.
 
 **Don't:**
 - Use formal business language or marketing-speak.
 - Be overly enthusiastic or use filler words.
 - Use "please" excessively. One "please" is fine. Three in a paragraph is too many.
-- Anthropomorphize the product ("Oncident thinks...", "Oncident wants to...").
+- Anthropomorphize the product ("Moonga thinks...", "Moonga wants to...").
 
 **Quick reference:**
 
@@ -200,9 +200,9 @@ Use these terms consistently. Don't capitalize unless starting a sentence.
 | plan | The deep routing mode for diagnosis and implementation planning | deep mode, heavy analysis |
 | integration | The technical connection to a source tool | connector, plugin, app |
 
-### Oncident-Specific Conventions
+### Moonga-Specific Conventions
 
-- **"Oncident" is the product name** — capitalize as shown. Never write "oncident" or "ONCIDENT" in UI copy.
+- **"Moonga" is the product name** — capitalize as shown. Never write "oncident" or "ONCIDENT" in UI copy.
 - **Source names are proper nouns** — capitalize: "GitHub", "Linear", "Sentry", "Better Stack", "Slack", "Email".
 - **Feature names are lowercase** unless starting a sentence: event, session, artifact, source, severity, status.
 - **Severity and status labels** use sentence case from `lib/constants`: "Critical", "High", "Medium", "Low"; "New", "Open", "In progress", "Resolved"; "Needs review", "Approved", "Rejected".

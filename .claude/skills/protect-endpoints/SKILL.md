@@ -224,7 +224,7 @@ Middleware gates *who can call this URL*. Service / DB queries must gate *what t
 
 ## Verify with tests
 
-Add a test that iterates all mounted routes and asserts auth/permission coverage. Since Oncident uses plain Express routers, use `express-list-endpoints` or iterate the router stack:
+Add a test that iterates all mounted routes and asserts auth/permission coverage. Since Moonga uses plain Express routers, use `express-list-endpoints` or iterate the router stack:
 
 ```ts
 // apps/api-server/src/routes/__tests__/route-security.test.ts

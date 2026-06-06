@@ -1,8 +1,8 @@
 # LLM Caching
 
-Oncident runs multi-step AI agent sessions where the same large prefix — system prompt, playbook, skills, and pre-fetched repository/ticket context — is resent to the model on every step of the tool loop, and again for the critic, retry, and reformat passes. That repetition is exactly what caching targets: cache the static prefix once, pay a fraction of the price (and less latency) on every subsequent call within a session.
+Moonga runs multi-step AI agent sessions where the same large prefix — system prompt, playbook, skills, and pre-fetched repository/ticket context — is resent to the model on every step of the tool loop, and again for the critic, retry, and reformat passes. That repetition is exactly what caching targets: cache the static prefix once, pay a fraction of the price (and less latency) on every subsequent call within a session.
 
-This document explains what caching Oncident relies on, what it deliberately does **not** use, and how to verify it is working.
+This document explains what caching Moonga relies on, what it deliberately does **not** use, and how to verify it is working.
 
 ## TL;DR
 
@@ -19,7 +19,7 @@ All caching lives in [`apps/api-server/src/lib/agent-runner.ts`](../../apps/api-
 
 ## How it works
 
-Oncident calls models through OpenRouter via the Vercel AI SDK (`@openrouter/ai-sdk-provider`). The vast majority of runs use **DeepSeek** through OpenRouter; OpenAI is used only when a user explicitly wants a frontier reasoning model.
+Moonga calls models through OpenRouter via the Vercel AI SDK (`@openrouter/ai-sdk-provider`). The vast majority of runs use **DeepSeek** through OpenRouter; OpenAI is used only when a user explicitly wants a frontier reasoning model.
 
 ### 1. Provider prompt caching (the real win)
 
@@ -32,11 +32,11 @@ Most providers cache the **prefix** of a prompt and bill a discounted rate when 
 | Gemini 2.5 | Automatic (implicit) | ~0.5× input |
 | Anthropic Claude | **Explicit `cache_control`** (see Deferred) | 0.1× input |
 
-For the DeepSeek path this is **free and automatic** — no request changes are required. The only thing Oncident must do is make sure consecutive steps land on the **same upstream**, which is what sticky routing solves.
+For the DeepSeek path this is **free and automatic** — no request changes are required. The only thing Moonga must do is make sure consecutive steps land on the **same upstream**, which is what sticky routing solves.
 
 ### 2. Sticky routing (`session_id`)
 
-A model served through OpenRouter can be routed to several upstream providers. A provider's prompt cache only helps if the next request hits the *same* upstream. Oncident pins this by sending a stable per-session id:
+A model served through OpenRouter can be routed to several upstream providers. A provider's prompt cache only helps if the next request hits the *same* upstream. Moonga pins this by sending a stable per-session id:
 
 ```ts
 createOpenRouter({
@@ -51,7 +51,7 @@ createOpenRouter({
 
 ### 3. Cached-token cost accounting
 
-OpenRouter's usage accounting carries everything we need: `usage.cost` (the authoritative billed amount, in credits == USD, **already net of any cache discount the upstream applied**), `usage.prompt_tokens_details.cached_tokens` (cache-read tokens), and `usage.cache_discount` (the realized savings on those reads). **The AI SDK provider (`@openrouter/ai-sdk-provider` 0.4.x) drops all of these** — it parses only prompt and completion token counts. So Oncident reads them off the raw HTTP response with a wrapped `fetch` (`makeCaptureFetch`) that accumulates them across every call in the session.
+OpenRouter's usage accounting carries everything we need: `usage.cost` (the authoritative billed amount, in credits == USD, **already net of any cache discount the upstream applied**), `usage.prompt_tokens_details.cached_tokens` (cache-read tokens), and `usage.cache_discount` (the realized savings on those reads). **The AI SDK provider (`@openrouter/ai-sdk-provider` 0.4.x) drops all of these** — it parses only prompt and completion token counts. So Moonga reads them off the raw HTTP response with a wrapped `fetch` (`makeCaptureFetch`) that accumulates them across every call in the session.
 
 `usage: { include: true }` is sent so OpenRouter populates the accounting details.
 
@@ -61,7 +61,7 @@ At the end of a session the totals are reconciled from OpenRouter's own numbers 
 - `cached_cost` holds the summed `usage.cache_discount` — the **realized** cache savings, or null when the provider reported cache hits but no discount.
 - `cached_tokens` is the summed cache-read token count.
 
-> **Why not estimate the discount?** An earlier version credited back a fixed `0.1 × input_rate` for every cached token. That was wrong: many third-party DeepSeek hosts on OpenRouter (e.g. Alibaba Cloud Int., SiliconFlow) report `cached_tokens` for the latency win but **bill them at the full input rate**. Assuming a 90% discount made Oncident's `total_cost` read lower than the actual OpenRouter bill. Trusting `usage.cost` removes the guess entirely. Per the [DeepSeek section of the OpenRouter caching docs](https://openrouter.ai/docs/guides/best-practices/prompt-caching#deepseek), the cache-read multiplier is provider-dependent, and Alibaba's DeepSeek caching is *explicit* (requires `cache_control` breakpoints) — automatic prefix caching there yields no discount.
+> **Why not estimate the discount?** An earlier version credited back a fixed `0.1 × input_rate` for every cached token. That was wrong: many third-party DeepSeek hosts on OpenRouter (e.g. Alibaba Cloud Int., SiliconFlow) report `cached_tokens` for the latency win but **bill them at the full input rate**. Assuming a 90% discount made Moonga's `total_cost` read lower than the actual OpenRouter bill. Trusting `usage.cost` removes the guess entirely. Per the [DeepSeek section of the OpenRouter caching docs](https://openrouter.ai/docs/guides/best-practices/prompt-caching#deepseek), the cache-read multiplier is provider-dependent, and Alibaba's DeepSeek caching is *explicit* (requires `cache_control` breakpoints) — automatic prefix caching there yields no discount.
 
 ## What is deliberately NOT used
 
@@ -94,7 +94,7 @@ A local exact-match cache (in-memory or Redis) keyed on the full request. Skippe
 ## Caveats and gotchas
 
 - **Cache TTLs are short** — typically 5 minutes. Caching helps *within* a session (steps fire back-to-back) far more than *across* sessions.
-- **Minimum prefix sizes apply** for automatic caching (OpenAI ≥1,024 tokens; Gemini ~2,000). Oncident's prefixes are comfortably above these, but a trivially small prompt may not cache.
+- **Minimum prefix sizes apply** for automatic caching (OpenAI ≥1,024 tokens; Gemini ~2,000). Moonga's prefixes are comfortably above these, but a trivially small prompt may not cache.
 - **The provider drops cache metadata.** If `@openrouter/ai-sdk-provider` is upgraded, re-check whether `prompt_tokens_details` is surfaced natively — the `makeCaptureFetch` workaround may become unnecessary.
 - **Concurrent identical webhooks** are not deduplicated before hitting the model. The first of two back-to-back identical events pays full price; the second benefits only if it lands inside the cache TTL.
 

@@ -9,7 +9,7 @@ why; "Current state" for what exists; "Roadmap" for what to build next and how.
 
 ## 1. Vision & guiding principle
 
-Oncident is an operations-intelligence control plane: webhooks (Linear, GitHub, Sentry,
+Moonga is an operations-intelligence control plane: webhooks (Linear, GitHub, Sentry,
 Slack, Better Stack) become `Event`s, which spawn AI `Session`s, which produce `Artifact`s
 (incident reports, plans) that a human approves before anything is sent.
 

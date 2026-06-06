@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Oncident is an operations intelligence control plane. Webhooks from GitHub/Linear/Sentry/Better Stack/Slack become `Event` records, which spawn AI agent `Session`s that produce `Artifact`s (incident reports, implementation plans). Artifacts go through a human approval gate (`draft` → `approved`/`rejected`/`edited`) before any output is sent.
+Moonga aka (Oncident, Eventmesh) is an operations intelligence control plane. Webhooks from GitHub/Linear/Sentry/Better Stack/Slack become `Event` records, which spawn AI agent `Session`s that produce `Artifact`s (incident reports, implementation plans). Artifacts go through a human approval gate (`draft` → `approved`/`rejected`/`edited`) before any output is sent.
 
 Session objectives are derived from event type: `diagnose` for incidents/errors/anomalies, `plan` for Linear tickets/feature requests.
 
