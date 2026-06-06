@@ -5,13 +5,13 @@ export default function App() {
       <nav className="nav">
         <div className="wrap">
           <div className="logo">
-            <span className="mark">T</span> Tract
+            <span className="mark">T</span> Moonga
           </div>
           <div className="navlinks">
             <a href="#how">How it works</a>
             <a href="#product">Product</a>
             <a href="#output">The plan</a>
-            <a href="#why">Why Tract</a>
+            <a href="#why">Why Moonga</a>
           </div>
           <div className="nav-cta">
             <a className="btn" href="#">
@@ -38,7 +38,7 @@ export default function App() {
               anyone writes code.
             </h1>
             <p className="lede">
-              Tract reads a new Linear issue, pulls real context from your GitHub repo, drafts a
+              Moonga reads a new Linear issue, pulls real context from your GitHub repo, drafts a
               structured implementation plan, and posts it to Slack for approval — then writes it
               back to Linear.
             </p>
@@ -72,7 +72,7 @@ export default function App() {
                   <i className="g" />
                 </div>
                 <div className="url">
-                  <b>app.tract.dev</b> / artifacts / EVE-5
+                  <b>app.moonga.dev</b> / artifacts / EVE-5
                 </div>
               </div>
               <img
@@ -141,7 +141,7 @@ export default function App() {
       {/* ===================== PRODUCT SHOWCASE ===================== */}
       <section id="product" className="section bg-soft">
         <div className="wrap">
-          <div className="eyebrow">Inside Tract</div>
+          <div className="eyebrow">Inside Moonga</div>
           <h2 className="h2">See the whole workflow, not just an answer</h2>
           <p className="sectlede">
             Every session is inspectable — the plan, the trace, the integrations, and the playbook
@@ -220,7 +220,7 @@ export default function App() {
       {/* ===================== WHY ===================== */}
       <section id="why" className="section bg-soft">
         <div className="wrap">
-          <div className="eyebrow">Why Tract</div>
+          <div className="eyebrow">Why Moonga</div>
           <h2 className="h2">A context-driven planning layer — not another AI chatbot</h2>
           <p className="sectlede">
             The wedge is context aggregation plus structured planning. Most tools have only one.
@@ -229,17 +229,17 @@ export default function App() {
             <div className="wcard">
               <div className="ic">🧩</div>
               <h4>Linear-native AI lacks repo context</h4>
-              <p>It can summarize a ticket, but it doesn't know your codebase. Tract reads GitHub directly.</p>
+              <p>It can summarize a ticket, but it doesn't know your codebase. Moonga reads GitHub directly.</p>
             </div>
             <div className="wcard">
               <div className="ic">💬</div>
               <h4>Chat agents are disconnected</h4>
-              <p>Generic assistants float outside your workflow. Tract lives inside Linear → GitHub → Slack.</p>
+              <p>Generic assistants float outside your workflow. Moonga lives inside Linear → GitHub → Slack.</p>
             </div>
             <div className="wcard">
               <div className="ic">⚡</div>
               <h4>Coding agents skip the plan</h4>
-              <p>Execution agents jump to changing code. Tract stops at the plan — where the leverage is.</p>
+              <p>Execution agents jump to changing code. Moonga stops at the plan — where the leverage is.</p>
             </div>
             <div className="wcard">
               <div className="ic">🔌</div>
@@ -263,7 +263,7 @@ export default function App() {
           <div className="inner">
             <h2 className="h2">Reduce the cost of interpretation before implementation.</h2>
             <p>
-              Self-host Tract today. It's open source, runs as a personal tool, and never touches
+              Self-host Moonga today. It's open source, runs as a personal tool, and never touches
               your code without you.
             </p>
             <div className="cta">
@@ -282,7 +282,7 @@ export default function App() {
       <footer className="footer">
         <div className="wrap">
           <div className="logo">
-            <span className="mark">T</span> Tract
+            <span className="mark">T</span> Moonga
           </div>
           <div className="links">
             <a href="#">GitHub</a>
