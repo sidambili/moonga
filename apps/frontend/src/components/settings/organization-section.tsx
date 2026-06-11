@@ -14,7 +14,7 @@ import {
   getListProjectsQueryKey,
   getListProjectSourcesQueryKey,
 } from "@workspace/api-client-react";
-import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug, Loader2, ChevronsUpDown, ChevronDown } from "lucide-react";
+import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug, Loader2, ChevronsUpDown, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,6 +131,9 @@ function OrgRenamePanel({
 }) {
   const [value, setValue] = useState(name);
   const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
   useEffect(() => setValue(name), [name]);
 
   const save = async () => {
@@ -149,8 +152,39 @@ function OrgRenamePanel({
     onSaved();
   };
 
+  const createOrg = async () => {
+    const trimmed = newOrgName.trim();
+    if (!trimmed) return;
+    const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    setCreating(true);
+    const { error } = await authClient.organization.create({ name: trimmed, slug });
+    setCreating(false);
+    if (error) {
+      toast({ title: "Failed to create organization", description: error.message, variant: "destructive" });
+      return;
+    }
+    setNewOrgName("");
+    setShowCreate(false);
+    toast({ title: "Organization created", description: `"${trimmed}" is ready. Switch to it from the topbar.` });
+    onSaved();
+  };
+
   return (
-    <Panel icon={Building2} title="Organization">
+    <Panel
+      icon={Building2}
+      title="Organization"
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs gap-1"
+          onClick={() => { setShowCreate((v) => !v); setNewOrgName(""); }}
+        >
+          <Plus className="w-3 h-3" />
+          Add Organization
+        </Button>
+      }
+    >
       <div className="px-4 py-4 space-y-2">
         <Label className="text-xs font-medium text-muted-foreground">Name</Label>
         <div className="flex items-center gap-2">
@@ -168,6 +202,25 @@ function OrgRenamePanel({
           <p className="text-[11px] text-muted-foreground">Only owners and admins can rename the organization.</p>
         )}
       </div>
+
+      {showCreate && (
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-border">
+          <Input
+            autoFocus
+            value={newOrgName}
+            onChange={(e) => setNewOrgName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") createOrg(); if (e.key === "Escape") setShowCreate(false); }}
+            placeholder="New organization name…"
+            className="h-8 text-sm bg-muted/40 border-border"
+          />
+          <Button className="h-8 shrink-0" onClick={createOrg} disabled={creating || !newOrgName.trim()}>
+            {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Create"}
+          </Button>
+          <Button variant="ghost" className="h-8 shrink-0" onClick={() => setShowCreate(false)}>
+            Cancel
+          </Button>
+        </div>
+      )}
     </Panel>
   );
 }

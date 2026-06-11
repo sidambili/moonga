@@ -11,6 +11,19 @@ Session objectives are derived from event type: `diagnose` for incidents/errors/
 > your living memories are stored in `.claude/memories/` and should be used to provide context and should be updated as needed to reflect changes to the project.
 > Always load .`claude/memories/local/MEMORY.md` at the start of each session (if it exists).
 
+## Hard rules — never do these (operations)
+
+- **NEVER run any command that touches the remote database** — this includes `pnpm --filter @workspace/db run push`, `push-force`, `drizzle-kit migrate`, raw `psql`, or any MCP/Supabase SQL execution tool. Running anything against the remote DB can break prod for all users.
+- **Schema changes:** edit the TypeScript schema, then run `pnpm --filter @workspace/db run generate` (from the repo root) or `pnpm generate` (from `lib/db/`). This produces a SQL migration file in `lib/db/drizzle/` — commit it. The user applies it to the database themselves.
+
+## Database migration rules (hard)
+
+- **Never overwrite an existing migration.** Once a migration file is applied anywhere (local, staging, prod), it is immutable. Generate incremental migrations with `drizzle-kit generate` instead.
+- **Do not use `CREATE TYPE IF NOT EXISTS` in SQL migrations.** PostgreSQL does not support `IF NOT EXISTS` on `CREATE TYPE ... AS ENUM`. Use a `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'typename') THEN CREATE TYPE ... END IF; END $$` block instead.
+- **Never regenerate `0000_whole_gauntlet.sql` or any existing migration.** Regenerating migrations destroys incremental history and causes schema drift on existing databases.
+- **`drizzle-kit migrate` only marks migrations as applied; it does not auto-add missing columns to existing tables.** If a column is added to the schema after the initial migration, you must generate an incremental migration (`drizzle-kit generate`) or add the column manually with `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+- **Before deploying schema changes, verify the migration applies cleanly on a fresh database.** Run `drizzle-kit migrate` against a clean Postgres instance locally to catch `CREATE TYPE` and `IF NOT EXISTS` issues before they hit prod.
+
 ## Commands
 
 ```bash
@@ -29,9 +42,9 @@ pnpm run build                                          # typecheck + recursive 
 # before touching frontend code that uses the generated types)
 pnpm --filter @workspace/api-spec run codegen
 
-# DB schema sync (dev only — no migrations directory; drizzle-kit push)
-pnpm --filter @workspace/db run push
-pnpm --filter @workspace/db run push-force             # destructive; only when intended
+# Generate a new incremental migration (safe — no DB connection; run from lib/db/)
+pnpm --filter @workspace/db run generate
+# DO NOT run push, push-force, or migrate — those touch the remote DB
 
 # Formatting (no lint task; prettier only)
 pnpm exec prettier --write .

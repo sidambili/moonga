@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { rm, cp } from "node:fs/promises";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -108,7 +108,7 @@ export async function buildAll() {
     sourcemap: "linked",
     plugins: [
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
-      esbuildPluginPino({ transports: ["pino-pretty"] })
+      esbuildPluginPino({ transports: ["pino-pretty"] }),
     ],
     // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {
@@ -122,6 +122,14 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  // Copy Drizzle migration SQL files next to the bundle so runMigrations()
+  // can find them at runtime on any deployment (self-hosted, Docker, etc.).
+  await cp(
+    path.resolve(artifactDir, "../../lib/db/drizzle"),
+    path.resolve(distDir, "drizzle"),
+    { recursive: true },
+  );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

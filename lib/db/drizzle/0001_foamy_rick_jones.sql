@@ -1,0 +1,2 @@
+ALTER TABLE "integrations" DROP CONSTRAINT "integrations_provider_unique";--> statement-breakpoint
+ALTER TABLE "integrations" ADD CONSTRAINT "integrations_org_provider_unique" UNIQUE("organization_id","provider");
