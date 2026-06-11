@@ -349,6 +349,10 @@ paths:
           in: query
           schema:
             type: integer
+        - name: event_id
+          in: query
+          schema:
+            type: integer
         - name: limit
           in: query
           schema:

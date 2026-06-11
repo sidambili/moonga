@@ -519,6 +519,7 @@ cursor?: number;
 export type ListArtifactsParams = {
 approval_state?: string;
 session_id?: number;
+event_id?: number;
 limit?: number;
 /**
  * ID of the last item from the previous page (for cursor pagination)

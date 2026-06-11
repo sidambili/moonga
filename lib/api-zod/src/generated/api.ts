@@ -536,6 +536,7 @@ export const listArtifactsQueryLimitDefault = 50;
 export const ListArtifactsQueryParams = zod.object({
   "approval_state": zod.coerce.string().optional(),
   "session_id": zod.coerce.number().optional(),
+  "event_id": zod.coerce.number().optional(),
   "limit": zod.coerce.number().default(listArtifactsQueryLimitDefault),
   "cursor": zod.coerce.number().optional()
 })

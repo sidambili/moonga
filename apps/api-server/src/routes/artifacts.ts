@@ -18,7 +18,7 @@ async function hydrateArtifact(artifact: typeof artifactsTable.$inferSelect) {
 
 router.get("/", async (req, res) => {
   try {
-    const { approval_state, session_id, limit = "50", cursor } = req.query as Record<string, string>;
+    const { approval_state, session_id, event_id, limit = "50", cursor } = req.query as Record<string, string>;
     const limitN = Math.min(Number(limit) || 50, 200);
     const cursorN = cursor ? Number(cursor) : undefined;
 
@@ -27,6 +27,7 @@ router.get("/", async (req, res) => {
     if (scope) conditions.push(scope);
     if (approval_state) conditions.push(eq(artifactsTable.approval_state, approval_state));
     if (session_id) conditions.push(eq(artifactsTable.session_id, Number(session_id)));
+    if (event_id) conditions.push(eq(agentSessionsTable.event_id, Number(event_id)));
     if (cursorN) conditions.push(lt(artifactsTable.id, cursorN));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 

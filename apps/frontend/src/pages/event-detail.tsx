@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useRoute, Link } from "wouter";
-import { useGetEvent, getGetEventQueryKey, useListAgentSessions, getListAgentSessionsQueryKey } from "@workspace/api-client-react";
+import { useRoute, Link, useLocation } from "wouter";
+import { useGetEvent, getGetEventQueryKey, useListAgentSessions, getListAgentSessionsQueryKey, useListArtifacts, getListArtifactsQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArrowLeft, ExternalLink, Copy, Check, ChevronDown, Bot } from "lucide-react";
 import { formatDate, formatRelative } from "@/lib/format";
-import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource, formatEventResolution } from "@/components/ui-helpers";
+import { SourceIcon, SeverityBadge, StatusBadge, formatEventType, formatSource, formatEventResolution, ApprovalBadge, ArtifactTypeBadge } from "@/components/ui-helpers";
 import { EventPayloadRenderer } from "@/components/event-payload-renderers";
 
 export default function EventDetail() {
@@ -17,6 +17,12 @@ export default function EventDetail() {
     { query: { queryKey: getListAgentSessionsQueryKey({ event_id: id }), enabled: !!id } }
   );
   const linkedSessions = sessionsData?.items ?? [];
+  const { data: artifactsData } = useListArtifacts(
+    { event_id: id },
+    { query: { queryKey: getListArtifactsQueryKey({ event_id: id }), enabled: !!id } }
+  );
+  const linkedArtifacts = artifactsData?.items ?? [];
+  const [, navigate] = useLocation();
   const [rawOpen, setRawOpen] = useState(false);
   const [rawCopied, setRawCopied] = useState(false);
 
@@ -143,6 +149,64 @@ export default function EventDetail() {
           </div>
         )}
       </div>
+
+      {/* Artifacts */}
+      {linkedArtifacts.length > 0 && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Artifacts</span>
+              <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+                {linkedArtifacts.length}
+              </span>
+            </div>
+          </div>
+          <table className="w-full">
+            <thead>
+              <tr className="bg-muted/30">
+                <th className="text-[11px] font-medium text-muted-foreground text-left px-4 py-2">Type</th>
+                <th className="text-[11px] font-medium text-muted-foreground text-left px-4 py-2">Preview</th>
+                <th className="text-[11px] font-medium text-muted-foreground text-left px-4 py-2 hidden sm:table-cell">Session</th>
+                <th className="text-[11px] font-medium text-muted-foreground text-left px-4 py-2 hidden md:table-cell">State</th>
+                <th className="text-[11px] font-medium text-muted-foreground text-left px-4 py-2 hidden md:table-cell">Age</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {linkedArtifacts.map((artifact) => (
+                <tr
+                  key={artifact.id}
+                  className="hover:bg-muted/40 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/artifacts/${artifact.id}`)}
+                >
+                  <td className="px-4 py-2.5 whitespace-nowrap">
+                    <ArtifactTypeBadge type={artifact.type} />
+                  </td>
+                  <td className="px-4 py-2.5 max-w-0">
+                    <p className="text-sm truncate text-muted-foreground">
+                      {artifact.content.replace(/[#*_`[\]]/g, "").slice(0, 120)}
+                    </p>
+                  </td>
+                  <td className="px-4 py-2.5 hidden sm:table-cell whitespace-nowrap">
+                    <Link
+                      href={`/agent-sessions/${artifact.session_id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      #{artifact.session_id}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2.5 hidden md:table-cell whitespace-nowrap">
+                    <ApprovalBadge state={artifact.approval_state} />
+                  </td>
+                  <td className="px-4 py-2.5 hidden md:table-cell whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                    {formatRelative(artifact.created_at)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Source-specific payload */}
       {event.payload_raw && (
