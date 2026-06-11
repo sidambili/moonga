@@ -35,6 +35,9 @@ export function OrganizationSection() {
   const { data: session } = authClient.useSession();
   const { data: activeOrg, isPending: orgPending, refetch: refetchOrg } =
     authClient.useActiveOrganization();
+  // activeMember gives the current user's role directly — more reliable than
+  // searching activeOrg.members, which can be empty if the join doesn't load.
+  const { data: activeMember } = authClient.useActiveMember();
 
   if (orgPending) {
     return <div className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</div>;
@@ -51,7 +54,9 @@ export function OrganizationSection() {
   const invitations = ((activeOrg.invitations ?? []) as OrgInvitation[]).filter(
     (i) => i.status === "pending",
   );
-  const myRole = members.find((m) => m.userId === session?.user?.id)?.role;
+  const myRole =
+    (activeMember as { role?: string } | null | undefined)?.role ??
+    members.find((m) => m.userId === session?.user?.id)?.role;
   const canManage = myRole === "owner" || myRole === "admin";
 
   return (
