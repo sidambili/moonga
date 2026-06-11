@@ -23,13 +23,25 @@ The API contract lives in `lib/api-spec/openapi.yaml`. If you change it:
 
 ### Database schema changes
 
-Drizzle schema files live in `lib/db/src/schema/`. After editing:
+Drizzle schema files live in `lib/db/src/schema/`. **Committed migrations are the source of truth** — every schema change ships as a generated SQL migration, applied automatically at deploy time.
 
-```bash
-pnpm --filter @workspace/db run push
-```
+After editing the schema:
 
-This applies schema changes in development. The `model_settings` table uses a singleton pattern — always get-or-create, never ID-based create.
+1. Generate an incremental migration (no DB connection needed):
+   ```bash
+   pnpm --filter @workspace/db run generate
+   ```
+2. Commit the generated `lib/db/drizzle/*.sql` file (and its `meta/` snapshot) **together with** your schema change.
+
+Migrations are applied by a single baseline-aware runner at deploy time (the Docker entrypoint runs `apps/api-server/dist/migrate.mjs` before the server starts). It is safe on both fresh and existing databases.
+
+**Rules — these have wiped databases before, so they are hard rules:**
+
+- **Never `push` to a shared or production database.** `drizzle-kit push` diffs the schema and auto-generates `DROP`/`ALTER` statements — it can silently drop columns and tables. `pnpm db:push` is **only** for a throwaway local dev DB you don't mind losing.
+- **Never edit a migration that has already been applied anywhere.** Migrations are immutable once applied; generate a new incremental one instead.
+- **Never hand-write SQL against a deployed database.** All schema state flows through committed migrations.
+
+The `model_settings` table uses a singleton pattern — always get-or-create, never ID-based create.
 
 ### TypeScript and validation
 

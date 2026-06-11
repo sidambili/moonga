@@ -1,12 +1,9 @@
 import "dotenv/config";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startAgentWorker } from "./lib/agent-worker";
 import { seedModelPrices } from "./lib/model-prices";
 import { seedSystemPlaybooks } from "./lib/playbook-loader";
-import { runMigrations } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 const port = rawPort ? Number(rawPort) : 3000;
@@ -15,17 +12,9 @@ if (rawPort && (Number.isNaN(port) || port <= 0)) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-// Run pending migrations before accepting any requests. The `drizzle/` folder
-// is copied next to the built bundle by build.mjs so the SQL files are present
-// at runtime for both local dev and self-hosted deployments.
-const migrationsFolder = path.join(path.dirname(fileURLToPath(import.meta.url)), "drizzle");
-try {
-  await runMigrations(migrationsFolder);
-  logger.info("Database migrations applied");
-} catch (err) {
-  logger.error({ err }, "Migration failed — aborting startup");
-  process.exit(1);
-}
+// Migrations are NOT run here. They are applied once as a dedicated pre-start
+// step (src/migrate.ts, invoked by the Docker entrypoint) so they never race
+// across multiple booting instances. The server assumes the schema is current.
 
 app.listen(port, async (err) => {
   if (err) {

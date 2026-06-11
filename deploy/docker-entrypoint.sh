@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Oncident container entrypoint
-# Pushes the Drizzle schema to Postgres, then starts the API server.
-# This guarantees tables exist before the app accepts traffic.
+# Applies Drizzle migrations to Postgres, then starts the API server.
+# This guarantees the schema is current before the app accepts traffic.
 
 set -e
 
@@ -21,8 +21,11 @@ for i in {1..30}; do
   sleep 2
 done
 
-echo "[entrypoint] Running drizzle-kit migrate ..."
-./node_modules/.bin/drizzle-kit migrate --config ./lib/db/drizzle.config.ts
+# Baseline-aware migration runner (single authority). Unlike raw `drizzle-kit
+# migrate`, this baselines existing push-built databases so it never tries to
+# re-create tables that already exist. Safe on both fresh and existing DBs.
+echo "[entrypoint] Applying database migrations ..."
+node --enable-source-maps ./apps/api-server/dist/migrate.mjs
 
 echo "[entrypoint] Starting API server ..."
 exec node --enable-source-maps ./apps/api-server/dist/index.mjs

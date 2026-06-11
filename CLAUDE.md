@@ -13,16 +13,22 @@ Session objectives are derived from event type: `diagnose` for incidents/errors/
 
 ## Hard rules — never do these (operations)
 
-- **NEVER run any command that touches the remote database** — this includes `pnpm --filter @workspace/db run push`, `push-force`, `drizzle-kit migrate`, raw `psql`, or any MCP/Supabase SQL execution tool. Running anything against the remote DB can break prod for all users.
-- **Schema changes:** edit the TypeScript schema, then run `pnpm --filter @workspace/db run generate` (from the repo root) or `pnpm generate` (from `lib/db/`). This produces a SQL migration file in `lib/db/drizzle/` — commit it. The user applies it to the database themselves.
+- **NEVER run any command, by hand, that touches the remote database** — this includes `pnpm --filter @workspace/db run push`, `push-force`, `drizzle-kit migrate`, the `migrate.mjs` runner, raw `psql`, or any MCP/Supabase SQL execution tool. Running anything against the remote DB by hand can break prod for all users. (Migrations _are_ applied to prod — but only automatically, by the deploy, never by you manually. See below.)
+- **Schema changes:** edit the TypeScript schema, then run `pnpm --filter @workspace/db run generate` (from the repo root) or `pnpm generate` (from `lib/db/`). This produces a SQL migration file in `lib/db/drizzle/` — commit it (the `.sql` and its `meta/` snapshot). Committed migrations are the source of truth; they are applied automatically at deploy time.
+
+## Migration mechanism (single authority)
+
+Migrations are applied by **one** baseline-aware runner: `apps/api-server/src/migrate.ts` → bundled to `dist/migrate.mjs`, invoked once by the Docker entrypoint ([deploy/docker-entrypoint.sh](deploy/docker-entrypoint.sh)) _before_ the API server starts. The server itself ([apps/api-server/src/index.ts](apps/api-server/src/index.ts)) does **not** migrate at boot — keep it that way (running migrations as a dedicated pre-start step avoids concurrent-boot races across instances).
+
+`runMigrations()` in [lib/db/src/index.ts](lib/db/src/index.ts) baselines existing `push`-built databases (records `0000` as already-applied when the schema exists but `drizzle.__drizzle_migrations` is empty) so `migrate()` only applies incremental migrations and never re-creates existing tables. This is why the deploy is safe on both fresh and existing DBs. Do not reintroduce a raw `drizzle-kit migrate` call into the deploy path — it lacks the baseline and will fail on existing databases.
 
 ## Database migration rules (hard)
 
 - **Never overwrite an existing migration.** Once a migration file is applied anywhere (local, staging, prod), it is immutable. Generate incremental migrations with `drizzle-kit generate` instead.
 - **Do not use `CREATE TYPE IF NOT EXISTS` in SQL migrations.** PostgreSQL does not support `IF NOT EXISTS` on `CREATE TYPE ... AS ENUM`. Use a `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'typename') THEN CREATE TYPE ... END IF; END $$` block instead.
-- **Never regenerate `0000_whole_gauntlet.sql` or any existing migration.** Regenerating migrations destroys incremental history and causes schema drift on existing databases.
-- **`drizzle-kit migrate` only marks migrations as applied; it does not auto-add missing columns to existing tables.** If a column is added to the schema after the initial migration, you must generate an incremental migration (`drizzle-kit generate`) or add the column manually with `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
-- **Before deploying schema changes, verify the migration applies cleanly on a fresh database.** Run `drizzle-kit migrate` against a clean Postgres instance locally to catch `CREATE TYPE` and `IF NOT EXISTS` issues before they hit prod.
+- **Never regenerate the `0000` baseline (`0000_medical_blue_blade.sql`) or any existing migration.** Regenerating migrations destroys incremental history and causes schema drift on existing databases.
+- **Applying a migration does not auto-add missing columns to existing tables.** If a column is added to the schema after the initial migration, you must generate an incremental migration (`drizzle-kit generate`); never patch the live DB by hand.
+- **Before deploying schema changes, verify the migration applies cleanly on a fresh database.** Run it against a clean _local_ Postgres instance (raw `drizzle-kit migrate` is fine locally on a fresh DB, since baselining only matters for existing push-built DBs) to catch `CREATE TYPE` and `IF NOT EXISTS` issues before they hit prod.
 
 ## Commands
 
@@ -44,7 +50,9 @@ pnpm --filter @workspace/api-spec run codegen
 
 # Generate a new incremental migration (safe — no DB connection; run from lib/db/)
 pnpm --filter @workspace/db run generate
-# DO NOT run push, push-force, or migrate — those touch the remote DB
+# Commit the resulting lib/db/drizzle/*.sql + meta snapshot. The deploy applies it.
+# DO NOT run push, push-force, or migrate against the remote DB by hand — the
+# deploy applies committed migrations automatically (baseline-aware migrate.mjs).
 
 # Formatting (no lint task; prettier only)
 pnpm exec prettier --write .
@@ -59,6 +67,7 @@ Required env: `DATABASE_URL` (Postgres). Loaded from `.env.local` (preferred) or
 This is a pnpm workspace. Three layers:
 
 **`lib/api-spec/openapi.yaml`** is the single source of truth for API contracts. Orval generates two sibling packages from it:
+
 - `lib/api-client-react/src/generated/` — React Query hooks + fetch client (consumed by `frontend`)
 - `lib/api-zod/src/generated/` — Zod schemas + TS types (consumed by `api-server` for validation)
 
@@ -98,32 +107,42 @@ Polling cadence (already in the code): Dashboard refetches every 30s; Events/Ses
 All pages must follow these patterns. Do not introduce ad-hoc spacing values or one-off card styles.
 
 ### Page wrapper
+
 Every list/detail page uses this outer container — no exceptions:
+
 ```tsx
 <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">
 ```
 
 ### Panels (sections)
+
 All content lives inside panels. A panel is a bordered card that acts as a table/section container:
+
 ```tsx
 <div className="rounded-lg border border-border bg-card overflow-hidden">
 ```
 
 ### Panel header
+
 Every panel that has a title or filters uses this header bar:
+
 ```tsx
 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
   <div className="flex items-center gap-2">
     <span className="text-sm font-medium">Title</span>
     {/* optional count badge */}
-    <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">{count}</span>
+    <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">
+      {count}
+    </span>
   </div>
   {/* right side: filters or actions */}
 </div>
 ```
 
 ### Data tables
+
 List pages render data as `<table>` elements inside panels:
+
 - `<thead>` row: `bg-muted/30`, cells use `text-[11px] font-medium text-muted-foreground`
 - `<tbody>` rows: `divide-y divide-border`, each row `hover:bg-muted/40 transition-colors cursor-pointer`
 - Row navigation: `onClick={() => navigate(...)}` via `useLocation` — never wrap `<tr>` in `<Link>`
@@ -132,21 +151,28 @@ List pages render data as `<table>` elements inside panels:
 - Numbers/times: always `tabular-nums`
 
 ### Filter selects in panel header
+
 ```tsx
 <Select ...>
   <SelectTrigger className="w-[120px] h-7 text-xs">
 ```
+
 Use `h-7 text-xs` — never `h-9` or `h-8` in panel headers.
 
 ### Empty/loading states
+
 ```tsx
-<div className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</div>
+<div className="px-4 py-10 text-center text-sm text-muted-foreground">
+  Loading…
+</div>
 ```
 
 ### Topbar
+
 The global topbar in `Layout` (`components/layout.tsx`) derives the current page name from the `nav` array via `isActive`. It has three stub icon buttons (Search, Bell, RefreshCw) that are `disabled` until wired up. To activate one: remove `disabled`, add `onClick`, and remove the `/40` opacity class.
 
 ### Hard rules — never do these
+
 - No `framer-motion` on page-level elements or list items
 - No `backdrop-blur-sm` on cards or panels
 - No gradient accent bars on stat cards (`bg-gradient-to-r from-*/60`)
