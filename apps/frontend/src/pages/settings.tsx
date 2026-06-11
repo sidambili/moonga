@@ -4,14 +4,14 @@ import { ModelSection } from "@/components/settings/model-section";
 import { OrganizationSection } from "@/components/settings/organization-section";
 
 const sections = [
-  { id: "model", label: "Model" },
   { id: "organization", label: "Organization" },
+  { id: "model", label: "Model" },
 ] as const;
 
 type SectionId = (typeof sections)[number]["id"];
 
 export default function Settings() {
-  const [section, setSection] = useState<SectionId>("model");
+  const [section, setSection] = useState<SectionId>("organization");
 
   return (
     <div className="px-5 py-5 max-w-6xl mx-auto space-y-5">

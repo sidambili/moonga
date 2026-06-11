@@ -14,7 +14,7 @@ import {
   getListProjectsQueryKey,
   getListProjectSourcesQueryKey,
 } from "@workspace/api-client-react";
-import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug, Loader2, ChevronsUpDown } from "lucide-react";
+import { Building2, FolderGit2, Users, Check, Trash2, Pencil, Plug, Loader2, ChevronsUpDown, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,15 +69,10 @@ export function OrganizationSection() {
       />
       <ProjectsPanel
         canManage={canManage}
-        invalidate={() =>
-          queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() })
-        }
-      />
-      <ProjectSourcesPanel
-        canManage={canManage}
-        invalidate={() =>
-          queryClient.invalidateQueries({ queryKey: getListProjectSourcesQueryKey() })
-        }
+        invalidate={() => {
+          queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListProjectSourcesQueryKey() });
+        }}
       />
       <MembersPanel
         orgId={activeOrg.id}
@@ -179,15 +174,26 @@ function OrgRenamePanel({
 
 function ProjectsPanel({ canManage, invalidate }: { canManage: boolean; invalidate: () => void }) {
   const { data, isLoading } = useListProjects();
+  const { data: allSourcesData } = useListProjectSources();
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
   const activateMutation = useActivateProject();
 
   const [newName, setNewName] = useState("");
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   const projects = data?.items ?? [];
   const activeProjectId = data?.activeProjectId ?? null;
+  const allSources = allSourcesData ?? [];
+
+  const toggleSources = (id: string) => {
+    setExpandedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const create = () => {
     if (!newName.trim()) return;
@@ -242,72 +248,102 @@ function ProjectsPanel({ canManage, invalidate }: { canManage: boolean; invalida
             {projects.map((p) => {
               const isActive = p.id === activeProjectId;
               const isEditing = editing?.id === p.id;
+              const isExpanded = expandedProjects.has(p.id);
+              const projectSources = allSources.filter((s) => s.project_id === p.id);
+
               return (
-                <tr key={p.id} className="hover:bg-muted/40 transition-colors">
-                  <td className="px-4 py-2.5 max-w-0">
-                    {isEditing ? (
-                      <Input
-                        autoFocus
-                        value={editing!.name}
-                        onChange={(e) => setEditing({ id: p.id, name: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") saveRename();
-                          if (e.key === "Escape") setEditing(null);
-                        }}
-                        className="h-7 text-sm bg-muted/40 border-border"
-                      />
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm truncate">{p.name}</span>
-                        {isActive && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                            <Check className="w-3 h-3" /> Active
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 hidden sm:table-cell">
-                    <span className="text-xs text-muted-foreground">{p.slug}</span>
-                  </td>
-                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                    {isEditing ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <Button size="sm" className="h-7 text-xs" onClick={saveRename} disabled={updateMutation.isPending}>
-                          Save
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-end gap-1">
-                        {!isActive && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs"
-                            onClick={() => activate(p.id)}
-                            disabled={activateMutation.isPending}
-                          >
-                            Switch
+                <>
+                  <tr key={p.id} className="hover:bg-muted/40 transition-colors">
+                    <td className="px-4 py-2.5 max-w-0">
+                      {isEditing ? (
+                        <Input
+                          autoFocus
+                          value={editing!.name}
+                          onChange={(e) => setEditing({ id: p.id, name: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveRename();
+                            if (e.key === "Escape") setEditing(null);
+                          }}
+                          className="h-7 text-sm bg-muted/40 border-border"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm truncate">{p.name}</span>
+                          {isActive && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                              <Check className="w-3 h-3" /> Active
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 hidden sm:table-cell">
+                      <span className="text-xs text-muted-foreground">{p.slug}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                      {isEditing ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <Button size="sm" className="h-7 text-xs" onClick={saveRename} disabled={updateMutation.isPending}>
+                            Save
                           </Button>
-                        )}
-                        {canManage && (
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1">
+                          {!isActive && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={() => activate(p.id)}
+                              disabled={activateMutation.isPending}
+                            >
+                              Switch
+                            </Button>
+                          )}
+                          {canManage && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              title="Rename"
+                              onClick={() => setEditing({ id: p.id, name: p.name })}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 w-7 p-0"
-                            title="Rename"
-                            onClick={() => setEditing({ id: p.id, name: p.name })}
+                            className="h-7 px-2 gap-1 text-xs text-muted-foreground"
+                            title={isExpanded ? "Hide sources" : "Show sources"}
+                            onClick={() => toggleSources(p.id)}
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Plug className="w-3 h-3" />
+                            {projectSources.length > 0 && (
+                              <span className="tabular-nums">{projectSources.length}</span>
+                            )}
+                            <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                           </Button>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${p.id}-sources`}>
+                      <td colSpan={3} className="p-0">
+                        <ProjectSourcesCollapsible
+                          projectId={p.id}
+                          sources={projectSources}
+                          canManage={canManage}
+                          invalidate={invalidate}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </>
               );
             })}
             {projects.length === 0 && (
@@ -336,6 +372,214 @@ function ProjectsPanel({ canManage, invalidate }: { canManage: boolean; invalida
         </div>
       )}
     </Panel>
+  );
+}
+
+type ProjectSource = {
+  id: string;
+  project_id: string;
+  provider: string;
+  external_id: string;
+  label?: string | null;
+  notes?: string | null;
+  project_name?: string | null;
+};
+
+function ProjectSourcesCollapsible({
+  projectId,
+  sources,
+  canManage,
+  invalidate,
+}: {
+  projectId: string;
+  sources: ProjectSource[];
+  canManage: boolean;
+  invalidate: () => void;
+}) {
+  const createMutation = useCreateProjectSource();
+  const updateMutation = useUpdateProjectSource();
+  const deleteMutation = useDeleteProjectSource();
+
+  const [provider, setProvider] = useState<string>("linear");
+  const [externalId, setExternalId] = useState("");
+  const [label, setLabel] = useState("");
+  const [notes, setNotes] = useState("");
+  const [pendingSourceId, setPendingSourceId] = useState<string | null>(null);
+  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+  const [editingNotesValue, setEditingNotesValue] = useState("");
+
+  const add = () => {
+    if (!externalId.trim()) return;
+    createMutation.mutate(
+      { data: { project_id: projectId, provider, external_id: externalId.trim(), label: label.trim() || undefined, notes: notes.trim() || undefined } },
+      {
+        onSuccess: () => {
+          setExternalId(""); setLabel(""); setNotes("");
+          invalidate();
+          toast({ title: "Source mapped" });
+        },
+        onError: () => toast({ title: "Failed to map source", description: "That resource may already be mapped.", variant: "destructive" }),
+      },
+    );
+  };
+
+  const startEditNotes = (id: string, current: string | null) => {
+    setEditingNotesId(id);
+    setEditingNotesValue(current ?? "");
+  };
+
+  const saveNotes = (id: string) => {
+    updateMutation.mutate(
+      { id, data: { notes: editingNotesValue.trim() || null } },
+      {
+        onSuccess: () => {
+          setEditingNotesId(null);
+          invalidate();
+          toast({ title: "Notes saved" });
+        },
+        onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
+      },
+    );
+  };
+
+  const remove = (id: string) => {
+    if (pendingSourceId === id) return;
+    setPendingSourceId(id);
+    deleteMutation.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          invalidate();
+          toast({ title: "Source removed" });
+        },
+        onError: () => toast({ title: "Failed to remove source", variant: "destructive" }),
+        onSettled: () => setPendingSourceId(null),
+      },
+    );
+  };
+
+  return (
+    <div className="bg-muted/10 border-t border-border">
+      <div className="flex items-center gap-2 px-5 py-2 border-b border-border/60">
+        <Plug className="w-3 h-3 text-muted-foreground" />
+        <span className="text-[11px] font-medium text-muted-foreground">Sources</span>
+        {sources.length > 0 && (
+          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded tabular-nums">{sources.length}</span>
+        )}
+      </div>
+
+      {sources.length === 0 ? (
+        <div className="px-5 py-3 text-[11px] text-muted-foreground">No sources mapped to this project.</div>
+      ) : (
+        <div className="divide-y divide-border/60">
+          {sources.map((s) => {
+            const isRemoving = pendingSourceId === s.id;
+            const isEditingNotes = editingNotesId === s.id;
+            return (
+              <div key={s.id}>
+                <div className="flex items-center gap-3 px-5 py-2">
+                  <span className="text-[10px] font-medium text-muted-foreground capitalize w-10 shrink-0">{s.provider}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs truncate">{s.label || s.external_id}</p>
+                    {s.label && <p className="text-[10px] text-muted-foreground font-mono truncate">{s.external_id}</p>}
+                    {!isEditingNotes && s.notes && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 whitespace-pre-wrap leading-relaxed">{s.notes}</p>
+                    )}
+                  </div>
+                  {canManage && (
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                        title={isEditingNotes ? "Cancel" : "Edit notes"}
+                        onClick={() => isEditingNotes ? setEditingNotesId(null) : startEditNotes(s.id, s.notes ?? null)}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        title="Remove source"
+                        onClick={() => remove(s.id)}
+                        disabled={isRemoving}
+                      >
+                        {isRemoving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                {isEditingNotes && (
+                  <div className="px-5 pb-3 space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground">Agent instructions injected when this source triggers a session.</p>
+                    <Textarea
+                      value={editingNotesValue}
+                      onChange={(e) => setEditingNotesValue(e.target.value)}
+                      placeholder="e.g. Focus on apps/api. Escalate if error rate exceeds 1%."
+                      className="text-xs min-h-[60px] bg-background"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" className="h-6 text-xs" onClick={() => saveNotes(s.id)} disabled={updateMutation.isPending}>
+                        {updateMutation.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditingNotesId(null)}>Cancel</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {canManage && (
+        <div className="px-5 py-3 border-t border-border/60 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={provider}
+              onValueChange={(v) => { setProvider(v); setExternalId(""); setLabel(""); }}
+            >
+              <SelectTrigger className="w-[100px] h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SOURCE_PROVIDERS.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <SourceResourceCombobox
+              provider={provider}
+              value={externalId}
+              onSelect={(v, l) => {
+                setExternalId(v);
+                if (l && (!label || label === externalId)) setLabel(l);
+              }}
+            />
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Label (optional)"
+              className="h-7 text-xs bg-muted/40 border-border w-[130px]"
+            />
+          </div>
+          <div className="flex gap-2 items-start">
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Source notes (optional) — agent instructions, e.g. coding conventions, escalation rules"
+              className="text-xs min-h-[48px] bg-muted/40 border-border flex-1"
+            />
+            <Button className="h-7 text-xs shrink-0" onClick={add} disabled={createMutation.isPending || !externalId.trim()}>
+              Map
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -430,253 +674,6 @@ function SourceResourceCombobox({
   );
 }
 
-function ProjectSourcesPanel({ canManage, invalidate }: { canManage: boolean; invalidate: () => void }) {
-  const { data: projectData } = useListProjects();
-  const { data: sources, isLoading } = useListProjectSources();
-  const createMutation = useCreateProjectSource();
-  const updateMutation = useUpdateProjectSource();
-  const deleteMutation = useDeleteProjectSource();
-
-  const projects = projectData?.items ?? [];
-  const [projectId, setProjectId] = useState("");
-  const [provider, setProvider] = useState<string>("linear");
-  const [externalId, setExternalId] = useState("");
-  const [label, setLabel] = useState("");
-  const [notes, setNotes] = useState("");
-  const [pendingSourceId, setPendingSourceId] = useState<string | null>(null);
-  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
-  const [editingNotesValue, setEditingNotesValue] = useState("");
-
-  // Default the project select to the first project once loaded.
-  useEffect(() => {
-    if (!projectId && projects.length > 0) setProjectId(projects[0].id);
-  }, [projects, projectId]);
-
-  const add = () => {
-    if (!projectId || !externalId.trim()) return;
-    createMutation.mutate(
-      { data: { project_id: projectId, provider, external_id: externalId.trim(), label: label.trim() || undefined, notes: notes.trim() || undefined } },
-      {
-        onSuccess: () => {
-          setExternalId("");
-          setLabel("");
-          setNotes("");
-          invalidate();
-          toast({ title: "Source mapped" });
-        },
-        onError: () => toast({ title: "Failed to map source", description: "That resource may already be mapped.", variant: "destructive" }),
-      },
-    );
-  };
-
-  const startEditNotes = (id: string, current: string | null) => {
-    setEditingNotesId(id);
-    setEditingNotesValue(current ?? "");
-  };
-
-  const saveNotes = (id: string) => {
-    updateMutation.mutate(
-      { id, data: { notes: editingNotesValue.trim() || null } },
-      {
-        onSuccess: () => {
-          setEditingNotesId(null);
-          invalidate();
-          toast({ title: "Notes saved" });
-        },
-        onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
-      },
-    );
-  };
-
-  const remove = (id: string) => {
-    if (pendingSourceId === id) return;
-    setPendingSourceId(id);
-    deleteMutation.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          invalidate();
-          toast({ title: "Source removed" });
-        },
-        onError: () => toast({ title: "Failed to remove source", variant: "destructive" }),
-        onSettled: () => setPendingSourceId(null),
-      },
-    );
-  };
-
-  return (
-    <Panel icon={Plug} title="Project Sources" count={sources?.length}>
-      <div className="px-4 py-2.5 border-b border-border">
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Route inbound webhooks to a project by binding the external resource that sent them — a
-          Linear team id or a GitHub <span className="font-mono">owner/repo</span>. Unmapped
-          resources fall back to the org's default project.
-        </p>
-      </div>
-      {isLoading ? (
-        <div className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</div>
-      ) : (
-        <table className="w-full">
-          <tbody className="divide-y divide-border">
-            {(sources ?? []).map((s) => {
-              const isRemoving = pendingSourceId === s.id;
-              const isEditingNotes = editingNotesId === s.id;
-
-              return (
-                <>
-                  <tr key={s.id} className="hover:bg-muted/40 transition-colors">
-                    <td className="px-4 py-2.5 max-w-0">
-                      <p className="text-sm truncate">{s.label || s.external_id}</p>
-                      {s.label && (
-                        <p className="text-[11px] text-muted-foreground truncate font-mono">{s.external_id}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 hidden sm:table-cell">
-                      <span className="text-xs text-muted-foreground capitalize">{s.provider}</span>
-                    </td>
-                    <td className="px-4 py-2.5 hidden md:table-cell">
-                      <span className="text-xs text-muted-foreground">{s.project_name}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                      {canManage && (
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                            title={isEditingNotes ? "Cancel editing notes" : "Edit source notes"}
-                            aria-label={isEditingNotes ? "Cancel editing notes" : "Edit source notes"}
-                            onClick={() => isEditingNotes ? setEditingNotesId(null) : startEditNotes(s.id, s.notes ?? null)}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                            title={isRemoving ? "Removing source" : "Remove source"}
-                            aria-label={isRemoving ? "Removing source" : "Remove source"}
-                            aria-busy={isRemoving}
-                            onClick={() => remove(s.id)}
-                            disabled={isRemoving}
-                          >
-                            {isRemoving ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-3.5 h-3.5" />
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                  {isEditingNotes && (
-                    <tr key={`${s.id}-notes`} className="bg-muted/20">
-                      <td colSpan={4} className="px-4 pb-3 pt-1">
-                        <div className="space-y-1.5">
-                          <p className="text-[11px] text-muted-foreground">Custom instructions injected into the agent context when this source triggers a session.</p>
-                          <Textarea
-                            value={editingNotesValue}
-                            onChange={(e) => setEditingNotesValue(e.target.value)}
-                            placeholder="e.g. This is a monorepo — focus on the apps/api directory. Escalate to on-call if error rate exceeds 1%."
-                            className="text-xs min-h-[80px] bg-background"
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <Button size="sm" className="h-7 text-xs" onClick={() => saveNotes(s.id)} disabled={updateMutation.isPending}>
-                              {updateMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
-                              Save
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingNotesId(null)}>Cancel</Button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  {!isEditingNotes && s.notes && (
-                    <tr key={`${s.id}-notes-display`} className="bg-muted/10">
-                      <td colSpan={4} className="px-4 pb-2.5 pt-0">
-                        <p className="text-[11px] text-muted-foreground whitespace-pre-wrap leading-relaxed">{s.notes}</p>
-                      </td>
-                    </tr>
-                  )}
-                </>
-              );
-            })}
-            {(sources?.length ?? 0) === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                  No sources mapped yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
-
-      {canManage && projects.length > 0 && (
-        <div className="flex flex-col gap-2 px-4 py-3 border-t border-border">
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger className="w-[140px] h-8 text-xs">
-                <SelectValue placeholder="Project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={provider}
-              onValueChange={(v) => {
-                setProvider(v);
-                setExternalId("");
-                setLabel("");
-              }}
-            >
-              <SelectTrigger className="w-[110px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SOURCE_PROVIDERS.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <SourceResourceCombobox
-              provider={provider}
-              value={externalId}
-              onSelect={(v, l) => {
-                setExternalId(v);
-                // Auto-fill the label with the human name (team name / repo) unless
-                // the user has typed their own; keeps the table readable for ids.
-                if (l && (!label || label === externalId)) setLabel(l);
-              }}
-            />
-            <Input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="Label (optional)"
-              className="h-8 text-sm bg-muted/40 border-border w-[150px]"
-            />
-          </div>
-          <div className="flex gap-2 items-start">
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Source notes (optional) — agent instructions for this repo or team, e.g. coding conventions, escalation rules"
-              className="text-xs min-h-[60px] bg-muted/40 border-border flex-1"
-            />
-            <Button className="h-8 shrink-0" onClick={add} disabled={createMutation.isPending || !projectId || !externalId.trim()}>
-              Map
-            </Button>
-          </div>
-        </div>
-      )}
-    </Panel>
-  );
-}
 
 function MembersPanel({
   orgId,
