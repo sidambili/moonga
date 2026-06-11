@@ -1,7 +1,7 @@
-CREATE TYPE IF NOT EXISTS "public"."objective" AS ENUM('diagnose', 'plan');--> statement-breakpoint
-CREATE TYPE IF NOT EXISTS "public"."playbook_source" AS ENUM('system', 'user');--> statement-breakpoint
-CREATE TYPE IF NOT EXISTS "public"."trigger_source" AS ENUM('linear', 'github', 'sentry');--> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "events" (
+CREATE TYPE "public"."objective" AS ENUM('diagnose', 'plan');--> statement-breakpoint
+CREATE TYPE "public"."playbook_source" AS ENUM('system', 'user');--> statement-breakpoint
+CREATE TYPE "public"."trigger_source" AS ENUM('linear', 'github', 'sentry');--> statement-breakpoint
+CREATE TABLE "events" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"source" text NOT NULL,
 	"event_type" text NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS "events" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "agent_sessions" (
+CREATE TABLE "agent_sessions" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"event_id" integer NOT NULL,
 	"objective" text NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS "agent_sessions" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "artifacts" (
+CREATE TABLE "artifacts" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"session_id" integer NOT NULL,
 	"type" text NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS "artifacts" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "integrations" (
+CREATE TABLE "integrations" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"organization_id" text,
 	"provider" text NOT NULL,
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS "integrations" (
 	CONSTRAINT "integrations_provider_unique" UNIQUE("provider")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "model_settings" (
+CREATE TABLE "model_settings" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"organization_id" text,
 	"provider" text DEFAULT 'openai' NOT NULL,
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS "model_settings" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "model_prices" (
+CREATE TABLE "model_prices" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"model_slug" text NOT NULL,
 	"display_name" text,
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS "model_prices" (
 	CONSTRAINT "model_prices_model_slug_unique" UNIQUE("model_slug")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "agent_session_steps" (
+CREATE TABLE "agent_session_steps" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"session_id" integer NOT NULL,
 	"step_number" integer NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS "agent_session_steps" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "account" (
+CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
 	"provider_id" text NOT NULL,
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS "account" (
 	"updated_at" timestamp NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "session" (
+CREATE TABLE "session" (
 	"id" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp NOT NULL,
 	"token" text NOT NULL,
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS "session" (
 	CONSTRAINT "session_token_unique" UNIQUE("token")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "user" (
+CREATE TABLE "user" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"email" text NOT NULL,
@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS "user" (
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "verification" (
+CREATE TABLE "verification" (
 	"id" text PRIMARY KEY NOT NULL,
 	"identifier" text NOT NULL,
 	"value" text NOT NULL,
@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS "verification" (
 	"updated_at" timestamp
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "invitation" (
+CREATE TABLE "invitation" (
 	"id" text PRIMARY KEY NOT NULL,
 	"organization_id" text NOT NULL,
 	"email" text NOT NULL,
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS "invitation" (
 	"inviter_id" text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "member" (
+CREATE TABLE "member" (
 	"id" text PRIMARY KEY NOT NULL,
 	"organization_id" text NOT NULL,
 	"user_id" text NOT NULL,
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS "member" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "organization" (
+CREATE TABLE "organization" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"slug" text,
@@ -200,7 +200,7 @@ CREATE TABLE IF NOT EXISTS "organization" (
 	CONSTRAINT "organization_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "projects" (
+CREATE TABLE "projects" (
 	"id" text PRIMARY KEY NOT NULL,
 	"organization_id" text NOT NULL,
 	"name" text NOT NULL,
@@ -209,7 +209,7 @@ CREATE TABLE IF NOT EXISTS "projects" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "project_sources" (
+CREATE TABLE "project_sources" (
 	"id" text PRIMARY KEY NOT NULL,
 	"project_id" text NOT NULL,
 	"provider" text NOT NULL,
@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS "project_sources" (
 	CONSTRAINT "project_sources_provider_external_id_unique" UNIQUE("provider","external_id")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "playbooks" (
+CREATE TABLE "playbooks" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"organization_id" text,
 	"slug" text NOT NULL,
@@ -236,7 +236,7 @@ CREATE TABLE IF NOT EXISTS "playbooks" (
 	CONSTRAINT "playbooks_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "skills" (
+CREATE TABLE "skills" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"organization_id" text,
 	"slug" text NOT NULL,
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS "skills" (
 	CONSTRAINT "skills_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "repo_index" (
+CREATE TABLE "repo_index" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"repo" text NOT NULL,
 	"sha" text NOT NULL,
@@ -261,62 +261,26 @@ CREATE TABLE IF NOT EXISTS "repo_index" (
 	CONSTRAINT "repo_index_repo_sha_unique" UNIQUE("repo","sha")
 );
 --> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "events" ADD CONSTRAINT "events_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE set null ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "agent_sessions" ADD CONSTRAINT "agent_sessions_event_id_events_id_fk" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "agent_sessions" ADD CONSTRAINT "agent_sessions_playbook_id_playbooks_id_fk" FOREIGN KEY ("playbook_id") REFERENCES "public"."playbooks"("id") ON DELETE set null ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "agent_sessions" ADD CONSTRAINT "agent_sessions_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE set null ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "artifacts" ADD CONSTRAINT "artifacts_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE set null ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "integrations" ADD CONSTRAINT "integrations_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "model_settings" ADD CONSTRAINT "model_settings_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "agent_session_steps" ADD CONSTRAINT "agent_session_steps_session_id_agent_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."agent_sessions"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "invitation" ADD CONSTRAINT "invitation_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "invitation" ADD CONSTRAINT "invitation_inviter_id_user_id_fk" FOREIGN KEY ("inviter_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "member" ADD CONSTRAINT "member_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "member" ADD CONSTRAINT "member_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "projects" ADD CONSTRAINT "projects_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "project_sources" ADD CONSTRAINT "project_sources_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "playbooks" ADD CONSTRAINT "playbooks_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-DO $$ BEGIN
-  ALTER TABLE "skills" ADD CONSTRAINT "skills_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "agent_sessions_event_id_idx" ON "agent_sessions" USING btree ("event_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "agent_sessions_status_idx" ON "agent_sessions" USING btree ("status");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "agent_sessions_project_id_idx" ON "agent_sessions" USING btree ("project_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "agent_session_steps_session_step_idx" ON "agent_session_steps" USING btree ("session_id","step_number");--> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "projects_organization_slug_unique" ON "projects" USING btree ("organization_id","slug");
+ALTER TABLE "events" ADD CONSTRAINT "events_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_sessions" ADD CONSTRAINT "agent_sessions_event_id_events_id_fk" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_sessions" ADD CONSTRAINT "agent_sessions_playbook_id_playbooks_id_fk" FOREIGN KEY ("playbook_id") REFERENCES "public"."playbooks"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_sessions" ADD CONSTRAINT "agent_sessions_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "artifacts" ADD CONSTRAINT "artifacts_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "integrations" ADD CONSTRAINT "integrations_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "model_settings" ADD CONSTRAINT "model_settings_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_session_steps" ADD CONSTRAINT "agent_session_steps_session_id_agent_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."agent_sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invitation" ADD CONSTRAINT "invitation_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invitation" ADD CONSTRAINT "invitation_inviter_id_user_id_fk" FOREIGN KEY ("inviter_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "member" ADD CONSTRAINT "member_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "member" ADD CONSTRAINT "member_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_sources" ADD CONSTRAINT "project_sources_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "playbooks" ADD CONSTRAINT "playbooks_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "skills" ADD CONSTRAINT "skills_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "agent_sessions_event_id_idx" ON "agent_sessions" USING btree ("event_id");--> statement-breakpoint
+CREATE INDEX "agent_sessions_status_idx" ON "agent_sessions" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "agent_sessions_project_id_idx" ON "agent_sessions" USING btree ("project_id");--> statement-breakpoint
+CREATE INDEX "agent_session_steps_session_step_idx" ON "agent_session_steps" USING btree ("session_id","step_number");--> statement-breakpoint
+CREATE UNIQUE INDEX "projects_organization_slug_unique" ON "projects" USING btree ("organization_id","slug");
