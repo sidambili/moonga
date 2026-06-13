@@ -6,6 +6,7 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { ProjectSwitcher } from "@/components/project-switcher";
 import { authClient } from "@/lib/auth-client";
+import { useHealthCheck, getHealthCheckQueryKey } from "@workspace/api-client-react";
 
 const nav = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -31,6 +32,10 @@ async function signOut() {
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { data: health, isError: healthError } = useHealthCheck({
+    query: { queryKey: getHealthCheckQueryKey(), refetchInterval: 60000 },
+  });
+  const systemOk = !healthError && health?.status === "ok";
 
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location.startsWith(href);
@@ -73,8 +78,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <div className="p-3 border-t border-border/40">
           <div className="flex items-center gap-2 px-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-            <span className="text-xs text-muted-foreground flex-1">System nominal</span>
+            <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", systemOk ? "bg-emerald-400" : "bg-red-400")} />
+            <span className="text-xs text-muted-foreground flex-1">{systemOk ? "System nominal" : "System degraded"}</span>
             <button
               onClick={signOut}
               title="Sign out"
@@ -133,8 +138,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
             <div className="p-3 border-t border-border/40">
               <div className="flex items-center gap-2 px-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-                <span className="text-xs text-muted-foreground flex-1">System nominal</span>
+                <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", systemOk ? "bg-emerald-400" : "bg-red-400")} />
+                <span className="text-xs text-muted-foreground flex-1">{systemOk ? "System nominal" : "System degraded"}</span>
                 <button
                   onClick={signOut}
                   title="Sign out"
